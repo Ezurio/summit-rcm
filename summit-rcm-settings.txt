@@ -1,0 +1,9 @@
+[settings]
+cert_for_file_encryption = /etc/summit-rcm/ssl/ca.crt
+log_data_streaming_size = 100
+user_callback_timeout = 10
+login_retry_times = 5
+login_retry_window = 600
+tamper_protection_timeout = 600
+session_timeout = 10
+max_web_clients = 1

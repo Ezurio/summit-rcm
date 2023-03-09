@@ -1,0 +1,59 @@
+# global settings.  If these values are set prior to sourcing this file,
+#                   the earlier value will be retained.
+#                   Adjust these values for your system.
+
+# setup the Ip address of the DUT
+if [ -z "$IPADDR" ]
+then
+    IPADDR=192.168.1.233
+else
+    sed -i 's/^    IPADDR=.*$/    IPADDR='"${IPADDR}"'/g' global_settings
+fi
+if [[ -z "$IPADDR" && -z "$URL" ]]
+then
+    echo "IPADDR variable needs to be set."
+    exit 1
+fi
+
+function smart_jq {
+    local input=$(cat)
+    if [ "${input:0:1}" == "{" ]; then
+        echo "${input}" | jq
+    else
+        echo "${input}"
+    fi
+}
+
+# Use jq if it is installed.
+
+if [ -z "${JQ_APP+x}" ]
+then
+    if ! command -v jq &> /dev/null
+    then
+        # recommend installing the jq application
+        JQ_APP=tee
+    else
+        JQ_APP=smart_jq
+    fi
+fi
+
+URL="${URL:-"https://${IPADDR}"}"
+SUMMIT_RCM_USERNAME="${SUMMIT_RCM_USERNAME:-root}"
+SUMMIT_RCM_PASSWORD="${SUMMIT_RCM_PASSWORD:-Config123!}"
+ORIGINAL_SUMMIT_RCM_PASSWORD="${ORIGINAL_SUMMIT_RCM_PASSWORD:-summit}"
+
+WL_USERNAME="${WL_USERNAME:-user1}"
+WL_PASSWORD="${WL_PASSWORD:-user1}"
+CONNECTION_NAME="${CONNECTION_NAME:-"UNSET"}"
+SSID="${SSID:-${CONNECTION_NAME}}"
+PRIVATE_KEY="${PRIVATE_KEY:-user1.pfx}"
+PRIVATE_KEY_PASSWORD="${PRIVATE_KEY_PASSWORD:-user1}"
+ANONYMOUS_IDENTITY="${ANONYMOUS_IDENTITY:-anonNAME}"
+CA_CERT="${CA_CERT:-SystestCA.cer}"
+BT_CONTROLLER="${BT_CONTROLLER:-controller0}"
+
+CURL_APP="${CURL_APP:-curl}"
+
+
+
+

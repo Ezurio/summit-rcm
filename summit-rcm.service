@@ -1,0 +1,13 @@
+[Unit]
+Description=Summit Remote Control Manager (RCM)
+Wants=network.target
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/summit-rcm
+KeyringMode=inherit
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

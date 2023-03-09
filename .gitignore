@@ -1,0 +1,12 @@
+*~
+.kate*
+.files-list.txt
+.stamp_built
+.stamp_configured
+.stamp_rsynced
+.stamp_target_installed
+build/
+dist/
+summit-rcm.egg-info/
+usage_examples/cookie
+tags
