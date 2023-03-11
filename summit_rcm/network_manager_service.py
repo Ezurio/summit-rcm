@@ -2,7 +2,7 @@ from os import path
 from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
 from typing import Any, Dict, List, Callable
-from summit_rcm import definition
+import summit_rcm.definition
 from .utils import Singleton
 from .dbus_manager import DBusManager
 from dbus_fast import Message, MessageType, Variant
@@ -1692,7 +1692,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         return bytearray(
             str(
                 "file://{0}{1}\x00".format(
-                    definition.FILEDIR_DICT.get("cert"), cert_name
+                    summit_rcm.definition.FILEDIR_DICT.get("cert"), cert_name
                 )
             ),
             "utf-8",
