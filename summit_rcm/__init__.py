@@ -564,7 +564,7 @@ def start_server():
         # ssl_ca_certs=ssl_certificate_chain,
         # ssl_version=ssl.PROTOCOL_SSLv23,
         lifespan="on",
-        http="h11",
+        http="auto",
         loop="asyncio",
         log_level="error",
     )
