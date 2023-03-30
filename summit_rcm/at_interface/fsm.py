@@ -11,6 +11,8 @@ from summit_rcm.at_interface.commands.version_command import VersionCommand
 from summit_rcm.at_interface.commands.cipstart_command import CIPSTARTCommand
 from summit_rcm.at_interface.commands.cipsend_command import CIPSENDCommand
 from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
+# from summit_rcm.at_interface.commands.ping_command import PingCommand
+from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
 from utils import Singleton
 
 AT_COMMANDS = {
@@ -20,6 +22,8 @@ AT_COMMANDS = {
     CommunicationCheckCommand.signature: CommunicationCheckCommand,
     EmptyCommand.signature: EmptyCommand,
     VersionCommand.signature: VersionCommand,
+    # PingCommand.signature: PingCommand,
+    ConnectionsCommand.signature: ConnectionsCommand,
 }
 
 
@@ -78,16 +82,27 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
     ):
         if source.id == self.idle.id or source.id == self.analyze_input.id:
             message = message.decode("utf-8")
+            length = len(self.command_buffer)
             self.command_buffer += message
+            while "\x7f" in self.command_buffer:
+                if length > 1:
+                    backspace_index = self.command_buffer.find("\x7f")
+                    temp_buf = self.command_buffer[: backspace_index - 1]
+                    if backspace_index != (length - 1):
+                        temp_buf += self.command_buffer[backspace_index + 1 :]
+                    self.command_buffer = temp_buf
+                else:
+                    self.command_buffer = ""
             self.echo(message)
         elif source.id == self.process_command.id:
+            self.log_debug("Rx: " + message.decode("utf-8") + " ")
             for listener in self._listeners:
                 listener(message)
 
     def on_invalid_command(
         self, event: str, source: State, target: State, message: str = ""
     ):
-        self.dte_output("\r\nERROR\r\n")
+        self.dte_output("\r\nERROR: Invalid Command\r\n")
 
     def on_enter_idle(self):
         self.log_debug("Entering Idle\r\n")
@@ -136,7 +151,8 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
             return
 
         self.log_debug(
-            f"*** EXEC: id: {command.signature}, name: {command.name}, params: {params}, print usage: {print_usage} ***\r\n"
+            f"*** EXEC: id: {command.signature}, name: {command.name}, "
+            "params: {params}, print usage: {print_usage} ***\r\n"
         )
         done = True
         if print_usage:

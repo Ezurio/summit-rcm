@@ -7,6 +7,7 @@ from summit_rcm.at_interface.commands.command import Command
 class EmptyCommand(Command):
     name = "Empty"
     signature = ""
+    valid_num_params = [0]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
