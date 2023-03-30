@@ -1,4 +1,4 @@
-from syslog import LOG_ERR, syslog
+from syslog import syslog
 from typing import List
 from . import definition
 from .network_status import NetworkStatus

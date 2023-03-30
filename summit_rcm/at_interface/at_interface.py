@@ -1,4 +1,5 @@
 import asyncio
+from syslog import LOG_ERR, syslog
 import threading
 from summit_rcm.at_interface.fsm import ATInterfaceFSM
 
@@ -11,7 +12,10 @@ class ATInterface:
         fd = ATInterfaceFSM().dte_file.fileno()
         self.loop.add_reader(fd, self.reader)
         self.loop.call_later(0.1, self.repeat)
-        threading.Thread(target=self.loop.run_forever, daemon=True).start()
+        try:
+            threading.Thread(target=self.loop.run_forever, daemon=True).start()
+        except Exception as e:
+            syslog(LOG_ERR, f"ATInterface error: {str(e)}")
 
     def repeat(self):
         ATInterfaceFSM().check_escape()
