@@ -23,10 +23,7 @@ from .advanced import PowerOff, Suspend, Reboot, FactoryReset, Fips
 from .date_time import DateTimeSetting
 from .settings import SystemSettingsManage, ServerConfig
 from .version import Version
-import asyncio
-import uvicorn
 import falcon.asgi
-import ssl
 
 summit_rcm_plugins: List[str] = []
 
@@ -102,6 +99,11 @@ try:
     summit_rcm_plugins.append("ntp")
 except ImportError:
     NTP = None
+
+try:
+    from .at_interface.at_interface import ATInterface
+except ImportError:
+    ATInterface = None
 
 app = falcon.asgi.App()
 
@@ -190,17 +192,8 @@ class IndexResource(object):
         resp.text = "Summit RCM"
 
 
-# class FaviconResource(object):
-#     async def on_get(self, req, resp):
-#         resp.status = falcon.HTTP_200
-#         resp.content_type = falcon.MEDIA_PNG
-#         with open("/var/www/assets/img/favicon.png", "rb") as f:
-#             resp.text = f.read()
-
-
 class DefinitionsResource(object):
     async def on_get(self, req, resp):
-
         plugins = []
         for k in ServerConfig().get_parser().options("plugins"):
             plugins.append(k)
@@ -233,22 +226,9 @@ class DefinitionsResource(object):
         }
 
 
-async def add_static_routes():
-    # static_dir: str = (
-    #     ServerConfig()
-    #     .get_parser()
-    #     .get("/", "tools.staticdir.dir", fallback="/var/www")
-    #     .strip('"')
-    # )
-    # app.add_static_route("/", static_dir)
-    app.add_route("/", IndexResource())
-    # app.add_route("/favicon.ico", FaviconResource())
-    syslog("__main__: static routes loaded")
-
-
 async def add_definitions():
     app.add_route("/definitions", DefinitionsResource())
-    syslog("__main__: definitions route loaded")
+    syslog("definitions loaded")
 
 
 async def add_firewall():
@@ -257,9 +237,9 @@ async def add_firewall():
 
         app.add_route("/firewall", firewall)
         app.add_route("/firewall/{command}", firewall)
-        syslog("__main__: firewall loaded")
+        syslog("firewall loaded")
     else:
-        syslog("__main__: firewall NOT loaded")
+        syslog("firewall NOT loaded")
 
 
 async def add_users():
@@ -269,9 +249,9 @@ async def add_users():
 
         app.add_route("/login", login_manage)
         app.add_route("/users", user_manage)
-        syslog("__main__: users loaded")
+        syslog("users loaded")
     except ImportError:
-        syslog("__main__: users NOT loaded")
+        syslog("users NOT loaded")
 
 
 async def add_network():
@@ -294,9 +274,9 @@ async def add_network():
         app.add_route("/connection", connection)
         app.add_route("/accesspoints", access_points)
         app.add_route("/wifiEnable", wifi_enable)
-        syslog("__main__: network loaded")
+        syslog("network loaded")
     except ImportError:
-        syslog("__main__: network NOT loaded")
+        syslog("network NOT loaded")
 
 
 async def add_advanced():
@@ -312,9 +292,9 @@ async def add_advanced():
         app.add_route("/reboot", reboot)
         app.add_route("/factoryReset", factory_reset)
         app.add_route("/fips", fips)
-        syslog("__main__: advanced loaded")
+        syslog("advanced loaded")
     except ImportError:
-        syslog("__main__: advanced NOT loaded")
+        syslog("advanced NOT loaded")
 
 
 async def add_certificates():
@@ -322,9 +302,9 @@ async def add_certificates():
         certs = Certificates()
 
         app.add_route("/certificates", certs)
-        syslog("__main__: certificates loaded")
+        syslog("certificates loaded")
     except ImportError:
-        syslog("__main__: certificates NOT loaded")
+        syslog("certificates NOT loaded")
 
 
 async def add_files():
@@ -334,9 +314,9 @@ async def add_files():
 
         app.add_route("/files", files_manage)
         app.add_route("/file", file_manage)
-        syslog("__main__: files loaded")
+        syslog("files loaded")
     except ImportError:
-        syslog("__main__: files NOT loaded")
+        syslog("files NOT loaded")
 
 
 async def add_date_time():
@@ -345,9 +325,9 @@ async def add_date_time():
 
         app.add_route("/datetime", date_time_setting)
         await date_time_setting.populate_time_zone_list()
-        syslog("__main__: datetime loaded")
+        syslog("datetime loaded")
     except ImportError:
-        syslog("__main__: datetime NOT loaded")
+        syslog("datetime NOT loaded")
 
 
 async def add_logs():
@@ -359,9 +339,9 @@ async def add_logs():
         app.add_route("/logData", log_data)
         app.add_route("/logSetting", log_setting)
         app.add_route("/logForwarding", log_forwarding)
-        syslog("__main__: logs loaded")
+        syslog("logs loaded")
     except ImportError:
-        syslog("__main__: logs NOT loaded")
+        syslog("logs NOT loaded")
 
 
 async def add_version():
@@ -369,9 +349,9 @@ async def add_version():
         version = Version()
 
         app.add_route("/version", version)
-        syslog("__main__: version loaded")
+        syslog("version loaded")
     except ImportError:
-        syslog("__main__: version NOT loaded")
+        syslog("version NOT loaded")
 
 
 async def add_firmware():
@@ -379,9 +359,9 @@ async def add_firmware():
         swupdate = SWUpdate()
 
         app.add_route("/firmware", swupdate)
-        syslog("__main__: firmware loaded")
+        syslog("firmware loaded")
     except ImportError:
-        syslog("__main__: firmware NOT loaded")
+        syslog("firmware NOT loaded")
 
 
 async def add_unauthenticated():
@@ -389,9 +369,9 @@ async def add_unauthenticated():
         unauthenticated = AllowUnauthenticatedResetReboot()
 
         app.add_route("/allowUnauthenticatedResetReboot", unauthenticated)
-        syslog("__main__: allowUnauthenticatedResetReboot loaded")
+        syslog("allowUnauthenticatedResetReboot loaded")
     except ImportError:
-        syslog("__main__: allowUnauthenticatedResetReboot NOT loaded")
+        syslog("allowUnauthenticatedResetReboot NOT loaded")
 
 
 async def add_awm():
@@ -399,9 +379,9 @@ async def add_awm():
         awm = AWMCfgManage()
 
         app.add_route("/awm", awm)
-        syslog("__main__: AWM loaded")
+        syslog("AWM loaded")
     else:
-        syslog("__main__: AWM NOT loaded")
+        syslog("AWM NOT loaded")
 
 
 async def add_stunnel():
@@ -409,9 +389,9 @@ async def add_stunnel():
         stunnel = Stunnel()
 
         app.add_route("/stunnel", stunnel)
-        syslog("__main__: stunnel loaded")
+        syslog("stunnel loaded")
     else:
-        syslog("__main__: stunnel NOT loaded")
+        syslog("stunnel NOT loaded")
 
 
 async def add_modem():
@@ -425,9 +405,9 @@ async def add_modem():
         app.add_route("/positioningSwitch", positioning_switch)
         app.add_route("/modemFirmwareUpdate", modem_firmware_update)
         app.add_route("/modemEnable", modem_enable)
-        syslog("__main__: modem loaded")
+        syslog("modem loaded")
     else:
-        syslog("__main__: modem NOT loaded")
+        syslog("modem NOT loaded")
 
 
 async def add_radio_siso_mode():
@@ -435,9 +415,9 @@ async def add_radio_siso_mode():
         radioSISOMode = RadioSISOMode()
 
         app.add_route("/radioSISOMode", radioSISOMode)
-        syslog("__main__: Radio SISO mode loaded")
+        syslog("Radio SISO mode loaded")
     else:
-        syslog("__main__: Radio SISO mode NOT loaded")
+        syslog("Radio SISO mode NOT loaded")
 
 
 async def add_ntp():
@@ -446,9 +426,9 @@ async def add_ntp():
 
         app.add_route("/ntp", ntp)
         app.add_route("/ntp/{command}", ntp)
-        syslog("__main__: chrony NTP loaded")
+        syslog("chrony NTP loaded")
     else:
-        syslog("__main__: chrony NTP NOT loaded")
+        syslog("chrony NTP NOT loaded")
 
 
 async def add_bluetooth():
@@ -457,35 +437,9 @@ async def add_bluetooth():
         await bluetooth.setup()
 
         app.add_route("/bluetooth", bluetooth)
-        syslog("__main__: Bluetooth loaded")
+        syslog("Bluetooth loaded")
     else:
-        syslog("__main__: Bluetooth NOT loaded")
-
-
-def enable_ssl_client_auth(
-    socket: ssl.SSLSocket, ssl_certificate_chain: str, ssl_private_key: str
-) -> bool:
-    """
-    Enable SSL client authentication on the give SSL socket using the provided CA certificate chain
-    and private key.
-    """
-
-    try:
-        socket.context.load_cert_chain(ssl_certificate_chain, ssl_private_key)
-        if ssl.OPENSSL_VERSION_NUMBER >= 0x10101000:
-            # OpenSSL 1.1.1 or newer - we can use the built-in functionality to disable time
-            # checking during certificate verification
-            socket.context.verify_mode = ssl.CERT_REQUIRED
-            socket.context.verify_flags |= X509_V_FLAG_NO_CHECK_TIME
-        else:
-            # OpenSSL 1.0.2 - we need to use the patched-in functionality to disable time
-            # checking during certificate verification
-            socket.context.verify_mode = PY_SSL_CERT_REQUIRED_NO_CHECK_TIME
-        syslog("SSL client authentication enabled")
-        return True
-    except Exception as e:
-        syslog(LOG_ERR, f"Error configuring SSL client authentication - {str(e)}")
-        return False
+        syslog("Bluetooth NOT loaded")
 
 
 def add_middleware(enable_session_checking: bool) -> None:
@@ -504,7 +458,6 @@ async def add_routes() -> None:
     await add_network()
     await add_firewall()
     await add_firmware()
-    # await add_static_routes()
     await add_definitions()
     await add_users()
     await add_version()
@@ -524,57 +477,16 @@ async def add_routes() -> None:
 
 def start_server():
     parser = ServerConfig().get_parser()
-
-    socket_host = (
-        ServerConfig()
-        .get_parser()
-        .get("global", "server.socket_host", fallback="")
-        .strip('"')
-    )
-    socket_port = parser.getint("global", "server.socket_port", fallback=443)
-    ssl_private_key = (
-        parser["global"]
-        .get("server.ssl_private_key", "/etc/summit-rcm/ssl/server.key")
-        .strip('"')
-    )
-    ssl_certificate = (
-        parser["global"]
-        .get("server.ssl_certificate", "/etc/summit-rcm/ssl/server.crt")
-        .strip('"')
-    )
-    ssl_certificate_chain = (
-        parser["global"]
-        .get("server.ssl_certificate_chain", "/etc/summit-rcm/ssl/ca.crt")
-        .strip('"')
-    )
-    enable_client_auth = parser.getboolean(
-        section="summit-rcm", option="enable_client_auth", fallback=False
-    )
     enable_sessions = parser.getboolean(
         section="/", option="tools.sessions.on", fallback=True
     )
 
-    config = uvicorn.Config(
-        app=app,
-        host=socket_host,
-        port=socket_port,
-        # ssl_certfile=ssl_certificate,
-        # ssl_keyfile=ssl_private_key,
-        # ssl_cert_reqs=ssl.CERT_NONE,
-        # ssl_ca_certs=ssl_certificate_chain,
-        # ssl_version=ssl.PROTOCOL_SSLv23,
-        lifespan="on",
-        http="auto",
-        loop="asyncio",
-        log_level="error",
-    )
-    server = uvicorn.Server(config)
-
     add_middleware(enable_sessions)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(server.serve())
 
 
-def main(args=None):
-    syslog("Starting webserver")
-    start_server()
+syslog("Starting webserver")
+start_server()
+
+if ATInterface:
+    syslog("Starting AT interface")
+    ATInterface().start()
