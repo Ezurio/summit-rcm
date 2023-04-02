@@ -23,9 +23,9 @@ class CommunicationCheckCommand(Command):
     def parse_params(params: str) -> Tuple[bool, dict]:
         valid = True
         params_list = params.split(",")
-        valid |= len(params_list) in CommunicationCheckCommand.valid_num_params
+        valid &= len(params_list) in CommunicationCheckCommand.valid_num_params
         for param in params_list:
-            valid |= param != ""
+            valid &= param == ""
         return (valid, {})
 
     @staticmethod

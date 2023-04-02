@@ -41,9 +41,9 @@ class CIPSTARTCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         given_num_param = len(params_list)
-        valid |= given_num_param in CIPSTARTCommand.valid_num_params
+        valid &= given_num_param in CIPSTARTCommand.valid_num_params
         for param in params_list:
-            valid |= param != ""
+            valid &= param != ""
         if valid:
             try:
                 params_dict["connection_id"] = int(params_list[0])
