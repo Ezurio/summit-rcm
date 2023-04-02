@@ -22,7 +22,7 @@ class CIPSTARTCommand(Command):
             params_dict["type"]
         )
         if params_dict["type"] is None:
-            return (True, f"\r\nCONNECTION TYPE {params_dict[type]} ERROR\r\n")
+            return (True, "\r\nCONNECTION TYPE ERROR\r\n")
 
         if ConnectionService().start_connection(
             id=params_dict["connection_id"],
