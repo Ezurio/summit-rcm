@@ -27,7 +27,7 @@ class Connection:
     type: ConnectionType
     addr: str
     port: int
-    enable_keepalive: bool
+    keepalive: int
     connected: bool
     dialer: TcpDialler
     data_buffer: bytes
@@ -65,7 +65,7 @@ class ConnectionService(object, metaclass=Singleton):
                 addr="",
                 port=0,
                 connected=False,
-                enable_keepalive=False,
+                keepalive=0,
                 dialer=TcpDialler(asyncio.get_event_loop()),
                 data_buffer=bytes("", "utf-8"),
                 listener_id=-1,
@@ -105,7 +105,7 @@ class ConnectionService(object, metaclass=Singleton):
         type: ConnectionType,
         addr: str,
         port: int,
-        enable_keepalive: bool = False,
+        keepalive: int,
     ) -> bool:
         """
         Start a new IP connection and return success/failure
@@ -121,11 +121,11 @@ class ConnectionService(object, metaclass=Singleton):
         self.connections[id].type = type
         self.connections[id].addr = addr
         self.connections[id].port = port
-        self.connections[id].enable_keepalive = enable_keepalive
+        self.connections[id].keepalive = keepalive
 
         try:
             self.connections[id].dialer.dial(
-                f"{self.connections[id].addr}:{self.connections[id].port}"
+                f"{self.connections[id].addr}:{self.connections[id].port}", keepalive
             )
             self.connections[id].connected = True
         except Exception:
@@ -151,7 +151,7 @@ class ConnectionService(object, metaclass=Singleton):
             self.connections[id].addr = ""
             self.connections[id].port = 0
             self.connections[id].type = ConnectionType.TCP
-            self.connections[id].enable_keepalive = False
+            self.connections[id].keepalive = 0
             self.connections[id].data_buffer = b""
             self.connections[id].listener_id = -1
             self.connections[id].busy = False
