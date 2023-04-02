@@ -28,9 +28,9 @@ class ConnectionsCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid |= len(params_list) in ConnectionsCommand.valid_num_params
+        valid &= len(params_list) in ConnectionsCommand.valid_num_params
         for param in params_list:
-            valid |= param != ""
+            valid &= param == ""
         return (valid, params_dict)
 
     @staticmethod

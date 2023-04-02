@@ -60,9 +60,9 @@ class CIPSENDCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid |= len(params_list) in CIPSENDCommand.valid_num_params
+        valid &= len(params_list) in CIPSENDCommand.valid_num_params
         for param in params_list:
-            valid |= param != ""
+            valid &= param != ""
         if valid:
             try:
                 params_dict["connection_id"] = int(params_list[0])
