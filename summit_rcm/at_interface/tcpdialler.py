@@ -1,5 +1,6 @@
 import asyncio
 import asyncio.transports
+import socket
 
 from typing import Optional
 
@@ -32,11 +33,16 @@ class TcpDialler:
         self.on_data_received = None
         self.on_connection_lost = None
 
-    def dial(self, number):
+    def dial(self, number: str, keepalive: int):
         (host, port) = number.split(":")
-        c = self.loop.create_connection(
-            lambda: TcpDiallerProtocol(self), host, int(port)
-        )
+        socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socks.connect((host, int(port)))
+        if keepalive != 0:
+            socks.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            socks.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, keepalive)
+            socks.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)
+            socks.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+        c = self.loop.create_connection(lambda: TcpDiallerProtocol(self), sock=socks)
         self.loop.create_task(c)
         return (None, "", "")
 

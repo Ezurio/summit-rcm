@@ -29,7 +29,7 @@ class CIPSTARTCommand(Command):
             type=params_dict["type"],
             addr=params_dict["remote_ip"],
             port=params_dict["remote_port"],
-            enable_keepalive=params_dict["enable_keepalive"],
+            keepalive=params_dict["keepalive"],
         ):
             return (True, "\r\nOK\r\n")
         else:
@@ -50,8 +50,8 @@ class CIPSTARTCommand(Command):
                 params_dict["type"] = params_list[1]
                 params_dict["remote_ip"] = params_list[2]
                 params_dict["remote_port"] = params_list[3]
-                params_dict["enable_keepalive"] = (
-                    params_list[4] if given_num_param == 5 else False
+                params_dict["keepalive"] = (
+                    int(params_list[4]) if given_num_param == 5 else 0
                 )
             except Exception:
                 valid = False
@@ -61,5 +61,5 @@ class CIPSTARTCommand(Command):
     def usage() -> str:
         return (
             "\r\nAT+CIPSTART=<connection id>,<type>,<remote IP>,"
-            "<remote port>[,<enable keepalive>]\r\n"
+            "<remote port>[,<keepalive>]\r\n"
         )
