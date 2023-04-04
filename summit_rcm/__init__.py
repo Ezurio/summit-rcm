@@ -1,4 +1,4 @@
-from syslog import syslog
+from syslog import LOG_ERR, syslog
 from typing import List
 from . import definition
 from .network_status import NetworkStatus
@@ -124,65 +124,65 @@ class LifespanMiddleware:
         await add_routes()
 
 
-# class SessionCheckingMiddleware:
-#     def __init__(self) -> None:
-#         self.paths = [
-#             "connections",
-#             "connection",
-#             "accesspoints",
-#             "allowUnauthenticatedResetReboot",
-#             "networkInterfaces",
-#             "networkInterface",
-#             "file",
-#             "users",
-#             "firmware",
-#             "logData",
-#             "logSetting",
-#             "logForwarding",
-#             "poweroff",
-#             "suspend",
-#             "files",
-#             "certificates",
-#             "datetime",
-#             "fips",
-#             "modemEnable",
-#         ]
+class SessionCheckingMiddleware:
+    def __init__(self) -> None:
+        self.paths = [
+            "connections",
+            "connection",
+            "accesspoints",
+            "allowUnauthenticatedResetReboot",
+            "networkInterfaces",
+            "networkInterface",
+            "file",
+            "users",
+            "firmware",
+            "logData",
+            "logSetting",
+            "logForwarding",
+            "poweroff",
+            "suspend",
+            "files",
+            "certificates",
+            "datetime",
+            "fips",
+            "modemEnable",
+        ]
 
-#         if not AllowUnauthenticatedResetReboot().allow_unauthenticated_reset_reboot:
-#             self.paths += ["factoryReset", "reboot"]
+        if not AllowUnauthenticatedResetReboot().allow_unauthenticated_reset_reboot:
+            self.paths += ["factoryReset", "reboot"]
 
-#         # if Bluetooth and websockets_auth_by_header_token:
-#         #     self.paths.append("ws")
+        if Bluetooth and websockets_auth_by_header_token:
+            self.paths.append("ws")
 
-#     def process_request(self, req, resp):
-#         """
-#         Raise HTTP 401 Unauthorized client error if a session with invalid id tries to access
-#         following resources. HTMLs still can be loaded to keep consistency, i.e. loaded from local
-#         cache or remotely.
-#         """
-#         # # Check if SSL client authentication is enabled and if it failed ('SSL_CLIENT_VERIFY' is
-#         # # 'SUCCESS' when authentication is successful).
-#         # if (
-#         #     cherrypy.request.app.config["summit-rcm"].get("enable_client_auth", False)
-#         #     and cherrypy.request.wsgi_environ.get("SSL_CLIENT_VERIFY", "NONE") != "SUCCESS"
-#         # ):
-#         #     # Could not authenticate client
-#         #     raise cherrypy.HTTPError(401)
+    def session_is_valid(self, req) -> bool:
+        if not hasattr(req.context, "valid_session"):
+            return False
 
-#         # With the `get` method the session id will be saved which could result in session fixation vulnerability.
-#         # Session ids will be destroyed periodically so we have to check 'USERNAME' to make sure the session is not valid after logout.
-#         # if not cherrypy.session._exists() or not cherrypy.session.get("USERNAME", None):
-#         if not req.get_cookie_values("USERNAME"):
-#             url = req.url.split("/")[-1]
-#             path_root = req.path.split("/")[1]
-#             if (
-#                 url
-#                 and ".html" not in url
-#                 and ".js" not in url
-#                 and (path_root in self.paths or path_root in summit_rcm_plugins)
-#             ):
-#                 resp.status = falcon.HTTP_401
-#                 resp.complete = True
+        if not req.context.valid_session:
+            return False
+
+        username = req.context.get_session("USERNAME")
+        return username is not None and username != ""
+
+    async def process_request(self, req, resp):
+        """
+        Raise HTTP 401 Unauthorized client error if a session with invalid id tries to access
+        following resources.
+        """
+        # With the `get` method the session id will be saved which could result in session fixation
+        # vulnerability. Session ids will be destroyed periodically so we have to check 'USERNAME'
+        # to make sure the session is not valid after logout.
+        if not self.session_is_valid(req):
+            url = req.url.split("/")[-1]
+            path_root = req.path.split("/")[1]
+            if (
+                url
+                and ".html" not in url
+                and ".js" not in url
+                and (path_root in self.paths or path_root in summit_rcm_plugins)
+            ):
+                resp.status = falcon.HTTP_401
+                resp.complete = True
 
 
 class IndexResource(object):
@@ -446,9 +446,12 @@ def add_middleware(enable_session_checking: bool) -> None:
     # Add ASGI lifespan middleware
     app.add_middleware(LifespanMiddleware())
 
-    # # Add middleware to force session checking if enabled
-    # if enable_session_checking:
-    #     app.add_middleware(SessionCheckingMiddleware())
+    # Add middleware to force session checking if enabled
+    if enable_session_checking:
+        from .sessions_middleware import SessionsMiddleware
+
+        app.add_middleware(SessionsMiddleware())
+        app.add_middleware(SessionCheckingMiddleware())
 
     # Add middleware to inject secure headers
     app.add_middleware(SecureHeadersMiddleware())
