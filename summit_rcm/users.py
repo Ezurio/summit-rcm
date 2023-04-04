@@ -237,7 +237,6 @@ class UserManage:
 
 
 class LoginManageHelper(object):
-
     _lock = Lock()
     # Record logins with wrong credentials to protect against tamper
     _failed_logins = {}
@@ -288,9 +287,7 @@ class LoginManageHelper(object):
 
     @classmethod
     def is_user_logged_in(cls, username):
-
         with cls._lock:
-
             # temp_id = cherrypy.session.id
             # for user, sid in cls._sessions.copy().items():
             #     cherrypy.session.id = sid
@@ -358,7 +355,7 @@ class LoginManage:
         syslog(f"Attempt to login user {username}")
 
         # Return if username is blocked
-        username_from_cookie = req.get_cookie_values("USERNAME")
+        username_from_cookie = req.context.get_session("USERNAME")
         if not username_from_cookie:
             if LoginManageHelper.is_user_blocked(username):
                 result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_USER_BLOCKED")
@@ -370,7 +367,6 @@ class LoginManage:
         if (username == self._default_username) and (
             password == self._default_password
         ):
-
             cnt = UserManageHelper.getNumberOfUsers()
             if not cnt:
                 UserManageHelper.addUser(
@@ -382,7 +378,6 @@ class LoginManage:
             if not cnt or UserManageHelper.verify(
                 self._default_username, self._default_password
             ):
-
                 LoginManageHelper.login_reset(username)
                 if (
                     LoginManageHelper.is_user_logged_in(username)
@@ -393,7 +388,11 @@ class LoginManage:
                     resp.media = result
                     return
 
-                req.set_cookie("USERNAME", username)
+                resp.context.set_session("USERNAME", username)
+                resp.context.set_session(
+                    "iat", int(round(datetime.utcnow().timestamp()))
+                )
+                resp.context.valid_session = True
                 result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
                 result["REDIRECT"] = 1
                 result["InfoMsg"] = "Password change required"
@@ -413,17 +412,16 @@ class LoginManage:
 
         # If session already exists, return success (if multiple user sessions not allowed);
         # otherwise verify login username and password.
-        if not cherrypy.session.get("USERNAME", None) or cherrypy.request.app.config[
-            "summit-rcm"
-        ].get("allow_multiple_user_sessions", False):
+        if (
+            not req.context.get_session("USERNAME")
+            or self._allow_multiple_user_sessions
+        ):
             if not UserManageHelper.verify(username, password):
                 LoginManageHelper.login_failed(username)
                 result["InfoMsg"] = "unable to verify user/password"
 
                 # Expire the current session if user has already logged in
-                # if cherrypy.session.get("USERNAME", None):
-                #     cherrypy.lib.sessions.expire()
-                # return result
+                resp.context.valid_session = False
                 resp.media = result
                 return
 
@@ -438,7 +436,9 @@ class LoginManage:
             resp.media = result
             return
 
-        resp.set_cookie("USERNAME", username)
+        resp.context.set_session("USERNAME", username)
+        resp.context.set_session("iat", int(round(datetime.utcnow().timestamp())))
+        resp.context.valid_session = True
 
         result["PERMISSION"] = UserManageHelper.getPermission(username)
         # Don't display "system_user" page for single user mode
@@ -451,19 +451,19 @@ class LoginManage:
         resp.media = result
         return
 
-    async def DELETE(self, req, resp):
+    async def on_delete(self, req, resp):
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
             "SDCERR": SUMMIT_RCM_ERRORS.get("SDCERR_FAIL", 1),
             "InfoMsg": "",
         }
-        # username = cherrypy.session.pop("USERNAME", None)
-        username = req.get_cookie_values("USERNAME")
+        username = req.context.get_session("USERNAME")
         if username:
             LoginManageHelper.delete(username)
             result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
             result["InfoMsg"] = f"user {username} logged out"
+            resp.context.valid_session = False
             syslog(f"logout user {username}")
         else:
             result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_FAIL")
