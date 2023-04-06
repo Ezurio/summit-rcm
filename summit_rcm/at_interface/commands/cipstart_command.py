@@ -18,10 +18,7 @@ class CIPSTARTCommand(Command):
                 True,
                 f"\r\nInvalid Parameters: See Usage - {CIPSTARTCommand.signature}?\r\n",
             )
-        params_dict["type"] = ConnectionService.parse_connection_type(
-            params_dict["type"]
-        )
-        if params_dict["type"] is None:
+        if not ConnectionService.validate_connection_type(params_dict["type"]):
             return (True, "\r\nCONNECTION TYPE ERROR\r\n")
 
         if ConnectionService().start_connection(
@@ -47,7 +44,7 @@ class CIPSTARTCommand(Command):
         if valid:
             try:
                 params_dict["connection_id"] = int(params_list[0])
-                params_dict["type"] = params_list[1]
+                params_dict["type"] = params_list[1].lower()
                 params_dict["remote_ip"] = params_list[2]
                 params_dict["remote_port"] = params_list[3]
                 params_dict["keepalive"] = (
