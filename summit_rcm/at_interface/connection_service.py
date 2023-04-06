@@ -2,34 +2,21 @@ import asyncio
 import time
 from typing import List, Optional, Tuple
 from dataclasses import dataclass
-from enum import IntEnum, unique
-from summit_rcm.at_interface.tcpdialler import TcpDialler
+from summit_rcm.at_interface.dialer import Dialer
 
 from summit_rcm.utils import Singleton
 import summit_rcm.at_interface.fsm as fsm
 
 
-@unique
-class ConnectionType(IntEnum):
-    TCP = 0
-    """TCP connection"""
-
-    UDP = 1
-    """UDP connection"""
-
-    SSL = 2
-    """SSL connection"""
-
-
 @dataclass
 class Connection:
     id: int
-    type: ConnectionType
+    type: str
     addr: str
     port: int
     keepalive: int
     connected: bool
-    dialer: TcpDialler
+    dialer: Dialer
     data_buffer: bytes
     listener_id: int
     busy: bool
@@ -61,12 +48,12 @@ class ConnectionService(object, metaclass=Singleton):
         for i in range(self.MAX_CONNECTIONS):
             current_connection = Connection(
                 id=i,
-                type=ConnectionType.TCP,
+                type="",
                 addr="",
                 port=0,
                 connected=False,
                 keepalive=0,
-                dialer=TcpDialler(asyncio.get_event_loop()),
+                dialer=Dialer(asyncio.get_event_loop()),
                 data_buffer=bytes("", "utf-8"),
                 listener_id=-1,
                 busy=False,
@@ -83,26 +70,20 @@ class ConnectionService(object, metaclass=Singleton):
             self.connections.append(current_connection)
 
     @staticmethod
-    def parse_connection_type(input: str) -> Optional[ConnectionType]:
+    def validate_connection_type(input: str) -> bool:
         """
-        Parse the input string and return the appropriate connection type value, if valid.
-        Otherwise, return None.
+        Analyzes the input string and returns the True if the connection type value is valid.
+        Otherwise, return False.
         """
-        input = input.lower()
-
-        if input == "tcp":
-            return ConnectionType.TCP
-        elif input == "udp":
-            return ConnectionType.UDP
-        elif input == "ssl":
-            return ConnectionType.SSL
+        if input == "tcp" or input == "udp" or input == "ssl":
+            return True
         else:
-            return None
+            return False
 
     def start_connection(
         self,
         id: int,
-        type: ConnectionType,
+        type: str,
         addr: str,
         port: int,
         keepalive: int,
@@ -125,7 +106,9 @@ class ConnectionService(object, metaclass=Singleton):
 
         try:
             self.connections[id].dialer.dial(
-                f"{self.connections[id].addr}:{self.connections[id].port}", keepalive
+                f"{self.connections[id].addr}:{self.connections[id].port}",
+                keepalive,
+                type,
             )
             self.connections[id].connected = True
         except Exception:
@@ -150,7 +133,7 @@ class ConnectionService(object, metaclass=Singleton):
             self.connections[id].connected = False
             self.connections[id].addr = ""
             self.connections[id].port = 0
-            self.connections[id].type = ConnectionType.TCP
+            self.connections[id].type = ""
             self.connections[id].keepalive = 0
             self.connections[id].data_buffer = b""
             self.connections[id].listener_id = -1
