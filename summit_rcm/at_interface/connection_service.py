@@ -26,7 +26,12 @@ class Connection:
 
     def on_data_received(self, data: bytes):
         fsm.ATInterfaceFSM().dte_output(
-            f"+IPD: {self.id},{str(data.decode('utf-8'))}\r\n"
+            f"+IPD: {self.id},{len(data)},{str(data.decode('utf-8'))}\r\n"
+        )
+
+    def on_datagram_received(self, data: bytes, addr: Tuple[str, int]):
+        fsm.ATInterfaceFSM().dte_output(
+            f"+IPD: {self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}\r\n"
         )
 
     def on_connection_lost(self):
@@ -63,6 +68,9 @@ class ConnectionService(object, metaclass=Singleton):
             )
             current_connection.dialer.on_data_received = (
                 current_connection.on_data_received
+            )
+            current_connection.dialer.on_datagram_received = (
+                current_connection.on_datagram_received
             )
             current_connection.dialer.on_connection_lost = (
                 current_connection.on_connection_lost
