@@ -2,6 +2,7 @@ import asyncio
 import asyncio.transports
 import socket
 import ssl
+from typing import Tuple
 
 from typing import Optional
 
@@ -26,24 +27,47 @@ class StreamingProtocol(asyncio.Protocol):
             self.dialer.on_connection_lost()
 
 
+class UserDatagramProtocol(asyncio.DatagramProtocol):
+    def __init__(self, dialer):
+        self.dialer = dialer
+        self.dialer.protocol = self
+
+    def connection_made(self, transport: asyncio.DatagramTransport):
+        self.transport = transport
+        if self.dialer.on_connection_made:
+            self.dialer.on_connection_made()
+
+    def datagram_received(self, data: bytes, addr: Tuple[str, int]):
+        if self.dialer.on_datagram_received:
+            self.dialer.on_datagram_received(data, addr)
+
+    def connection_lost(self, exc: Optional[Exception]):
+        self.dialer.protocol = None
+        if self.dialer.on_connection_lost:
+            self.dialer.on_connection_lost()
+
+
 class Dialer:
     def __init__(self, loop):
         self.loop = loop
         self.protocol = None
         self.on_connection_made = None
         self.on_data_received = None
+        self.on_datagram_received = None
         self.on_connection_lost = None
 
     def dial(self, number: str, keepalive: int, type: str):
         (host, port) = number.split(":")
-        if type == "tcp":
+        if type == "udp":
+            c = self.loop.create_datagram_endpoint(
+                lambda: create_protocol(self, type), remote_addr=(host, port)
+            )
+            self.loop.create_task(c)
+            return (None, "", "")
+        elif type == "tcp":
             socks = setup_tcp_socket(host, port, keepalive)
-        elif type == "ssl":
-            (socks, context) = setup_ssl_socket(host, port, keepalive)
-        elif type == "udp":
-            pass
         else:
-            pass
+            (socks, context) = setup_ssl_socket(host, port, keepalive)
         c = self.loop.create_connection(
             lambda: create_protocol(self, type),
             server_hostname=host if type == "ssl" else None,
@@ -58,15 +82,17 @@ class Dialer:
             self.protocol.transport.abort()
 
     def write(self, s):
-        if self.protocol and self.protocol.transport:
+        if isinstance(self.protocol, StreamingProtocol) and self.protocol.transport:
             self.protocol.transport.write(s)
+        else:
+            self.protocol.transport.sendto(s)
 
 
 def create_protocol(dialer, type: str) -> asyncio.BaseProtocol | None:
     if type == "tcp" or type == "ssl":
         return StreamingProtocol(dialer)
     elif type == "udp":
-        pass
+        return UserDatagramProtocol(dialer)
     else:
         return None
 
