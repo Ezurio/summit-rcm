@@ -1,17 +1,13 @@
-from dbus_fast import Message, MessageType
 import falcon
 import os
 from syslog import syslog, LOG_ERR
 from subprocess import run, call, TimeoutExpired, CalledProcessError
 from .definition import (
     SUMMIT_RCM_ERRORS,
-    LOGIND_BUS_NAME,
-    LOGIND_MAIN_OBJ,
-    LOGIND_MAIN_IFACE,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
 )
 from .settings import SystemSettingsManage
-from .dbus_manager import DBusManager
+from summit_rcm.services.system_service import SystemService
 
 
 class PowerOff:
@@ -29,22 +25,7 @@ class PowerOff:
             return
 
         try:
-            bus = await DBusManager().get_bus()
-
-            # Call PowerOff() (non-interactive)
-            reply = await bus.call(
-                Message(
-                    destination=LOGIND_BUS_NAME,
-                    path=LOGIND_MAIN_OBJ,
-                    interface=LOGIND_MAIN_IFACE,
-                    member="PowerOff",
-                    signature="b",
-                    body=[False],
-                )
-            )
-
-            if reply.message_type == MessageType.ERROR:
-                raise Exception(reply.body[0])
+            await SystemService().set_power_state("off")
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Poweroff initiated"
@@ -69,22 +50,7 @@ class Suspend:
             return
 
         try:
-            bus = await DBusManager().get_bus()
-
-            # Call Suspend() (non-interactive)
-            reply = await bus.call(
-                Message(
-                    destination=LOGIND_BUS_NAME,
-                    path=LOGIND_MAIN_OBJ,
-                    interface=LOGIND_MAIN_IFACE,
-                    member="Suspend",
-                    signature="b",
-                    body=[False],
-                )
-            )
-
-            if reply.message_type == MessageType.ERROR:
-                raise Exception(reply.body[0])
+            await SystemService().set_power_state("suspend")
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Suspend initiated"
@@ -110,22 +76,7 @@ class Reboot:
             return
 
         try:
-            bus = await DBusManager().get_bus()
-
-            # Call Reboot() (non-interactive)
-            reply = await bus.call(
-                Message(
-                    destination=LOGIND_BUS_NAME,
-                    path=LOGIND_MAIN_OBJ,
-                    interface=LOGIND_MAIN_IFACE,
-                    member="Reboot",
-                    signature="b",
-                    body=[False],
-                )
-            )
-
-            if reply.message_type == MessageType.ERROR:
-                raise Exception(reply.body[0])
+            await SystemService().set_power_state("reboot")
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Reboot initiated"
@@ -172,7 +123,6 @@ class FactoryReset:
 
 
 class Fips:
-
     FIPS_SCRIPT = "/usr/bin/fips-set"
 
     async def on_put(self, req, resp):
