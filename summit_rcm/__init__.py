@@ -1,4 +1,4 @@
-from syslog import LOG_ERR, syslog
+from syslog import syslog
 from typing import List
 from . import definition
 from .network_status import NetworkStatus
@@ -24,6 +24,7 @@ from .date_time import DateTimeSetting
 from .settings import SystemSettingsManage, ServerConfig
 from .version import Version
 import falcon.asgi
+from summit_rcm.rest_api.system.power import PowerResource
 
 summit_rcm_plugins: List[str] = []
 
@@ -442,6 +443,11 @@ async def add_bluetooth():
         syslog("Bluetooth NOT loaded")
 
 
+async def add_system():
+    app.add_route("/api/v2/system/power", PowerResource())
+    syslog("/api/v2/system/power loaded")
+
+
 def add_middleware(enable_session_checking: bool) -> None:
     # Add ASGI lifespan middleware
     app.add_middleware(LifespanMiddleware())
@@ -465,6 +471,7 @@ async def add_routes() -> None:
     await add_users()
     await add_version()
     await add_advanced()
+    await add_system()
     await add_files()
     await add_certificates()
     await add_logs()
