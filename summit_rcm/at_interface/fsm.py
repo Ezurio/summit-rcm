@@ -11,7 +11,7 @@ from summit_rcm.at_interface.commands.version_command import VersionCommand
 from summit_rcm.at_interface.commands.cipstart_command import CIPSTARTCommand
 from summit_rcm.at_interface.commands.cipsend_command import CIPSENDCommand
 from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
-# from summit_rcm.at_interface.commands.ping_command import PingCommand
+from summit_rcm.at_interface.commands.ping_command import PingCommand
 from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
 from utils import Singleton
 
@@ -22,7 +22,7 @@ AT_COMMANDS: List[Command] = [
     CommunicationCheckCommand,
     EmptyCommand,
     VersionCommand,
-    # PingCommand,
+    PingCommand,
     ConnectionsCommand,
 ]
 
@@ -91,7 +91,7 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
                     backspace_index = self.command_buffer.find("\x7f")
                     temp_buf = self.command_buffer[: backspace_index - 1]
                     if backspace_index != (length - 1):
-                        temp_buf += self.command_buffer[backspace_index + 1 :]
+                        temp_buf += self.command_buffer[backspace_index + 1:]
                     self.command_buffer = temp_buf
                 else:
                     self.command_buffer = ""

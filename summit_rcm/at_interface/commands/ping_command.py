@@ -1,15 +1,17 @@
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
-from pythonping import ping
+import subprocess
+import re
 
-DEFAULT_TIMEOUT = 5
-PING_COUNT = 3
+DEFAULT_TIMEOUT = "10"
+DEFAULT_PROTOCOL = ""
+PING_COUNT = 1
 
 
 class PingCommand(Command):
     NAME: str = "Ping"
     SIGNATURE: str = "at+ping"
-    VALID_NUM_PARAMS: List[int] = [1, 2]
+    VALID_NUM_PARAMS: List[int] = [1, 2, 3]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -19,19 +21,23 @@ class PingCommand(Command):
                 True,
                 f"\r\nInvalid Parameters: See Usage - {PingCommand.SIGNATURE}?\r\n",
             )
+        command = (
+            ["ping", "-c", str(PING_COUNT), "-W",
+             params_dict["timeout"], params_dict["target"]]
+        )
+        if params_dict["protocol"]:
+            protocol = "-" + params_dict["protocol"]
+            command.insert(1, protocol)
         try:
-            ping_str = str(
-                ping(
-                    params_dict["target"],
-                    verbose=True,
-                    timeout=params_dict["timeout"],
-                    count=PING_COUNT,
-                )
-            )
-            return (True, f"\r\n{ping_str}\r\n")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            return (True, "\r\nError\r\n")
+            proc = subprocess.run(command, capture_output=True)
+            ping_str = proc.stdout.decode("utf-8")
+            if match := re.search(r"(\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)", ping_str):
+                ping_str = match.group(2)
+                return (True, f"\r\n{ping_str} OK\r\n")
+            else:
+                return (True, "\r\nTIMEOUT ERROR\r\n")
+        except Exception:
+            return (True, "\r\nERROR\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -45,16 +51,15 @@ class PingCommand(Command):
         if valid:
             try:
                 params_dict["target"] = params_list[0]
-                params_dict["timeout"] = (
-                    int(params_list[1]) if given_num_param == 2 else DEFAULT_TIMEOUT
-                )
+                params_dict["timeout"] = params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
+                params_dict["protocol"] = params_list[2] if given_num_param == 3 else DEFAULT_PROTOCOL
             except Exception:
                 valid = False
         return (valid, params_dict)
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+PING=<target>[,<timeout>]\r\n"
+        return "\r\nAT+PING=<target>[,<timeout>[,<protocol>]]\r\n"
 
     @staticmethod
     def signature() -> str:
