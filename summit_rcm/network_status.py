@@ -1,10 +1,8 @@
 import os
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
-import time
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 import falcon
-from threading import Lock
 from .settings import ServerConfig, SystemSettingsManage
 from . import definition
 from syslog import syslog, LOG_ERR
@@ -30,9 +28,7 @@ from .network_manager_service import (
 
 
 class NetworkStatusHelper(object):
-
     _network_status = {}
-    _lock = Lock()
     _IW_PATH = "/usr/sbin/iw"
 
     @classmethod
@@ -1156,172 +1152,8 @@ class NetworkStatusHelper(object):
                         "activeaccesspoint"
                     ] = await cls.get_ap_properties(wireless_properties, interface_name)
 
-    @classmethod
-    def get_lock(cls):
-        return cls._lock
-
-
-async def dev_added(dev_obj_path: str) -> None:
-    try:
-        dev_properties = await NetworkManagerService().get_obj_properties(
-            dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-        )
-        interface_name = dev_properties.get("Interface", "")
-        if interface_name == "":
-            return
-        NetworkStatusHelper._network_status[interface_name] = {}
-        NetworkStatusHelper._network_status[interface_name][
-            "status"
-        ] = NetworkStatusHelper.get_dev_status(dev_properties)
-    except Exception:
-        pass
-
-
-async def dev_removed(dev_obj_path):
-    try:
-        dev_properties = await NetworkManagerService().get_obj_properties(
-            dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-        )
-        interface_name = dev_properties.get("Interface", "")
-        if interface_name == "":
-            return
-        NetworkStatusHelper._network_status.pop(interface_name, None)
-    except Exception:
-        pass
-
-
-# def ap_propchange(ap, interface, signal, properties):
-#     if "Strength" in properties:
-#         for k in NetworkStatusHelper._network_status:
-#             if NetworkStatusHelper._network_status[k].get("activeaccesspoint", None):
-#                 if (
-#                     NetworkStatusHelper._network_status[k]["activeaccesspoint"].get(
-#                         "Ssid"
-#                     )
-#                     == ap.Ssid
-#                 ):
-#                     with NetworkStatusHelper._lock:
-#                         NetworkStatusHelper._network_status[k]["activeaccesspoint"][
-#                             "Strength"
-#                         ] = properties["Strength"]
-
-
-def dev_statechange(dev, new_state, old_state, reason):
-    interface_name = dev.get_iface()
-    if not interface_name:
-        return
-    if interface_name not in NetworkStatusHelper._network_status:
-        NetworkStatusHelper._network_status[interface_name] = {}
-
-    with NetworkStatusHelper._lock:
-        if new_state == int(NM.DeviceState.ACTIVATED):
-            NetworkStatusHelper._network_status[interface_name][
-                "status"
-            ] = NetworkStatusHelper.get_dev_status(dev)
-
-            dev_active_connection = dev.get_active_connection()
-            if dev_active_connection:
-                active_connection = dev_active_connection.get_connection()
-                setting_connection = active_connection.get_setting_connection()
-
-                if setting_connection:
-                    connection_active = {}
-                    connection_active["id"] = setting_connection.get_id()
-                    connection_active[
-                        "interface-name"
-                    ] = setting_connection.get_interface_name()
-                    connection_active["permissions"] = setting_connection.get_property(
-                        "permissions"
-                    )
-                    connection_active["type"] = setting_connection.get_property("type")
-                    connection_active["uuid"] = setting_connection.get_uuid()
-                    connection_active["zone"] = setting_connection.get_zone()
-                    NetworkStatusHelper._network_status[interface_name][
-                        "connection_active"
-                    ] = connection_active
-
-            NetworkStatusHelper._network_status[interface_name][
-                "ip4config"
-            ] = NetworkStatusHelper.get_ip4config_properties(dev.get_ip4_config())
-            # NetworkStatusHelper._network_status[interface_name][
-            #     "ip6config"
-            # ] = NetworkStatusHelper.get_ipconfig_properties(dev.get_ip6_config())
-            NetworkStatusHelper._network_status[interface_name][
-                "dhcp4config"
-            ] = NetworkStatusHelper.get_dhcp_config_properties(dev.get_dhcp4_config())
-            NetworkStatusHelper._network_status[interface_name][
-                "dhcp6config"
-            ] = NetworkStatusHelper.get_dhcp_config_properties(dev.get_dhcp6_config())
-        # 				dev.ActiveAccessPoint.OnPropertiesChanged(ap_propchange)
-        elif new_state == int(NM.DeviceState.DISCONNECTED):
-            if "ip4config" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "ip4config", None
-                )
-            if "ip6config" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "ip6config", None
-                )
-            if "dhcp4config" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "dhcp4config", None
-                )
-            if "dhcp6config" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "dhcp6config", None
-                )
-            if (
-                "activeaccesspoint"
-                in NetworkStatusHelper._network_status[interface_name]
-            ):
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "activeaccesspoint", None
-                )
-            if (
-                "connection_active"
-                in NetworkStatusHelper._network_status[interface_name]
-            ):
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "connection_active", None
-                )
-        elif new_state == int(NM.DeviceState.UNAVAILABLE):
-            if "wired" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop("wired", None)
-            if "wireless" in NetworkStatusHelper._network_status[interface_name]:
-                NetworkStatusHelper._network_status[interface_name].pop(
-                    "wireless", None
-                )
-        NetworkStatusHelper._network_status[interface_name]["status"][
-            "State"
-        ] = new_state
-
-
-async def run_event_listener():
-
-    await NetworkStatusHelper.network_status_query()
-
-    await NetworkManagerService().add_device_added_callback(dev_added)
-    await NetworkManagerService().add_device_removed_callback(dev_removed)
-
-    # TODO:
-    # with NetworkStatusHelper.get_lock():
-    #     all_devices = NetworkStatusHelper.get_client().get_all_devices()
-    # for dev in all_devices:
-    #     if dev.get_device_type() in (
-    #         NM.DeviceType.ETHERNET,
-    #         NM.DeviceType.WIFI,
-    #         NM.DeviceType.MODEM,
-    #     ):
-    #         dev.connect("state-changed", dev_statechange)
-    # In case wifi connection is already activated
-    # 		if dev.DeviceType == NetworkManager.NM_DEVICE_TYPE_WIFI and dev.ActiveAccessPoint:
-    # 			dev.ActiveAccessPoint.OnPropertiesChanged(ap_propchange)
-
 
 class NetworkStatus:
-    async def start(self):
-        await run_event_listener()
-
     async def on_get(self, req, resp):
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON

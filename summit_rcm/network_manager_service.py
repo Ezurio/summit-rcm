@@ -1,12 +1,10 @@
-from os import path
 from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
-from typing import Any, Dict, List, Callable
+from typing import Any, Dict, List
 import summit_rcm.definition
 from .utils import Singleton
 from .dbus_manager import DBusManager
 from dbus_fast import Message, MessageType, Variant
-from dbus_fast.aio import ProxyObject
 from enum import IntFlag, IntEnum, unique
 
 
@@ -1442,9 +1440,6 @@ class NetworkManagerService(object, metaclass=Singleton):
 
     NM_ACCESS_POINT_IFACE = "org.freedesktop.NetworkManager.AccessPoint"
 
-    def __init__(self) -> None:
-        self._connection_manager = None
-
     async def get_all_devices(self) -> List[str]:
         bus = await DBusManager().get_bus()
 
@@ -1642,38 +1637,6 @@ class NetworkManagerService(object, metaclass=Singleton):
 
         if reply.message_type == MessageType.ERROR:
             raise Exception(reply.body[0])
-
-    async def get_connection_manager_proxy_object(self) -> ProxyObject:
-        if self._connection_manager is None:
-            bus = await DBusManager().get_bus()
-            if not bus:
-                raise
-            with open(
-                path.join(
-                    self.NM_INTROSPECTION_INTERFACES_DIR,
-                    self.NM_CONNECTION_MANAGER_IFACE + ".xml",
-                )
-            ) as interface_file:
-                introspection = interface_file.read()
-
-            self._connection_manager = bus.get_proxy_object(
-                self.NM_CONNECTION_MANAGER_IFACE,
-                self.NM_CONNECTION_MANAGER_OBJ_PATH,
-                introspection,
-            )
-        return self._connection_manager
-
-    async def add_device_added_callback(self, callback: Callable[[str], None]):
-        connection_manager = await self.get_connection_manager_proxy_object()
-        connection_manager.get_interface(
-            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE
-        ).on_device_added(callback)
-
-    async def add_device_removed_callback(self, callback: Callable[[str], None]):
-        connection_manager = await self.get_connection_manager_proxy_object()
-        connection_manager.get_interface(
-            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE
-        ).on_device_removed(callback)
 
     async def prepare_setting(
         self, setting_name: str, connection: dict, new_connection: dict
