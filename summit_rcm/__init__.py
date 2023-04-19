@@ -258,7 +258,6 @@ async def add_users():
 async def add_network():
     try:
         status = NetworkStatus()
-        await status.start()
         network_interface = NetworkInterface()
         network_interfaces = NetworkInterfaces()
         network_interface_stats = NetworkInterfaceStatistics()
