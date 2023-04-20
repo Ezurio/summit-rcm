@@ -1,14 +1,13 @@
 import asyncio
+from syslog import syslog
 import time
 from typing import List, Optional, Tuple
-from dataclasses import dataclass
 from summit_rcm.at_interface.dialer import Dialer
 
 from summit_rcm.utils import Singleton
 import summit_rcm.at_interface.fsm as fsm
 
 
-@dataclass
 class Connection:
     id: int
     type: str
@@ -20,6 +19,30 @@ class Connection:
     data_buffer: bytes
     listener_id: int
     busy: bool
+
+    def __init__(
+        self,
+        id: int,
+        type: str,
+        addr: str,
+        port: int,
+        keepalive: int,
+        connected: bool,
+        dialer: Dialer,
+        data_buffer: bytes,
+        listener_id: int,
+        busy: bool,
+    ) -> None:
+        self.id = id
+        self.type = type
+        self.addr = addr
+        self.port = port
+        self.keepalive = keepalive
+        self.connected = connected
+        self.dialer = dialer
+        self.data_buffer = data_buffer
+        self.listener_id = listener_id
+        self.busy = busy
 
     def on_connection_made(self):
         fsm.ATInterfaceFSM().dte_output(f"+IP, {self.id} Connected\r\n")
@@ -41,11 +64,11 @@ class Connection:
 
 
 class ConnectionService(object, metaclass=Singleton):
-    MAX_CONNECTIONS = 6
-    escape_delay = 0.02
-    escape_count = 0
-    escape = False
-    rx_timestamp = 0
+    MAX_CONNECTIONS: int = 6
+    escape_delay: float = 0.02
+    escape_count: int = 0
+    escape: bool = False
+    rx_timestamp: float = 0.0
 
     def __init__(self) -> None:
         # Pre-populate connection list
@@ -119,8 +142,9 @@ class ConnectionService(object, metaclass=Singleton):
                 type,
             )
             self.connections[id].connected = True
-        except Exception:
+        except Exception as e:
             self.connections[id].connected = False
+            syslog(f"Error starting connection: {str(e)}")
             return False
         return True
 
@@ -150,7 +174,7 @@ class ConnectionService(object, metaclass=Singleton):
             return False
         return True
 
-    def send_data(self, id: int, length: bytes) -> Tuple[bool, int]:
+    def send_data(self, id: int, length: int) -> Tuple[bool, int]:
         """
         Send data to an existing IP connection and return success/failure
         """

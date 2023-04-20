@@ -1,14 +1,12 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.definition import SUMMIT_RCM_VERSION
 
 
-@dataclass
 class VersionCommand(Command):
-    name = "Version"
-    signature = "at+ver"
-    valid_num_params = [1]
+    NAME: str = "Version"
+    SIGNATURE: str = "at+ver"
+    VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -16,7 +14,7 @@ class VersionCommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {VersionCommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {VersionCommand.SIGNATURE}?\r\n",
             )
         return (True, f"\r\n{SUMMIT_RCM_VERSION}\r\nOK\r\n")
 
@@ -25,7 +23,7 @@ class VersionCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in VersionCommand.valid_num_params
+        valid &= len(params_list) in VersionCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param == ""
         return (valid, params_dict)
@@ -33,3 +31,11 @@ class VersionCommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\nAT+VER\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return VersionCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return VersionCommand.NAME
