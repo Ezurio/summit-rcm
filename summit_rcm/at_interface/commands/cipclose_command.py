@@ -1,14 +1,12 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.connection_service import ConnectionService
 
 
-@dataclass
 class CIPCLOSECommand(Command):
-    name = "Close IP connection"
-    signature = "at+cipclose"
-    valid_num_params = [1]
+    NAME: str = "Close IP connection"
+    SIGNATURE: str = "at+cipclose"
+    VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -16,7 +14,7 @@ class CIPCLOSECommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {CIPCLOSECommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {CIPCLOSECommand.SIGNATURE}?\r\n",
             )
 
         try:
@@ -38,7 +36,7 @@ class CIPCLOSECommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in CIPCLOSECommand.valid_num_params
+        valid &= len(params_list) in CIPCLOSECommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
         if valid:
@@ -51,3 +49,11 @@ class CIPCLOSECommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\nAT+CIPCLOSE=<connection id>\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return CIPCLOSECommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return CIPCLOSECommand.NAME

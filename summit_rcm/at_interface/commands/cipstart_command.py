@@ -1,14 +1,12 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.connection_service import ConnectionService
 
 
-@dataclass
 class CIPSTARTCommand(Command):
-    name = "Start IP connection"
-    signature = "at+cipstart"
-    valid_num_params = [4, 5]
+    NAME: str = "Start IP connection"
+    SIGNATURE: str = "at+cipstart"
+    VALID_NUM_PARAMS: List[int] = [4, 5]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -16,7 +14,7 @@ class CIPSTARTCommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {CIPSTARTCommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {CIPSTARTCommand.SIGNATURE}?\r\n",
             )
         if not ConnectionService.validate_connection_type(params_dict["type"]):
             return (True, "\r\nCONNECTION TYPE ERROR\r\n")
@@ -38,7 +36,7 @@ class CIPSTARTCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         given_num_param = len(params_list)
-        valid &= given_num_param in CIPSTARTCommand.valid_num_params
+        valid &= given_num_param in CIPSTARTCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
         if valid:
@@ -60,3 +58,11 @@ class CIPSTARTCommand(Command):
             "\r\nAT+CIPSTART=<connection id>,<type>,<remote IP>,"
             "<remote port>[,<keepalive>]\r\n"
         )
+
+    @staticmethod
+    def signature() -> str:
+        return CIPSTARTCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return CIPSTARTCommand.NAME

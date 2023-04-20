@@ -1,13 +1,11 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 
 
-@dataclass
 class EmptyCommand(Command):
-    name = "Empty"
-    signature = ""
-    valid_num_params = [0]
+    NAME: str = "Empty"
+    SIGNATURE: str = ""
+    VALID_NUM_PARAMS: List[int] = [0]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -16,3 +14,11 @@ class EmptyCommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return EmptyCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return EmptyCommand.NAME

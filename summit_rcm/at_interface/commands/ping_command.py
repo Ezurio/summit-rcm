@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 from pythonping import ping
 
@@ -7,11 +6,10 @@ DEFAULT_TIMEOUT = 5
 PING_COUNT = 3
 
 
-@dataclass
 class PingCommand(Command):
-    name = "Ping"
-    signature = "at+ping"
-    valid_num_params = [1, 2]
+    NAME: str = "Ping"
+    SIGNATURE: str = "at+ping"
+    VALID_NUM_PARAMS: List[int] = [1, 2]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -19,7 +17,7 @@ class PingCommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {PingCommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {PingCommand.SIGNATURE}?\r\n",
             )
         try:
             ping_str = str(
@@ -41,7 +39,7 @@ class PingCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         given_num_param = len(params_list)
-        valid &= given_num_param in PingCommand.valid_num_params
+        valid &= given_num_param in PingCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
         if valid:
@@ -57,3 +55,11 @@ class PingCommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\nAT+PING=<target>[,<timeout>]\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return PingCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return PingCommand.NAME
