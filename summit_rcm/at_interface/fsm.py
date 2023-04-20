@@ -1,5 +1,5 @@
 import serial
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 from statemachine import StateMachine, State
 from threading import Lock
 from summit_rcm.at_interface.commands.command import Command
@@ -15,16 +15,16 @@ from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
 from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
 from utils import Singleton
 
-AT_COMMANDS = {
-    CIPSTARTCommand.signature: CIPSTARTCommand,
-    CIPCLOSECommand.signature: CIPCLOSECommand,
-    CIPSENDCommand.signature: CIPSENDCommand,
-    CommunicationCheckCommand.signature: CommunicationCheckCommand,
-    EmptyCommand.signature: EmptyCommand,
-    VersionCommand.signature: VersionCommand,
-    # PingCommand.signature: PingCommand,
-    ConnectionsCommand.signature: ConnectionsCommand,
-}
+AT_COMMANDS: List[Command] = [
+    CIPSTARTCommand,
+    CIPCLOSECommand,
+    CIPSENDCommand,
+    CommunicationCheckCommand,
+    EmptyCommand,
+    VersionCommand,
+    # PingCommand,
+    ConnectionsCommand,
+]
 
 
 class SingletonBase(metaclass=Singleton):
@@ -78,8 +78,10 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
         super().__init__(model, state_field, start_value)
 
     def on_input_received(
-        self, event: str, source: State, target: State, message: bytes
+        self, event: str, source: State, target: State, message: bytes | str
     ):
+        if isinstance(message, str):
+            message = bytes(message)
         if source.id == self.idle.id or source.id == self.analyze_input.id:
             message = message.decode("utf-8")
             length = len(self.command_buffer)
@@ -151,8 +153,8 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
             return
 
         self.log_debug(
-            f"*** EXEC: id: {command.signature}, name: {command.name}, "
-            "params: {params}, print usage: {print_usage} ***\r\n"
+            f"*** EXEC: id: {command.signature()}, name: {command.name()}, "
+            f"params: {params}, print usage: {print_usage} ***\r\n"
         )
         done = True
         if print_usage:
@@ -189,20 +191,15 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
         if "=" in command:
             # 'value' command
             command_split = command.split("=")
-            if command_split[0] in AT_COMMANDS.keys():
-                return (
-                    AT_COMMANDS[command_split[0]],
-                    "=".join(command_split[1:]),
-                    print_usage,
-                )
-            else:
-                return (None, "", False)
+            for at_command in AT_COMMANDS:
+                if command_split[0] == at_command.signature():
+                    return (at_command, "=".join(command_split[1:]), print_usage)
         else:
             # not a 'value' command
-            if command in AT_COMMANDS.keys():
-                return (AT_COMMANDS[command], "", print_usage)
-            else:
-                return (None, "", False)
+            for at_command in AT_COMMANDS:
+                if command == at_command.signature():
+                    return (at_command, "", print_usage)
+        return (None, "", False)
 
     def check_escape(self):
         pass

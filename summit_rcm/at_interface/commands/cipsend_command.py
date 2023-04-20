@@ -1,16 +1,14 @@
-from dataclasses import dataclass
 from syslog import LOG_ERR, syslog
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.connection_service import ConnectionService
 import summit_rcm.at_interface.fsm as fsm
 
 
-@dataclass
 class CIPSENDCommand(Command):
-    name = "Send IP data command"
-    signature = "at+cipsend"
-    valid_num_params = [2]
+    NAME: str = "Send IP data command"
+    SIGNATURE: str = "at+cipsend"
+    VALID_NUM_PARAMS: List[int] = [2]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -18,7 +16,7 @@ class CIPSENDCommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {CIPSENDCommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {CIPSENDCommand.SIGNATURE}?\r\n",
             )
 
         try:
@@ -60,7 +58,7 @@ class CIPSENDCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in CIPSENDCommand.valid_num_params
+        valid &= len(params_list) in CIPSENDCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
         if valid:
@@ -74,3 +72,11 @@ class CIPSENDCommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\nAT+CIPSEND=<connection id>,<length>\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return CIPSENDCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return CIPSENDCommand.NAME

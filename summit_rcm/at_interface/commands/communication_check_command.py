@@ -1,13 +1,11 @@
-from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 
 
-@dataclass
 class CommunicationCheckCommand(Command):
-    name = "Communication Check"
-    signature = "at"
-    valid_num_params = [1]
+    NAME: str = "Communication Check"
+    SIGNATURE: str = "at"
+    VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
     def execute(params: str) -> Tuple[bool, str]:
@@ -15,7 +13,7 @@ class CommunicationCheckCommand(Command):
         if not valid:
             return (
                 True,
-                f"\r\nInvalid Parameters: See Usage - {CommunicationCheckCommand.signature}?\r\n",
+                f"\r\nInvalid Parameters: See Usage - {CommunicationCheckCommand.SIGNATURE}?\r\n",
             )
         return (True, "\r\nOK\r\n")
 
@@ -23,7 +21,7 @@ class CommunicationCheckCommand(Command):
     def parse_params(params: str) -> Tuple[bool, dict]:
         valid = True
         params_list = params.split(",")
-        valid &= len(params_list) in CommunicationCheckCommand.valid_num_params
+        valid &= len(params_list) in CommunicationCheckCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param == ""
         return (valid, {})
@@ -31,3 +29,11 @@ class CommunicationCheckCommand(Command):
     @staticmethod
     def usage() -> str:
         return "\r\nAT\r\n"
+
+    @staticmethod
+    def signature() -> str:
+        return CommunicationCheckCommand.SIGNATURE
+
+    @staticmethod
+    def name() -> str:
+        return CommunicationCheckCommand.NAME

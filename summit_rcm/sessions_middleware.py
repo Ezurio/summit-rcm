@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from falcon import Request, Response
@@ -18,10 +17,13 @@ Maximum session age in seconds (10 minutes)
 """
 
 
-@dataclass
 class Session:
     id: str
     expiry: int
+
+    def __init__(self, id: str, expiry: int) -> None:
+        self.id = id
+        self.expiry = expiry
 
 
 class SessionsMiddleware:
