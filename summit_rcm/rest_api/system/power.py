@@ -1,5 +1,5 @@
 import falcon
-from summit_rcm.services.system_service import SystemService
+from summit_rcm.services.system_service import SystemService, VALID_POWER_STATES
 
 
 class PowerResource(object):
@@ -15,7 +15,7 @@ class PowerResource(object):
     async def on_put(self, req: falcon.Request, resp: falcon.Response) -> None:
         post_data = await req.get_media()
         desired_state = str(post_data.get("state", ""))
-        if desired_state == "":
+        if desired_state == "" or desired_state not in VALID_POWER_STATES:
             resp.status = falcon.HTTP_400
             return
 
