@@ -25,6 +25,7 @@ from .settings import SystemSettingsManage, ServerConfig
 from .version import Version
 import falcon.asgi
 from summit_rcm.rest_api.system.power import PowerResource
+from summit_rcm.rest_api.system.fips import FipsResource
 
 summit_rcm_plugins: List[str] = []
 
@@ -444,7 +445,8 @@ async def add_bluetooth():
 
 async def add_system():
     app.add_route("/api/v2/system/power", PowerResource())
-    syslog("/api/v2/system/power loaded")
+    app.add_route("/api/v2/system/fips", FipsResource())
+    syslog("/api/v2/system loaded")
 
 
 def add_middleware(enable_session_checking: bool) -> None:

@@ -15,14 +15,14 @@ VALID_POWER_STATES = ["on", "off", "suspend", "reboot"]
 
 class SystemService(metaclass=Singleton):
     def __init__(self) -> None:
-        self._state: str = "on"
+        self._power_state: str = "on"
 
     @property
     def power_state(self) -> str:
         """
         Retrive the current power state
         """
-        return self._state
+        return self._power_state
 
     async def set_power_state(self, value: str):
         """
@@ -33,11 +33,11 @@ class SystemService(metaclass=Singleton):
         - reboot
         """
         if value == "on":
-            self._state = "on"
+            self._power_state = "on"
         elif value == "off":
-            self._state = "off" if await self.__power_off() else "on"
+            self._power_state = "off" if await self.__power_off() else "on"
         elif value == "reboot":
-            self._state = "reboot" if await self.__reboot() else "on"
+            self._power_state = "reboot" if await self.__reboot() else "on"
         elif value == "suspend":
             self._state = "suspend" if await self.__suspend() else "on"
 

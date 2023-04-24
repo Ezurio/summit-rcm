@@ -1,13 +1,13 @@
 import falcon
 import os
 from syslog import syslog, LOG_ERR
-from subprocess import run, call, TimeoutExpired, CalledProcessError
+from subprocess import call
 from .definition import (
     SUMMIT_RCM_ERRORS,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
 )
-from .settings import SystemSettingsManage
 from summit_rcm.services.system_service import SystemService
+from summit_rcm.services.fips_service import FipsService
 
 
 class PowerOff:
@@ -123,8 +123,6 @@ class FactoryReset:
 
 
 class Fips:
-    FIPS_SCRIPT = "/usr/bin/fips-set"
-
     async def on_put(self, req, resp):
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -142,28 +140,10 @@ class Fips:
             resp.media = result
             return
 
-        try:
-            run(
-                [Fips.FIPS_SCRIPT, fips],
-                check=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-
-        except CalledProcessError as e:
-            syslog("FIPS set error: %d" % e.returncode)
+        if not await FipsService().set_fips_state(fips):
             result["InfoMsg"] = "FIPS SET error"
-
-        except FileNotFoundError:
-            result["InfoMsg"] = "Not a FIPS image"
-
-        except TimeoutExpired as e:
-            syslog("FIPS SET timeout: %s" % e)
-            result["InfoMsg"] = "FIPS SET timeout"
-
-        except Exception as e:
-            syslog("FIPS set exception: %s" % e)
-            result["InfoMsg"] = "FIPS SET exception: {}".format(e)
+        else:
+            result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
 
         try:
             from .stunnel.stunnel import Stunnel
@@ -190,30 +170,7 @@ class Fips:
             "status": "unset",
         }
 
-        try:
-            p = run(
-                [Fips.FIPS_SCRIPT, "status"],
-                capture_output=True,
-                check=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            result["status"] = p.stdout.decode("utf-8").strip()
-            result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-
-        except CalledProcessError as e:
-            syslog("FIPS set error: %d" % e.returncode)
-            result["InfoMsg"] = "FIPS SET error"
-
-        except FileNotFoundError:
-            result["InfoMsg"] = "Not a FIPS image"
-            result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-
-        except TimeoutExpired as e:
-            syslog("FIPS SET timeout: %s" % e)
-            result["InfoMsg"] = "FIPS SET timeout"
-
-        except Exception as e:
-            syslog("FIPS set exception: %s" % e)
-            result["InfoMsg"] = "FIPS SET exception: {}".format(e)
+        result["status"] = await FipsService().get_fips_state()
+        result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
 
         resp.media = result
