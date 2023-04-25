@@ -3,7 +3,7 @@ from typing import Tuple
 
 class Command:
     @staticmethod
-    def execute(params: str) -> Tuple[bool, str]:
+    async def execute(params: str) -> Tuple[bool, str]:
         """
         Function which runs the actual logic of the command. Return type is a tuple in the form
         (done, response)
