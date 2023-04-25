@@ -1,12 +1,11 @@
 import falcon
 import os
 from syslog import syslog, LOG_ERR
-from subprocess import call
-from .definition import (
+from summit_rcm.definition import (
     SUMMIT_RCM_ERRORS,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
 )
-from summit_rcm.services.system_service import SystemService
+from summit_rcm.services.system_service import SystemService, FACTORY_RESET_SCRIPT
 from summit_rcm.services.fips_service import FipsService
 
 
@@ -87,8 +86,6 @@ class Reboot:
 
 
 class FactoryReset:
-    FACTORY_RESET_SCRIPT = "/usr/sbin/do_factory_reset.sh"
-
     async def on_put(self, req, resp):
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -97,7 +94,7 @@ class FactoryReset:
             "InfoMsg": "FactoryReset cannot be initiated",
         }
 
-        if not os.path.exists(self.FACTORY_RESET_SCRIPT):
+        if not os.path.exists(FACTORY_RESET_SCRIPT):
             result["InfoMsg"] += " - not available on non-encrypted file system images"
             resp.media = result
             return
@@ -107,17 +104,13 @@ class FactoryReset:
             resp.media = result
             return
 
-        syslog("Factory Reset requested")
-        try:
-            returncode = call([self.FACTORY_RESET_SCRIPT, "reset"])
-        except BaseException:
-            returncode = -1
+        returncode: int = await SystemService().initiate_factory_reset()
         result["SDCERR"] = returncode
         if returncode == 0:
             result["InfoMsg"] = "Reboot required"
         else:
             result["InfoMsg"] = "Error running factory reset"
-            syslog("FactoryReset's returned % d" % returncode)
+            syslog(f"FactoryReset returned {returncode}")
 
         resp.media = result
 
@@ -146,7 +139,7 @@ class Fips:
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
 
         try:
-            from .stunnel.stunnel import Stunnel
+            from summit_rcm.stunnel.stunnel import Stunnel
 
             if fips == "fips" or fips == "fips_wifi":
                 Stunnel.configure_fips(enabled=True)

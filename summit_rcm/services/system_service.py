@@ -9,8 +9,10 @@ from summit_rcm.definition import (
     LOGIND_MAIN_OBJ,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
 )
+from subprocess import call
 
 VALID_POWER_STATES = ["on", "off", "suspend", "reboot"]
+FACTORY_RESET_SCRIPT = "/usr/sbin/do_factory_reset.sh"
 
 
 class SystemService(metaclass=Singleton):
@@ -40,6 +42,28 @@ class SystemService(metaclass=Singleton):
             self._power_state = "reboot" if await self.__reboot() else "on"
         elif value == "suspend":
             self._state = "suspend" if await self.__suspend() else "on"
+
+    async def initiate_factory_reset(self) -> int:
+        """
+        Initiate a factory reset and return an integer returncode indicating success/failure (0 for
+        success, non-zero for failure).
+        """
+        if not os.path.exists(FACTORY_RESET_SCRIPT):
+            return -1
+
+        if os.path.exists(MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE):
+            return -1
+
+        syslog("Factory Reset requested")
+        try:
+            returncode: int = call([FACTORY_RESET_SCRIPT, "reset"])
+        except Exception as e:
+            syslog(LOG_ERR, f"FactoryReset error - {str(e)}")
+            return -1
+
+        if returncode != 0:
+            syslog(LOG_ERR, f"FactoryReset error - returncode: {returncode}")
+        return returncode
 
     async def __power_off(self) -> bool:
         """
