@@ -1,6 +1,5 @@
-import serial
 from typing import Callable, List, Optional, Tuple
-from statemachine import StateMachine, State
+from transitions.extensions.asyncio import AsyncMachine
 from threading import Lock
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.commands.communication_check_command import (
@@ -14,6 +13,7 @@ from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
 from summit_rcm.at_interface.commands.ping_command import PingCommand
 from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
 from utils import Singleton
+from asyncio import Transport, Protocol
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -27,37 +27,13 @@ AT_COMMANDS: List[Command] = [
 ]
 
 
-class SingletonBase(metaclass=Singleton):
-    pass
-
-
-class SingletonStateMachineMeta(type(StateMachine), type(SingletonBase)):
-    pass
-
-
-class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachineMeta):
+class ATInterfaceFSM(metaclass=Singleton):
     """
     The AT command interface finite state machine
     """
 
-    # States
-    idle = State("Idle", initial=True)
-    analyze_input = State("Analyze Input")
-    validate_command = State("Validate Command")
-    process_command = State("Process Command")
-
-    # Events
-    input_received = (
-        idle.to(analyze_input)
-        | analyze_input.to(analyze_input)
-        | validate_command.to(validate_command)
-        | process_command.to(process_command)
-    )
-    carriage_return_found = analyze_input.to(validate_command)
-    carriage_return_not_found = analyze_input.to(idle)
-    valid_command = validate_command.to(process_command)
-    invalid_command = validate_command.to(idle)
-    command_complete = process_command.to(idle)
+    states = ["idle", "analyze_input", "validate_command", "process_command"]
+    machine: Optional[AsyncMachine] = None
 
     mutex = Lock()
 
@@ -72,17 +48,54 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
 
     _listeners: Callable[[str], None] = []
 
-    def __init__(self, model=None, state_field="state", start_value=None):
-        self.quit = False
-        self.dte_file = serial.Serial("/dev/ttyS2", 115200, timeout=0)
-        super().__init__(model, state_field, start_value)
+    _transport: Optional[Transport] = None
+    _protocol: Optional[Protocol] = None
 
-    def on_input_received(
-        self, event: str, source: State, target: State, message: bytes | str
-    ):
+    def __init__(self):
+        self.machine = AsyncMachine(model=self, states=self.states, initial="idle")
+        self.machine.add_transition(
+            trigger="input_received", source="idle", dest="analyze_input"
+        )
+        self.machine.add_transition(
+            trigger="input_received", source="analyze_input", dest="analyze_input"
+        )
+        self.machine.add_transition(
+            trigger="input_received", source="validate_command", dest="validate_command"
+        )
+        self.machine.add_transition(
+            trigger="input_received", source="process_command", dest="process_command"
+        )
+        self.machine.add_transition(
+            trigger="carriage_return_found",
+            source="analyze_input",
+            dest="validate_command",
+        )
+        self.machine.add_transition(
+            trigger="carriage_return_not_found",
+            source="analyze_input",
+            dest="idle",
+        )
+        self.machine.add_transition(
+            trigger="valid_command",
+            source="validate_command",
+            dest="process_command",
+        )
+        self.machine.add_transition(
+            trigger="invalid_command",
+            source="validate_command",
+            dest="idle",
+        )
+        self.machine.add_transition(
+            trigger="command_complete",
+            source="process_command",
+            dest="idle",
+        )
+        self.quit = False
+
+    async def on_input_received(self, message: bytes | str):
         if isinstance(message, str):
             message = bytes(message)
-        if source.id == self.idle.id or source.id == self.analyze_input.id:
+        if self.state == "idle" or self.state == "analyze_input":
             message = message.decode("utf-8")
             length = len(self.command_buffer)
             self.command_buffer += message
@@ -91,34 +104,30 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
                     backspace_index = self.command_buffer.find("\x7f")
                     temp_buf = self.command_buffer[: backspace_index - 1]
                     if backspace_index != (length - 1):
-                        temp_buf += self.command_buffer[backspace_index + 1:]
+                        temp_buf += self.command_buffer[backspace_index + 1 :]
                     self.command_buffer = temp_buf
                 else:
                     self.command_buffer = ""
             self.echo(message)
-        elif source.id == self.process_command.id:
+        elif self.state == "process_command":
             self.log_debug("Rx: " + message.decode("utf-8") + " ")
             for listener in self._listeners:
                 listener(message)
+        await self.input_received()
 
-    def on_invalid_command(
-        self, event: str, source: State, target: State, message: str = ""
-    ):
-        self.dte_output("\r\nERROR: Invalid Command\r\n")
-
-    def on_enter_idle(self):
+    async def on_enter_idle(self):
         self.log_debug("Entering Idle\r\n")
 
-    def on_enter_analyze_input(self):
+    async def on_enter_analyze_input(self):
         self.log_debug("Entering Analyze Input\r\n")
         current_buffer = self.command_buffer
         found_crlf = len(current_buffer) >= 1 and current_buffer[-1:] == "\r"
         if found_crlf:
-            self.carriage_return_found()
+            await self.carriage_return_found()
         else:
-            self.carriage_return_not_found()
+            await self.carriage_return_not_found()
 
-    def on_enter_validate_command(self):
+    async def on_enter_validate_command(self):
         self.log_debug("Entering Validate Command\r\n")
         command = ""
         command = self.command_buffer.strip()
@@ -126,18 +135,19 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
         (command_to_run, params_to_use, print_usage) = self.lookup_command(command)
         if command_to_run is None:
             self.current_command = None
-            self.invalid_command()
+            self.dte_output("\r\nERROR: Invalid Command\r\n")
+            await self.invalid_command()
             return
 
         self.current_command = command_to_run
         self.current_command_params = params_to_use
         self.current_command_print_usage = print_usage
-        self.valid_command()
+        await self.valid_command()
 
-    def on_exit_validate_command(self):
+    async def on_exit_validate_command(self):
         self.clear_command_buffer()
 
-    def on_enter_process_command(self):
+    async def on_enter_process_command(self):
         self.log_debug("Entering Process Command\r\n")
 
         command = self.current_command
@@ -149,7 +159,7 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
             self.current_command = None
             self.current_command_params = ""
             self.current_command_print_usage = False
-            self.command_complete()
+            await self.command_complete()
             return
 
         self.log_debug(
@@ -160,7 +170,7 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
         if print_usage:
             resp = str(command.usage())
         else:
-            (done, resp) = command.execute(params)
+            (done, resp) = await command.execute(params)
         self.log_debug(f"*** RESP: {resp} ***\r\n")
         self.dte_output(resp)
 
@@ -168,7 +178,7 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
             self.current_command = None
             self.current_command_params = ""
             self.current_command_print_usage = False
-            self.command_complete()
+            await self.command_complete()
 
     def lookup_command(self, command: str) -> Tuple[Optional[Command], str, bool]:
         """
@@ -204,15 +214,11 @@ class ATInterfaceFSM(StateMachine, SingletonBase, metaclass=SingletonStateMachin
     def check_escape(self):
         pass
 
-    def dte_input(self, c):
-        self.input_received(message=c)
-
     def dte_output(self, c):
-        try:
-            self.dte_file.write(c)
-        except TypeError:
-            self.dte_file.write(bytes(c, "utf-8"))
-        self.dte_file.flush()
+        if self._transport and len(c) > 0:
+            if isinstance(c, str):
+                c = bytes(c, "utf-8")
+            self._transport.write(c)
 
     def log_debug(self, msg):
         if self.debug:

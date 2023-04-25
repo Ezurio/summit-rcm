@@ -9,7 +9,7 @@ class CIPSTARTCommand(Command):
     VALID_NUM_PARAMS: List[int] = [4, 5]
 
     @staticmethod
-    def execute(params: str) -> Tuple[bool, str]:
+    async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = CIPSTARTCommand.parse_params(params)
         if not valid:
             return (
