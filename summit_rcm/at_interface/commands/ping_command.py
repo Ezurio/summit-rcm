@@ -31,8 +31,9 @@ class PingCommand(Command):
         try:
             proc = subprocess.run(command, capture_output=True)
             ping_str = proc.stdout.decode("utf-8")
-            if match := re.search(r"(\d+\.\d+)/(\d+\.\d+)/(\d+\.\d+)", ping_str):
-                ping_str = match.group(2)
+            match = re.search(r"\d+\.\d+/(\d+\.\d+)/\d+\.\d+", ping_str)
+            if match:
+                ping_str = match.group(1)
                 return (True, f"\r\n{ping_str} OK\r\n")
             else:
                 return (True, "\r\nTIMEOUT ERROR\r\n")
