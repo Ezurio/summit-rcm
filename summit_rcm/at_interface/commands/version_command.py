@@ -9,7 +9,7 @@ class VersionCommand(Command):
     VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
-    def execute(params: str) -> Tuple[bool, str]:
+    async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = VersionCommand.parse_params(params)
         if not valid:
             return (

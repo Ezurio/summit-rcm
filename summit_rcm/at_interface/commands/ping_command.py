@@ -14,17 +14,21 @@ class PingCommand(Command):
     VALID_NUM_PARAMS: List[int] = [1, 2, 3]
 
     @staticmethod
-    def execute(params: str) -> Tuple[bool, str]:
+    async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = PingCommand.parse_params(params)
         if not valid:
             return (
                 True,
                 f"\r\nInvalid Parameters: See Usage - {PingCommand.SIGNATURE}?\r\n",
             )
-        command = (
-            ["ping", "-c", str(PING_COUNT), "-W",
-             params_dict["timeout"], params_dict["target"]]
-        )
+        command = [
+            "ping",
+            "-c",
+            str(PING_COUNT),
+            "-W",
+            params_dict["timeout"],
+            params_dict["target"],
+        ]
         if params_dict["protocol"]:
             protocol = "-" + params_dict["protocol"]
             command.insert(1, protocol)
@@ -52,8 +56,12 @@ class PingCommand(Command):
         if valid:
             try:
                 params_dict["target"] = params_list[0]
-                params_dict["timeout"] = params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
-                params_dict["protocol"] = params_list[2] if given_num_param == 3 else DEFAULT_PROTOCOL
+                params_dict["timeout"] = (
+                    params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
+                )
+                params_dict["protocol"] = (
+                    params_list[2] if given_num_param == 3 else DEFAULT_PROTOCOL
+                )
             except Exception:
                 valid = False
         return (valid, params_dict)

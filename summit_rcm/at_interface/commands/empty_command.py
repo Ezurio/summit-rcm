@@ -8,7 +8,7 @@ class EmptyCommand(Command):
     VALID_NUM_PARAMS: List[int] = [0]
 
     @staticmethod
-    def execute(params: str) -> Tuple[bool, str]:
+    async def execute(params: str) -> Tuple[bool, str]:
         return (True, "\r\n")
 
     @staticmethod
