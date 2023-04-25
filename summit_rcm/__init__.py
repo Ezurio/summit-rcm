@@ -20,13 +20,14 @@ from .unauthenticated import AllowUnauthenticatedResetReboot
 from .users import UserManage, LoginManage
 from .files import FileManage, FilesManage
 from .certificates import Certificates
-from .advanced import PowerOff, Suspend, Reboot, FactoryReset, Fips
+from summit_rcm.rest_api.legacy.advanced import PowerOff, Suspend, Reboot, FactoryReset, Fips
 from .date_time import DateTimeSetting
 from .settings import SystemSettingsManage, ServerConfig
 from .version import Version
 import falcon.asgi
-from summit_rcm.rest_api.system.power import PowerResource
-from summit_rcm.rest_api.system.fips import FipsResource
+from summit_rcm.rest_api.v2.system.power import PowerResource
+from summit_rcm.rest_api.v2.system.fips import FipsResource
+from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
 
 summit_rcm_plugins: List[str] = []
 
@@ -450,6 +451,7 @@ async def add_bluetooth():
 async def add_system():
     app.add_route("/api/v2/system/power", PowerResource())
     app.add_route("/api/v2/system/fips", FipsResource())
+    app.add_route("/api/v2/system/factoryReset", FactoryResetResource())
     syslog("/api/v2/system loaded")
 
 

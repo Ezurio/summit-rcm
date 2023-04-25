@@ -5,7 +5,7 @@ from threading import Lock
 from syslog import LOG_ERR, syslog
 from typing import Any, List, Tuple
 import falcon
-from .advanced import FactoryReset
+from summit_rcm.services.system_service import FACTORY_RESET_SCRIPT
 from .network_status import NetworkStatusHelper
 from . import definition
 from .settings import SystemSettingsManage
@@ -44,7 +44,7 @@ class FileManage:
             return None
 
     def is_encrypted_storage_toolkit_enabled(self) -> bool:
-        return os.path.exists(FactoryReset.FACTORY_RESET_SCRIPT)
+        return os.path.exists(FACTORY_RESET_SCRIPT)
 
     async def on_post(self, req, resp):
         resp.status = falcon.HTTP_200
