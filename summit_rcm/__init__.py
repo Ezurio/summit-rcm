@@ -1,3 +1,4 @@
+import asyncio
 from syslog import syslog
 from typing import List
 from . import definition
@@ -123,6 +124,9 @@ class SecureHeadersMiddleware:
 
 class LifespanMiddleware:
     async def process_startup(self, scope, event):
+        if ATInterface:
+            syslog("Starting AT interface")
+            asyncio.create_task(ATInterface(asyncio.get_event_loop()).start())
         await add_routes()
 
 
@@ -497,7 +501,3 @@ def start_server():
 
 syslog("Starting webserver")
 start_server()
-
-if ATInterface:
-    syslog("Starting AT interface")
-    ATInterface().start()
