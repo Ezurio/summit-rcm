@@ -14,6 +14,7 @@ from summit_rcm.at_interface.commands.ping_command import PingCommand
 from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
 from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
+from summit_rcm.at_interface.commands.fips_command import FipsCommand
 from utils import Singleton
 from asyncio import Transport, Protocol
 
@@ -28,6 +29,7 @@ AT_COMMANDS: List[Command] = [
     ConnectionsCommand,
     PowerCommand,
     FactoryResetCommand,
+    FipsCommand,
 ]
 
 
