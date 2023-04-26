@@ -12,6 +12,7 @@ from summit_rcm.at_interface.commands.cipsend_command import CIPSENDCommand
 from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
 from summit_rcm.at_interface.commands.ping_command import PingCommand
 from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
+from summit_rcm.at_interface.commands.power_command import PowerCommand
 from utils import Singleton
 from asyncio import Transport, Protocol
 
@@ -24,6 +25,7 @@ AT_COMMANDS: List[Command] = [
     VersionCommand,
     PingCommand,
     ConnectionsCommand,
+    PowerCommand,
 ]
 
 
