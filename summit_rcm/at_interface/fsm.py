@@ -1,6 +1,8 @@
 from typing import Callable, List, Optional, Tuple
-from transitions.extensions.asyncio import AsyncMachine
+from asyncio import Transport, Protocol
 from threading import Lock
+from transitions.extensions.asyncio import AsyncMachine
+from utils import Singleton
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.commands.communication_check_command import (
     CommunicationCheckCommand,
@@ -15,8 +17,8 @@ from summit_rcm.at_interface.commands.connections_command import ConnectionsComm
 from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
 from summit_rcm.at_interface.commands.fips_command import FipsCommand
-from utils import Singleton
-from asyncio import Transport, Protocol
+from summit_rcm.at_interface.commands.connect_command import ActivateConnectionCommand
+
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -30,6 +32,7 @@ AT_COMMANDS: List[Command] = [
     PowerCommand,
     FactoryResetCommand,
     FipsCommand,
+    ActivateConnectionCommand,
 ]
 
 
