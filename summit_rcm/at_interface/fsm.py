@@ -18,6 +18,11 @@ from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
 from summit_rcm.at_interface.commands.fips_command import FipsCommand
 from summit_rcm.at_interface.commands.connect_command import ActivateConnectionCommand
+from summit_rcm.at_interface.commands.configure_http_transaction import ConfigureHTTPTransaction
+from summit_rcm.at_interface.commands.execute_http_transaction import ExecuteHTTPTransaction
+from summit_rcm.at_interface.commands.add_http_header import AddHTTPHeader
+from summit_rcm.at_interface.commands.enable_http_reponse_headers import EnableHTTPResponseHeader
+from summit_rcm.at_interface.commands.clear_http_configuration import ClearHTTPConfiguration
 
 
 AT_COMMANDS: List[Command] = [
@@ -33,6 +38,11 @@ AT_COMMANDS: List[Command] = [
     FactoryResetCommand,
     FipsCommand,
     ActivateConnectionCommand,
+    ConfigureHTTPTransaction,
+    ExecuteHTTPTransaction,
+    AddHTTPHeader,
+    EnableHTTPResponseHeader,
+    ClearHTTPConfiguration,
 ]
 
 
