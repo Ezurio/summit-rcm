@@ -10,6 +10,12 @@ class Singleton(type):
         return cls._instances[cls]
 
 
+class InProgressException(Exception):
+    """
+    Exception Class for when the AT Interface is still executing a command
+    """
+
+
 def to_camel_case(string: str) -> str:
     """
     Return the given string formatted as camelCase.
