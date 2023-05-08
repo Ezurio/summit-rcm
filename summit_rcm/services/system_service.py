@@ -41,7 +41,7 @@ class SystemService(metaclass=Singleton):
         elif value == "reboot":
             self._power_state = "reboot" if await self.__reboot() else "on"
         elif value == "suspend":
-            self._state = "suspend" if await self.__suspend() else "on"
+            self._power_state = "suspend" if await self.__suspend() else "on"
 
     async def initiate_factory_reset(self) -> int:
         """

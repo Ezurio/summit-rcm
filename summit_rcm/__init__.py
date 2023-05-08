@@ -1,9 +1,18 @@
 import asyncio
 from syslog import syslog
 from typing import List
-from . import definition
-from .network_status import NetworkStatus
-from .network import (
+import falcon.asgi
+from summit_rcm import definition
+from summit_rcm.log import LogData, LogSetting, LogForwarding
+from summit_rcm.swupdate import SWUpdate
+from summit_rcm.unauthenticated import AllowUnauthenticatedResetReboot
+from summit_rcm.users import UserManage, LoginManage
+from summit_rcm.files import FileManage, FilesManage
+from summit_rcm.certificates import Certificates
+from summit_rcm.date_time import DateTimeSetting
+from summit_rcm.settings import SystemSettingsManage, ServerConfig
+from summit_rcm.version import Version
+from summit_rcm.network import (
     NetworkInterfaces,
     NetworkInterface,
     NetworkInterfaceStatistics,
@@ -12,22 +21,23 @@ from .network import (
     NetworkAccessPoints,
     WifiEnable,
 )
-
-from .log import LogData, LogSetting, LogForwarding
-
-from .swupdate import SWUpdate
-from .unauthenticated import AllowUnauthenticatedResetReboot
-from .users import UserManage, LoginManage
-from .files import FileManage, FilesManage
-from .certificates import Certificates
-from summit_rcm.rest_api.legacy.advanced import PowerOff, Suspend, Reboot, FactoryReset, Fips
-from .date_time import DateTimeSetting
-from .settings import SystemSettingsManage, ServerConfig
-from .version import Version
-import falcon.asgi
+from summit_rcm.rest_api.legacy.network_status import NetworkStatus
+from summit_rcm.rest_api.legacy.advanced import (
+    PowerOff,
+    Suspend,
+    Reboot,
+    FactoryReset,
+    Fips,
+)
 from summit_rcm.rest_api.v2.system.power import PowerResource
 from summit_rcm.rest_api.v2.system.fips import FipsResource
 from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
+from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
+from summit_rcm.rest_api.v2.network.interfaces import (
+    NetworkInterfacesResource,
+    NetworkInterfaceResource,
+    NetworkInterfaceStatsResource,
+)
 
 summit_rcm_plugins: List[str] = []
 
@@ -280,6 +290,12 @@ async def add_network():
         app.add_route("/connection", connection)
         app.add_route("/accesspoints", access_points)
         app.add_route("/wifiEnable", wifi_enable)
+        app.add_route("/api/v2/network/status", NetworkStatusResource())
+        app.add_route("/api/v2/network/interfaces", NetworkInterfacesResource())
+        app.add_route("/api/v2/network/interfaces/{name}", NetworkInterfaceResource())
+        app.add_route(
+            "/api/v2/network/interfaces/{name}/stats", NetworkInterfaceStatsResource()
+        )
         syslog("network loaded")
     except ImportError:
         syslog("network NOT loaded")

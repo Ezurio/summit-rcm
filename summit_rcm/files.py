@@ -6,7 +6,7 @@ from syslog import LOG_ERR, syslog
 from typing import Any, List, Tuple
 import falcon
 from summit_rcm.services.system_service import FACTORY_RESET_SCRIPT
-from .network_status import NetworkStatusHelper
+from summit_rcm.services.network_service import NetworkService
 from . import definition
 from .settings import SystemSettingsManage
 import aiofiles
@@ -284,7 +284,7 @@ class FileManage:
 
 
 class FilesManage:
-    def import_connections(
+    async def import_connections(
         self, import_archive: falcon.media.multipart.BodyPart, password: str
     ) -> Tuple[bool, str]:
         """
@@ -370,7 +370,7 @@ class FilesManage:
                         pass
 
             # Requst NetworkManager to reload connections
-            if not NetworkStatusHelper.reload_connections():
+            if not await NetworkService.reload_nm_connections():
                 return (False, "Unable to reload connections after import")
 
             result = (True, "")
@@ -530,7 +530,7 @@ class FilesManage:
             resp.media = result
             return
 
-        success, msg = self.import_connections(archive, password)
+        success, msg = await self.import_connections(archive, password)
         if success:
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
         else:

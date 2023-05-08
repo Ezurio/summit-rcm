@@ -1,11 +1,11 @@
 from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
 from typing import Any, Dict, List
-import summit_rcm.definition
-from .utils import Singleton
-from .dbus_manager import DBusManager
-from dbus_fast import Message, MessageType, Variant
 from enum import IntFlag, IntEnum, unique
+from dbus_fast import Message, MessageType, Variant
+import summit_rcm.definition
+from summit_rcm.utils import Singleton
+from summit_rcm.dbus_manager import DBusManager
 
 
 @unique
@@ -1621,7 +1621,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         property_name: str,
         value: Any,
         value_signature: str,
-    ) -> dict:
+    ) -> None:
         bus = await DBusManager().get_bus()
 
         reply = await bus.call(
@@ -1832,3 +1832,24 @@ class NetworkManagerService(object, metaclass=Singleton):
             await self.prepare_setting("ipv6", connection, new_connection)
 
         return new_connection
+
+    async def reload_connections(self) -> bool:
+        """
+        Trigger NetworkManager to reload all connection files from disk, including noticing any
+        added or deleted connection files.
+        """
+        bus = await DBusManager().get_bus()
+
+        reply = await bus.call(
+            Message(
+                destination=self.NM_BUS_NAME,
+                path=self.NM_SETTINGS_OBJ_PATH,
+                interface=self.NM_SETTINGS_IFACE,
+                member="ReloadConnections",
+            )
+        )
+
+        if reply.message_type == MessageType.ERROR:
+            raise Exception(reply.body[0])
+
+        return bool(reply.body[0])
