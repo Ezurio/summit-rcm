@@ -1,21 +1,14 @@
+from syslog import syslog, LOG_ERR
 import falcon
-from .network_manager_service import (
+from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,
     NM80211ApSecurityFlags,
-    NMDeviceCapabilities,
-    NMDeviceState,
-    NMDeviceStateReason,
     NMDeviceType,
     NetworkManagerService,
-    NMDeviceInterfaceFlags,
-    NMConnectivityState,
 )
-from . import definition
-from syslog import syslog, LOG_ERR
-from subprocess import run, TimeoutExpired
-from .settings import ServerConfig, SystemSettingsManage
-from .network_status import NetworkStatusHelper
-import os
+from summit_rcm.services.network_service import NetworkService
+from summit_rcm import definition
+from summit_rcm.settings import ServerConfig
 
 
 class NetworkConnections:
@@ -518,7 +511,7 @@ class NetworkConnection:
                         ret,
                         msg,
                         settings,
-                    ) = await NetworkStatusHelper.get_extended_connection_settings(uuid)
+                    ) = await NetworkService().get_extended_connection_settings(uuid)
 
                     if ret < 0:
                         result["InfoMsg"] = msg
@@ -786,45 +779,10 @@ class NetworkInterfaces:
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": "", "interfaces": []}
-        interfaces = []
 
         try:
-            managed_devices = (
-                ServerConfig()
-                .get_parser()
-                .get("summit-rcm", "managed_software_devices", fallback="")
-                .split()
-            )
-            unmanaged_devices = (
-                ServerConfig()
-                .get_parser()
-                .get("summit-rcm", "unmanaged_hardware_devices", fallback="")
-                .split()
-            )
-            dev_obj_paths = await NetworkManagerService().get_all_devices()
-            for dev_obj_path in dev_obj_paths:
-                dev_properties = await NetworkManagerService().get_obj_properties(
-                    dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-                )
-                # Don't return connections with unmanaged interfaces
-                dev_state = dev_properties.get("State", None)
-                if (
-                    dev_state is None
-                    or dev_state == NMDeviceState.NM_DEVICE_STATE_UNMANAGED
-                ):
-                    continue
-                interface_name = dev_properties.get("Interface", "")
-                if interface_name in unmanaged_devices:
-                    continue
-                interfaces.append(interface_name)
-
-            if os.path.exists(definition.MODEM_ENABLE_FILE):
-                for dev in managed_devices:
-                    if dev not in interfaces:
-                        interfaces.append(dev)
-
             result["SDCERR"] = 0
-            result["interfaces"] = interfaces
+            result["interfaces"] = await NetworkService.get_all_interfaces()
         except Exception as e:
             result["InfoMsg"] = "Could not retrieve list of interfaces"
             syslog(f"NetworkInterfaces GET exception: {e}")
@@ -865,28 +823,12 @@ class NetworkInterfaces:
             resp.media = result
             return
 
-        """
-            Currently only support wlan1/managed
-        """
+        # Currently only support wlan1/managed
         result["InfoMsg"] = f"Unable to add virtual interface {interface}."
-        try:
-            proc = run(
-                ["iw", "dev", "wlan0", "interface", "add", interface, "type", int_type],
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            if not proc.returncode:
-                result["SDCERR"] = 0
-                result["InfoMsg"] = f"Virtual interface {interface} added"
-        except TimeoutExpired:
-            syslog(
-                LOG_ERR,
-                f"Call 'iw dev wlan0 interface add {interface} type {int_type}' timeout",
-            )
-        except Exception as e:
-            syslog(
-                LOG_ERR,
-                f"Call 'iw dev wlan0 interface add {interface} type {int_type}' failed: {str(e)}",
-            )
+
+        if await NetworkService.add_virtual_interface():
+            result["SDCERR"] = 0
+            result["InfoMsg"] = f"Virtual interface {interface} added"
 
         resp.media = result
 
@@ -900,18 +842,9 @@ class NetworkInterfaces:
             resp.media = result
             return
 
-        try:
-            proc = run(
-                ["iw", "dev", interface, "del"],
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            if not proc.returncode:
-                result["SDCERR"] = 0
-                result["InfoMsg"] = f"Virtual interface {interface} removed"
-        except TimeoutExpired:
-            syslog(LOG_ERR, f"Call 'iw dev {interface} del' timeout")
-        except Exception as e:
-            syslog(LOG_ERR, f"Call 'iw dev {interface} del' failed: {str(e)}")
+        if await NetworkService.remove_virtual_interface():
+            result["SDCERR"] = 0
+            result["InfoMsg"] = f"Virtual interface {interface} removed"
 
         resp.media = result
 
@@ -939,182 +872,26 @@ class NetworkInterface:
                 resp.media = result
                 return
 
-            dev_obj_paths = await NetworkManagerService().get_all_devices()
-            for dev_obj_path in dev_obj_paths:
-                dev_props = await NetworkManagerService().get_obj_properties(
-                    dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-                )
-                interface_name = dev_props.get("Interface", "")
-                if name == interface_name:
-                    # Read all NM device properties
-                    dev_properties = {}
-                    dev_properties["udi"] = dev_props.get("Udi", "")
-                    dev_properties["path"] = dev_obj_path
-                    dev_properties["interface"] = interface_name
-                    dev_properties["ip_interface"] = dev_props.get("IpInterface", "")
-                    dev_properties["driver"] = dev_props.get("Driver", "")
-                    dev_properties["driver_version"] = dev_props.get(
-                        "DriverVersion", ""
-                    )
-                    dev_properties["firmware_version"] = dev_props.get(
-                        "FirmwareVersion", ""
-                    )
-                    dev_properties["capabilities"] = dev_props.get(
-                        "Capabilities", NMDeviceCapabilities.NM_DEVICE_CAP_NONE
-                    )
-                    state, state_reason = dev_props.get(
-                        "StateReason",
-                        (
-                            NMDeviceState.NM_DEVICE_STATE_UNKNOWN,
-                            NMDeviceStateReason.NM_DEVICE_STATE_REASON_UNKNOWN,
-                        ),
-                    )
-                    dev_properties["state_reason"] = state_reason
-                    dev_properties[
-                        "connection_active"
-                    ] = await NetworkStatusHelper.get_active_connection(dev_props)
-                    dev_properties[
-                        "ip4config"
-                    ] = await NetworkStatusHelper.get_ip4config_properties(
-                        dev_props.get("Ip4Config", "")
-                    )
-                    dev_properties[
-                        "ip6config"
-                    ] = await NetworkStatusHelper.get_ip6config_properties(
-                        dev_props.get("Ip6Config", "")
-                    )
-                    dev_properties[
-                        "dhcp4config"
-                    ] = await NetworkStatusHelper.get_dhcp4_config_properties(
-                        dev_props.get("Dhcp4Config", "")
-                    )
-                    dev_properties[
-                        "dhcp6config"
-                    ] = await NetworkStatusHelper.get_dhcp6_config_properties(
-                        dev_props.get("Dhcp6Config", "")
-                    )
-                    dev_properties["managed"] = bool(dev_props.get("Managed", False))
-                    dev_properties["autoconnect"] = bool(
-                        dev_props.get("Autoconnect", False)
-                    )
-                    dev_properties["firmware_missing"] = bool(
-                        dev_props.get("FirmwareMissing", False)
-                    )
-                    dev_properties["nm_plugin_missing"] = bool(
-                        dev_props.get("NmPluginMissing", False)
-                    )
-                    dev_properties["status"] = NetworkStatusHelper.get_dev_status(
-                        dev_props
-                    )
-                    dev_properties[
-                        "available_connections"
-                    ] = await NetworkStatusHelper.get_available_connections(dev_props)
-                    dev_properties["physical_port_id"] = dev_props.get(
-                        "PhysicalPortId", ""
-                    )
-                    dev_properties["metered"] = int(dev_props.get("Metered", 0))
-                    dev_properties[
-                        "metered_text"
-                    ] = definition.SUMMIT_RCM_METERED_TEXT.get(
-                        dev_properties["metered"]
-                    )
-                    try:
-                        lldp_neighbors = dev_props.get("LldpNeighbors", [])
-                        lldp_neighbors = [neighbor.value for neighbor in lldp_neighbors]
-                    except Exception as e:
-                        syslog(LOG_ERR, f"could not parse LLDP Neighbors: {str(e)}")
-                        lldp_neighbors = []
-                    dev_properties["lldp_neighbors"] = lldp_neighbors
-                    dev_properties["real"] = bool(dev_props.get("Real", False))
-                    dev_properties["ip4connectivity"] = int(
-                        dev_props.get(
-                            "Ip4Connectivity",
-                            NMConnectivityState.NM_CONNECTIVITY_UNKNOWN,
-                        )
-                    )
-                    dev_properties[
-                        "ip4connectivity_text"
-                    ] = definition.SUMMIT_RCM_CONNECTIVITY_STATE_TEXT.get(
-                        dev_properties["ip4connectivity"]
-                    )
-                    dev_properties["ip6connectivity"] = int(
-                        dev_props.get(
-                            "Ip6Connectivity",
-                            NMConnectivityState.NM_CONNECTIVITY_UNKNOWN,
-                        )
-                    )
-                    dev_properties[
-                        "ip6connectivity_text"
-                    ] = definition.SUMMIT_RCM_CONNECTIVITY_STATE_TEXT.get(
-                        dev_properties["ip6connectivity"]
-                    )
-                    dev_properties["interface_flags"] = int(
-                        dev_props.get(
-                            "InterfaceFlags",
-                            NMDeviceInterfaceFlags.NM_DEVICE_INTERFACE_FLAG_NONE,
-                        )
-                    )
+            result["properties"] = await NetworkService.get_interface_status(
+                target_interface_name=name, is_legacy=True
+            )
+            if len(result["properties"]) == 0:
+                result["InfoMsg"] = "invalid interface name provided"
+                resp.media = result
+                return
 
-                    # Get wired specific items
-                    if (
-                        dev_props.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
-                        == NMDeviceType.NM_DEVICE_TYPE_ETHERNET
-                    ):
-                        dev_properties[
-                            "wired"
-                        ] = await NetworkStatusHelper.get_wired_properties(dev_obj_path)
-                        dev_properties["wired"]["HwAddress"] = dev_props.get(
-                            "HwAddress", ""
-                        )
-
-                    # Get Wi-Fi specific items
-                    if (
-                        dev_props.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
-                        == NMDeviceType.NM_DEVICE_TYPE_WIFI
-                    ):
-                        wireless_properties = (
-                            await NetworkManagerService().get_obj_properties(
-                                dev_obj_path,
-                                NetworkManagerService().NM_DEVICE_WIRELESS_IFACE,
-                            )
-                        )
-                        dev_properties[
-                            "wireless"
-                        ] = await NetworkStatusHelper.get_wifi_properties(
-                            wireless_properties
-                        )
-                        dev_properties["wireless"]["HwAddress"] = dev_props.get(
-                            "HwAddress", ""
-                        )
-                        if (
-                            dev_props.get(
-                                "State", NMDeviceState.NM_DEVICE_STATE_UNKNOWN
-                            )
-                            == NMDeviceState.NM_DEVICE_STATE_ACTIVATED
-                        ):
-                            dev_properties[
-                                "activeaccesspoint"
-                            ] = await NetworkStatusHelper.get_ap_properties(
-                                wireless_properties, interface_name
-                            )
-
-                    result["properties"] = dev_properties
-                    result["SDCERR"] = 0
-
-                    resp.media = result
-                    return
-
-            # Target interface wasn't found, so throw an error
-            result["InfoMsg"] = "invalid interface name provided"
-
+            result["SDCERR"] = 0
         except Exception as e:
             syslog(
                 LOG_ERR,
                 f"Unable to retrieve detailed network interface configuration: {str(e)}",
             )
+            result[
+                "InfoMsg"
+            ] = "Unable to retrieve detailed network interface configuration"
+            result["SDCERR"] = 1
 
         resp.media = result
-        return
 
 
 class NetworkInterfaceStatistics(object):
@@ -1147,34 +924,15 @@ class NetworkInterfaceStatistics(object):
                 result["InfoMsg"] = "No interface name provided"
                 return result
 
-            path_to_stats_dir = f"/sys/class/net/{name}/statistics"
-            stats = {
-                "rx_bytes": f"{path_to_stats_dir}/rx_bytes",
-                "rx_packets": f"{path_to_stats_dir}/rx_packets",
-                "rx_errors": f"{path_to_stats_dir}/rx_errors",
-                "rx_dropped": f"{path_to_stats_dir}/rx_dropped",
-                "multicast": f"{path_to_stats_dir}/multicast",
-                "tx_bytes": f"{path_to_stats_dir}/tx_bytes",
-                "tx_packets": f"{path_to_stats_dir}/tx_packets",
-                "tx_errors": f"{path_to_stats_dir}/tx_errors",
-                "tx_dropped": f"{path_to_stats_dir}/tx_dropped",
-            }
-            outputstats = {}
-            for key in stats:
-                with open(stats[key]) as f:
-                    output = int(f.readline().strip())
-                    outputstats[key] = output
-
-            result["SDCERR"] = 0
-            result["statistics"] = outputstats
-            resp.media = result
-        except FileNotFoundError as e:
-            syslog(f"Invalid interface name - {str(e)}")
-            result["InfoMsg"] = f"Invalid interface name - {str(e)}"
-            resp.media = result
+            (success, stats) = await NetworkService.get_interface_statistics(
+                target_interface_name=name, is_legacy=True
+            )
+            if success:
+                result["SDCERR"] = 0
+                result["statistics"] = stats
         except Exception as e:
             result["InfoMsg"] = f"Could not read interface statistics - {str(e)}"
-            resp.media = result
+        resp.media = result
 
 
 class WifiEnable:

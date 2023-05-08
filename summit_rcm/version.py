@@ -1,11 +1,13 @@
 import falcon
 import subprocess
-from .network_manager_service import NMDeviceType, NetworkManagerService
+from summit_rcm.services.network_manager_service import (
+    NMDeviceType,
+    NetworkManagerService,
+)
 from . import definition
 
 
 class Version:
-
     _version = {}
 
     async def on_get(self, req, resp):
