@@ -1,5 +1,5 @@
 import os
-from summit_rcm.network_manager_service import (
+from summit_rcm.services.network_manager_service import (
     NM80211Mode,
     NMActiveConnectionState,
     NMDeviceState,
