@@ -26,6 +26,7 @@ from summit_rcm.at_interface.commands.clear_http_configuration import ClearHTTPC
 from summit_rcm.at_interface.commands.network_interface_statistics import (
     NetworkInterfaceStatisticsCommand
 )
+from summit_rcm.at_interface.commands.network_interfaces_command import NetworkInterfacesCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -46,6 +47,7 @@ AT_COMMANDS: List[Command] = [
     EnableHTTPResponseHeader,
     ClearHTTPConfiguration,
     NetworkInterfaceStatisticsCommand,
+    NetworkInterfacesCommand,
 ]
 
 
