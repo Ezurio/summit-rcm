@@ -18,6 +18,7 @@ from summit_rcm.at_interface.commands.version_command import VersionCommand
 from summit_rcm.at_interface.commands.cip_start_command import CIPStartCommand
 from summit_rcm.at_interface.commands.cip_send_command import CIPSendCommand
 from summit_rcm.at_interface.commands.cip_close_command import CIPCloseCommand
+from summit_rcm.at_interface.commands.cip_configure_ssl_command import CIPConfigureSSL
 from summit_rcm.at_interface.commands.ping_command import PingCommand
 from summit_rcm.at_interface.commands.connection_list_command import (
     ConnectionListCommand,
@@ -41,6 +42,7 @@ from summit_rcm.at_interface.commands.http_enable_reponse_headers import (
 from summit_rcm.at_interface.commands.http_clear_configuration import (
     HTTPClearConfiguration,
 )
+from summit_rcm.at_interface.commands.http_configure_ssl import HTTPConfigureSSL
 from summit_rcm.at_interface.commands.network_interface_statistics import (
     NetworkInterfaceStatisticsCommand,
 )
@@ -81,18 +83,18 @@ from summit_rcm.at_interface.commands.at_echo_disable_command import (
 )
 from summit_rcm.at_interface.commands.at_echo_enable_command import ATEchoEnableCommand
 
-
 discovered_plugins = {
-            name: importlib.import_module(name)
-            for finder, name, ispkg
-            in pkgutil.iter_modules()
-            if name.startswith('summit_rcm_')
+    name: importlib.import_module(name)
+    for finder, name, ispkg in pkgutil.iter_modules()
+    if name.startswith("summit_rcm_")
 }
+
 
 AT_COMMANDS: List[Command] = [
     CIPStartCommand,
     CIPCloseCommand,
     CIPSendCommand,
+    CIPConfigureSSL,
     CommunicationCheckCommand,
     EmptyCommand,
     VersionCommand,
@@ -107,6 +109,7 @@ AT_COMMANDS: List[Command] = [
     HTTPAddHeader,
     HTTPEnableResponseHeader,
     HTTPClearConfiguration,
+    HTTPConfigureSSL,
     NetworkInterfaceStatisticsCommand,
     NetworkInterfacesCommand,
     ConnectionModifyCommand,

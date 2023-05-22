@@ -30,7 +30,7 @@ class CIPStartCommand(Command):
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
 
-        if ConnectionService().start_connection(
+        if await ConnectionService().start_connection(
             id=params_dict["connection_id"],
             type=params_dict["type"],
             addr=params_dict["remote_ip"],

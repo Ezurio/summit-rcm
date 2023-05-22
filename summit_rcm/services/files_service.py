@@ -31,6 +31,7 @@ ZIP = "/usr/bin/zip"
 NETWORKMANAGER_DIR = "etc/NetworkManager"
 NETWORKMANAGER_DIR_FULL = "/etc/NetworkManager/"
 SUMMIT_RCM_DIR = "/etc/summit-rcm/"
+SUMMIT_RCM_CLIENT_SSL_DIR = "/etc/summit-rcm/client-ssl/"
 DATA_SECRET_NETWORKMANAGER_DIR = "/data/secret/NetworkManager"
 DATA_SECRET_SUMMIT_RCM_DIR = "/data/secret/summit-rcm"
 
@@ -103,6 +104,19 @@ class FilesService(metaclass=Singleton):
         """
         return await FilesService.handle_file_upload_bytes(
             incoming_data, CONFIG_TMP_ARCHIVE_FILE, mode
+        )
+
+    @staticmethod
+    async def handle_ssl_file_upload_bytes(
+        incoming_data: bytes, name: str, mode: str = "wb"
+    ):
+        """
+        Handle when a client uploads an SSL file
+        """
+        ssl_file_path = Path(SUMMIT_RCM_CLIENT_SSL_DIR)
+        ssl_file_path.mkdir(parents=True, exist_ok=True)
+        return await FilesService.handle_file_upload_bytes(
+            incoming_data, str(Path(SUMMIT_RCM_CLIENT_SSL_DIR, name)), mode
         )
 
     @staticmethod
