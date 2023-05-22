@@ -16,7 +16,7 @@ class VersionCommand(Command):
                 True,
                 f"\r\nInvalid Parameters: See Usage - {VersionCommand.SIGNATURE}?\r\n",
             )
-        return (True, f"\r\n{SUMMIT_RCM_VERSION}\r\nOK\r\n")
+        return (True, f"\r\n+VER:{SUMMIT_RCM_VERSION}\r\nOK\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
