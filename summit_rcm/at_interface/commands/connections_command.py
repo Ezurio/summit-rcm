@@ -20,7 +20,7 @@ class ConnectionsCommand(Command):
             )
         try:
             connections_str = await get_connections()
-            return (True, f"\r\n{connections_str}")
+            return (True, f"\r\n+LCON:{connections_str}\r\nOK\r\n")
         except Exception as e:
             syslog(LOG_ERR, f"Error getting connection {str(e)}")
             return (True, "\r\nError\r\n")
@@ -133,4 +133,4 @@ async def get_connections() -> str:
         else:
             continue
         return_str += f"{str(uuid)}:{entry['id']},{entry['activated']}\r\n"
-    return return_str
+    return return_str[:-2]
