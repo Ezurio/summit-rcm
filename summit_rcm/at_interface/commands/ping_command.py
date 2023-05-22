@@ -38,7 +38,7 @@ class PingCommand(Command):
             match = re.search(r"\d+\.\d+/(\d+\.\d+)/\d+\.\d+", ping_str)
             if match:
                 ping_str = match.group(1)
-                return (True, f"\r\n{ping_str} OK\r\n")
+                return (True, f"\r\n+PING:{ping_str}\r\nOK\r\n")
             else:
                 return (True, "\r\nTIMEOUT ERROR\r\n")
         except Exception:

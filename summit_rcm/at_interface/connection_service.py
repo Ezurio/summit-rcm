@@ -45,20 +45,20 @@ class Connection:
         self.busy = busy
 
     def on_connection_made(self):
-        fsm.ATInterfaceFSM().dte_output(f"+IP, {self.id} Connected\r\n")
+        fsm.ATInterfaceFSM().dte_output(f"+IP:{self.id},Connected\r\n")
 
     def on_data_received(self, data: bytes):
         fsm.ATInterfaceFSM().dte_output(
-            f"+IPD: {self.id},{len(data)},{str(data.decode('utf-8'))}\r\n"
+            f"+IPD:{self.id},{len(data)},{str(data.decode('utf-8'))}\r\n"
         )
 
     def on_datagram_received(self, data: bytes, addr: Tuple[str, int]):
         fsm.ATInterfaceFSM().dte_output(
-            f"+IPD: {self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}\r\n"
+            f"+IPD:{self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}\r\n"
         )
 
     def on_connection_lost(self):
-        fsm.ATInterfaceFSM().dte_output(f"+IP, {self.id} Disconnected\r\n")
+        fsm.ATInterfaceFSM().dte_output(f"+IP:{self.id},Disconnected\r\n")
         if ConnectionService().connections[self.id].connected:
             ConnectionService().close_connection(self.id)
 
