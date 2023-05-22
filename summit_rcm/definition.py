@@ -1,4 +1,5 @@
 import os
+from enum import IntEnum
 from summit_rcm.services.network_manager_service import (
     NM80211Mode,
     NMActiveConnectionState,
@@ -230,3 +231,11 @@ MODEM_ENABLE_FILE = "/etc/modem/modem_enabled"
 MODEM_CONTROL_SERVICE_FILE = "modem-control.service"
 
 INVALID_RSSI = -9999.9999
+
+
+class SSLModes(IntEnum):
+    DISABLED = -1
+    NO_AUTH = 0
+    SERVER_VERIFY_CLIENT = 1
+    CLIENT_VERIFY_SERVER = 2
+    MUTUAL_AUTH = 3

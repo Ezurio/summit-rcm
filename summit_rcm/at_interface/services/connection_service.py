@@ -2,13 +2,15 @@
 Module to handle IP Connections
 """
 import asyncio
-from syslog import syslog
+from syslog import syslog, LOG_ERR
 import time
 from typing import List, Optional, Tuple
+import ssl as SSL
 from summit_rcm.at_interface.services.dialer_service import Dialer
 
 from summit_rcm.utils import Singleton
 import summit_rcm.at_interface.fsm as fsm
+from summit_rcm.definition import SSLModes
 
 
 class Connection:
@@ -39,6 +41,7 @@ class Connection:
         data_buffer: bytes,
         listener_id: int,
         busy: bool,
+        ssl_context: SSL.SSLContext = None,
     ) -> None:
         self.id = id
         self.type = type
@@ -50,10 +53,11 @@ class Connection:
         self.data_buffer = data_buffer
         self.listener_id = listener_id
         self.busy = busy
+        self.ssl_context = ssl_context
 
     def on_connection_made(self):
         fsm.ATInterfaceFSM().at_output(
-            f"+IP: {self.id},Connected", print_leading_line_break=False
+            f"+IP: {self.id},Connected", print_trailing_line_break=False
         )
 
     def on_data_received(self, data: bytes):
@@ -64,7 +68,8 @@ class Connection:
 
     def on_datagram_received(self, data: bytes, addr: Tuple[str, int]):
         fsm.ATInterfaceFSM().at_output(
-            f"+IPD: {self.id},{len(data)},'{addr[0]}',{addr[1]},".encode("utf-8") + data,
+            f"+IPD: {self.id},{len(data)},'{addr[0]}',{addr[1]},".encode("utf-8")
+            + data,
             print_leading_line_break=False,
         )
 
@@ -102,6 +107,7 @@ class ConnectionService(object, metaclass=Singleton):
                 data_buffer=bytes("", "utf-8"),
                 listener_id=-1,
                 busy=False,
+                ssl_context=None,
             )
             current_connection.dialer.on_connection_made = (
                 current_connection.on_connection_made
@@ -117,7 +123,7 @@ class ConnectionService(object, metaclass=Singleton):
             )
             self.connections.append(current_connection)
 
-    def start_connection(
+    async def start_connection(
         self,
         id: int,
         type: str,
@@ -142,15 +148,16 @@ class ConnectionService(object, metaclass=Singleton):
         self.connections[id].keepalive = keepalive
 
         try:
-            self.connections[id].dialer.dial(
+            await self.connections[id].dialer.dial(
                 f"{self.connections[id].addr}:{self.connections[id].port}",
                 keepalive,
                 type,
+                self.connections[id].ssl_context,
             )
             self.connections[id].connected = True
         except Exception as e:
             self.connections[id].connected = False
-            syslog(f"Error starting connection: {str(e)}")
+            syslog(LOG_ERR, f"Error starting connection: {str(e)}")
             return False
         return True
 
@@ -168,16 +175,17 @@ class ConnectionService(object, metaclass=Singleton):
 
         try:
             self.connections[id].dialer.hangup()
-            self.connections[id].connected = False
-            self.connections[id].addr = ""
-            self.connections[id].port = 0
-            self.connections[id].type = ""
-            self.connections[id].keepalive = 0
-            self.connections[id].data_buffer = b""
-            self.connections[id].listener_id = -1
-            self.connections[id].busy = False
         except Exception:
-            return False
+            pass
+        self.connections[id].connected = False
+        self.connections[id].addr = ""
+        self.connections[id].port = 0
+        self.connections[id].type = ""
+        self.connections[id].keepalive = 0
+        self.connections[id].data_buffer = b""
+        self.connections[id].listener_id = -1
+        self.connections[id].busy = False
+        self.connections[id].ssl_context = None
         return True
 
     def send_data(self, id: int, length: int) -> Tuple[bool, int]:
@@ -255,3 +263,38 @@ class ConnectionService(object, metaclass=Singleton):
             return None
 
         return self.connections[id].busy
+
+    def configure_cip_ssl(
+        self,
+        id: int,
+        auth_mode: int,
+        check_hostname: bool,
+        key: str,
+        cert: str,
+        ca: str,
+    ):
+        """
+        Changes status of SSL to disabled, enabled without host verification, or
+        enabled with host verification and produces ssl context
+        """
+        try:
+            context = SSL.SSLContext(SSL.PROTOCOL_TLS_CLIENT)
+            context.check_hostname = check_hostname
+            ssl = SSLModes(auth_mode)
+            if ssl == SSLModes.NO_AUTH:
+                context.verify_mode = SSL.CERT_NONE
+            elif ssl == SSLModes.CLIENT_VERIFY_SERVER:
+                context.load_default_certs()
+                context.load_verify_locations(cafile=ca)
+            elif ssl == SSLModes.SERVER_VERIFY_CLIENT:
+                context.verify_mode = SSL.CERT_NONE
+                context.load_cert_chain(cert, key)
+            else:
+                context.load_default_certs()
+                context.load_verify_locations(cafile=ca)
+                context.load_cert_chain(cert, key)
+            self.connections[id].ssl_context = context
+            return
+        except Exception as exception:
+            self.connections[id].ssl_context = None
+            raise exception

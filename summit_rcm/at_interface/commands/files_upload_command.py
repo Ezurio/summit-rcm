@@ -14,6 +14,7 @@ class Types(IntEnum):
     FILE_TYPE_CERT = 0
     FILE_TYPE_CONNECTION = 1
     FILE_TYPE_CONFIG = 2
+    FILE_TYPE_SSL = 3
 
 
 class Modes(IntEnum):
@@ -65,7 +66,7 @@ class FilesUploadCommand(Command):
                 )
                 if not success:
                     raise Exception(message)
-            else:
+            elif file_type == Types.FILE_TYPE_CONFIG:
                 await FilesService.handle_config_import_file_upload_bytes(
                     body, MODES_DICT[params_dict["mode"]]
                 )
@@ -74,6 +75,10 @@ class FilesUploadCommand(Command):
                 )
                 if not success:
                     raise Exception(message)
+            else:
+                await FilesService.handle_ssl_file_upload_bytes(
+                    body, params_dict["name"], MODES_DICT[params_dict["mode"]]
+                )
             return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error uploading file: {str(exception)}")

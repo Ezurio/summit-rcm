@@ -6,6 +6,7 @@ import asyncio.transports
 import socket
 import ssl
 from typing import Tuple
+from syslog import syslog, LOG_ERR
 
 from typing import Optional
 
@@ -62,7 +63,7 @@ class Dialer:
         self.on_datagram_received = None
         self.on_connection_lost = None
 
-    def dial(self, number: str, keepalive: int, type: str):
+    async def dial(self, number: str, keepalive: int, type: str, context: ssl.SSLContext):
         """Create Socket"""
         (host, port) = number.split(":")
         if type == "udp":
@@ -71,17 +72,14 @@ class Dialer:
             )
             self.loop.create_task(c)
             return (None, "", "")
-        elif type == "tcp":
-            socks = setup_tcp_socket(host, port, keepalive)
-        else:
-            (socks, context) = setup_ssl_socket(host, port, keepalive)
+        socks = setup_socket(host, port, keepalive)
         c = self.loop.create_connection(
             lambda: create_protocol(self, type),
             server_hostname=host if type == "ssl" else None,
             sock=socks,
             ssl=context if type == "ssl" else None,
         )
-        self.loop.create_task(c)
+        await self.loop.create_task(c)
         return (None, "", "")
 
     def hangup(self):
@@ -107,25 +105,15 @@ def create_protocol(dialer, type: str) -> asyncio.BaseProtocol | None:
         return None
 
 
-def setup_tcp_socket(host: str, port: str, keepalive: int) -> socket:
-    """Set up TCP Socket"""
+def setup_socket(host: str, port: str, keepalive: int) -> socket:
+    """Set up Socket"""
     socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    socks.settimeout(10)
     socks.connect((host, int(port)))
+    socks.settimeout(None)
     if keepalive != 0:
         setup_keepalive(socks, keepalive)
     return socks
-
-
-def setup_ssl_socket(host: str, port: str, keepalive: int):
-    """Set up SSL socket"""
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    socks.connect((host, int(port)))
-    if keepalive != 0:
-        setup_keepalive(socks, keepalive)
-    return (socks, context)
 
 
 def setup_keepalive(sock: socket, keepalive: int):
