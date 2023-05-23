@@ -23,7 +23,9 @@ from summit_rcm.at_interface.commands.execute_http_transaction import ExecuteHTT
 from summit_rcm.at_interface.commands.add_http_header import AddHTTPHeader
 from summit_rcm.at_interface.commands.enable_http_reponse_headers import EnableHTTPResponseHeader
 from summit_rcm.at_interface.commands.clear_http_configuration import ClearHTTPConfiguration
-
+from summit_rcm.at_interface.commands.network_interface_statistics import (
+    NetworkInterfaceStatisticsCommand
+)
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -43,6 +45,7 @@ AT_COMMANDS: List[Command] = [
     AddHTTPHeader,
     EnableHTTPResponseHeader,
     ClearHTTPConfiguration,
+    NetworkInterfaceStatisticsCommand,
 ]
 
 
