@@ -11,7 +11,7 @@ class Command:
         pass
 
     @staticmethod
-    def parse_params(cls, params: str) -> Tuple[bool, dict]:
+    def parse_params(params: str) -> Tuple[bool, dict]:
         """
         Function which runs the parameters through a parsing function. Returns a dictionary
         consisting of parameter names and values.
