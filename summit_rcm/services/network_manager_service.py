@@ -1591,6 +1591,31 @@ class NetworkManagerService(object, metaclass=Singleton):
 
         return result
 
+    async def update_connection(
+        self, connection_obj_path: str, connection: dict
+    ) -> None:
+        """
+        Update the connection at the provided object path ('connection_obj_path') with the new
+        settings defined in the dictionary 'connection' using the NetworkManager D-Bus API.
+
+        https://people.freedesktop.org/~lkundrak/nm-docs/gdbus-org.freedesktop.NetworkManager.Settings.Connection.html#gdbus-method-org-freedesktop-NetworkManager-Settings-Connection.Update
+        """
+        bus = await DBusManager().get_bus()
+
+        reply = await bus.call(
+            Message(
+                destination=self.NM_BUS_NAME,
+                path=connection_obj_path,
+                interface=self.NM_SETTINGS_CONNECTION_IFACE,
+                member="Update",
+                signature="a{sa{sv}}",
+                body=[connection],
+            )
+        )
+
+        if reply.message_type == MessageType.ERROR:
+            raise Exception(reply.body[0])
+
     async def get_obj_properties(self, obj_path: str, interface: str) -> dict:
         bus = await DBusManager().get_bus()
 

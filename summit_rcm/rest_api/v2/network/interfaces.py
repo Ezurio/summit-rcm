@@ -126,7 +126,7 @@ class NetworkInterfaceResource(object):
         except Exception as e:
             syslog(
                 LOG_ERR,
-                f"Unable to add virtual network interface: {str(e)}",
+                f"Unable to remove network interface: {str(e)}",
             )
             resp.status = falcon.HTTP_500
 
