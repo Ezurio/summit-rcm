@@ -96,7 +96,10 @@ def get_cython_options():
     ext_modules.append(openssl_extension_module)
 
     for ext_mod in ext_modules:
-        ext_mod.cython_directives = {"language_level": "3"}
+        ext_mod.cython_directives = {
+            "language_level": "3",
+            "always_allow_keywords": True,
+        }
 
     cmdclass = {"build_ext": ve_build_ext}
     return cmdclass, ext_modules

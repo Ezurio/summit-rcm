@@ -12,7 +12,7 @@ from summit_rcm.certificates import Certificates
 from summit_rcm.date_time import DateTimeSetting
 from summit_rcm.settings import SystemSettingsManage, ServerConfig
 from summit_rcm.version import Version
-from summit_rcm.network import (
+from summit_rcm.rest_api.legacy.network import (
     NetworkInterfaces,
     NetworkInterface,
     NetworkInterfaceStatistics,
@@ -37,6 +37,10 @@ from summit_rcm.rest_api.v2.network.interfaces import (
     NetworkInterfacesResource,
     NetworkInterfaceResource,
     NetworkInterfaceStatsResource,
+)
+from summit_rcm.rest_api.v2.network.connections import (
+    NetworkConnectionsResource,
+    NetworkConnectionResourceByUuid,
 )
 
 summit_rcm_plugins: List[str] = []
@@ -295,6 +299,10 @@ async def add_network():
         app.add_route("/api/v2/network/interfaces/{name}", NetworkInterfaceResource())
         app.add_route(
             "/api/v2/network/interfaces/{name}/stats", NetworkInterfaceStatsResource()
+        )
+        app.add_route("/api/v2/network/connections", NetworkConnectionsResource())
+        app.add_route(
+            "/api/v2/network/connections/uuid/{uuid}", NetworkConnectionResourceByUuid()
         )
         syslog("network loaded")
     except ImportError:

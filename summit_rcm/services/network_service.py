@@ -1,10 +1,15 @@
+"""
+Module to provide an interface to perform networking tasks (interfaces, connection profiles, etc.).
+"""
+
+import asyncio
 import os
 import re
 from struct import pack
 from subprocess import TimeoutExpired, run
 from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,
@@ -34,6 +39,11 @@ IW_PATH = "/usr/sbin/iw"
 
 
 class NetworkService(metaclass=Singleton):
+    """
+    Service class which provides an interface to perform networking tasks (interfaces, connection
+    profiles, etc.).
+    """
+
     @staticmethod
     async def get_dev_status(dev_properties: dict, is_legacy: bool = False) -> dict:
         """
@@ -57,7 +67,7 @@ class NetworkService(metaclass=Singleton):
             )
         status["Mtu" if is_legacy else "mtu"] = dev_properties.get("Mtu", 0)
         status["DeviceType" if is_legacy else "deviceType"] = int(
-            dev_properties.get("DeviceType", NMDeviceState.NM_DEVICE_STATE_UNKNOWN)
+            dev_properties.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
         )
         try:
             status[
@@ -121,20 +131,26 @@ class NetworkService(metaclass=Singleton):
             i = 0
             props_routes = props.get("RouteData", None)
             if props_routes is not None:
-                for rt in props_routes:
+                for route in props_routes:
                     data = {}
                     data["dest"] = (
-                        rt["dest"].value if rt.get("dest", None) is not None else ""
+                        route["dest"].value
+                        if route.get("dest", None) is not None
+                        else ""
                     )
                     data["prefix"] = (
-                        rt["prefix"].value if rt.get("prefix", None) is not None else 0
+                        route["prefix"].value
+                        if route.get("prefix", None) is not None
+                        else 0
                     )
                     data["metric"] = (
-                        rt["metric"].value if rt.get("metric", None) is not None else -1
+                        route["metric"].value
+                        if route.get("metric", None) is not None
+                        else -1
                     )
                     data["next_hop" if is_legacy else "nextHop"] = (
-                        rt["next-hop"].value
-                        if rt.get("next-hop", None) is not None
+                        route["next-hop"].value
+                        if route.get("next-hop", None) is not None
                         else ""
                     )
                     route_data.append(data)
@@ -186,8 +202,8 @@ class NetworkService(metaclass=Singleton):
                 ipconfig_properties[
                     "WinsServerData" if is_legacy else "winsServerData"
                 ].append(wins_server)
-        except Exception as e:
-            syslog(f"Could not retrieve IPv4 configuration - {str(e)}")
+        except Exception as exception:
+            syslog(f"Could not retrieve IPv4 configuration - {str(exception)}")
             return {}
 
         return ipconfig_properties
@@ -240,20 +256,26 @@ class NetworkService(metaclass=Singleton):
             i = 0
             props_routes = props.get("RouteData", None)
             if props_routes is not None:
-                for rt in props_routes:
+                for route in props_routes:
                     data = {}
                     data["dest"] = (
-                        rt["dest"].value if rt.get("dest", None) is not None else ""
+                        route["dest"].value
+                        if route.get("dest", None) is not None
+                        else ""
                     )
                     data["prefix"] = (
-                        rt["prefix"].value if rt.get("prefix", None) is not None else 0
+                        route["prefix"].value
+                        if route.get("prefix", None) is not None
+                        else 0
                     )
                     data["metric"] = (
-                        rt["metric"].value if rt.get("metric", None) is not None else -1
+                        route["metric"].value
+                        if route.get("metric", None) is not None
+                        else -1
                     )
                     data["next_hop" if is_legacy else "nextHop"] = (
-                        rt["next-hop"].value
-                        if rt.get("next-hop", None) is not None
+                        route["next-hop"].value
+                        if route.get("next-hop", None) is not None
                         else ""
                     )
                     route_data.append(data)
@@ -290,8 +312,8 @@ class NetworkService(metaclass=Singleton):
                 ipconfig_properties[
                     "Nameservers" if is_legacy else "nameservers"
                 ].append(inet_ntop(AF_INET6, nameserver))
-        except Exception as e:
-            syslog(f"Could not retrieve IPv6 configuration - {str(e)}")
+        except Exception as exception:
+            syslog(f"Could not retrieve IPv6 configuration - {str(exception)}")
             return {}
 
         return ipconfig_properties
@@ -420,8 +442,10 @@ class NetworkService(metaclass=Singleton):
                         return (True, float(match.group("RSSI")))
         except TimeoutExpired:
             syslog(LOG_ERR, f"Call 'iw dev {str(ifname)} link' timeout")
-        except Exception as e:
-            syslog(LOG_ERR, f"Call 'iw dev {str(ifname)} link' failed: {str(e)}")
+        except Exception as exception:
+            syslog(
+                LOG_ERR, f"Call 'iw dev {str(ifname)} link' failed: {str(exception)}"
+            )
 
         return (False, definition.INVALID_RSSI)
 
@@ -448,8 +472,8 @@ class NetworkService(metaclass=Singleton):
                     return m.group(0)[8:10]
         except TimeoutExpired:
             syslog(LOG_ERR, "Call 'iw reg get' timeout")
-        except Exception as e:
-            syslog(LOG_ERR, f"Call 'iw reg get' failed: {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Call 'iw reg get' failed: {str(exception)}")
 
         return "WW"
 
@@ -479,8 +503,8 @@ class NetworkService(metaclass=Singleton):
                         return int(m.group(0))
         except TimeoutExpired:
             syslog(LOG_ERR, "Call 'iw dev' timeout")
-        except Exception as e:
-            syslog(LOG_ERR, f"Call 'iw dev' failed: {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Call 'iw dev' failed: {str(exception)}")
 
         return frequency
 
@@ -551,8 +575,8 @@ class NetworkService(metaclass=Singleton):
                 ap_properties["Signal" if is_legacy else "signal"] = (
                     signal if success else definition.INVALID_RSSI
                 )
-        except Exception as e:
-            syslog(f"Could not read AP properties: {str(e)}")
+        except Exception as exception:
+            syslog(f"Could not read AP properties: {str(exception)}")
             return {}
 
         return ap_properties
@@ -774,7 +798,7 @@ class NetworkService(metaclass=Singleton):
                 dev_properties["capabilities"] = dev_props.get(
                     "Capabilities", NMDeviceCapabilities.NM_DEVICE_CAP_NONE
                 )
-                state, state_reason = dev_props.get(
+                _, state_reason = dev_props.get(
                     "StateReason",
                     (
                         NMDeviceState.NM_DEVICE_STATE_UNKNOWN,
@@ -786,7 +810,7 @@ class NetworkService(metaclass=Singleton):
                 ] = state_reason
                 dev_properties[
                     "connection_active" if is_legacy else "activeConnection"
-                ] = await NetworkService().get_active_connection(dev_props)
+                ] = await NetworkService.get_active_connection(dev_props)
                 dev_properties["managed"] = bool(dev_props.get("Managed", False))
                 dev_properties["autoconnect"] = bool(
                     dev_props.get("Autoconnect", False)
@@ -931,10 +955,10 @@ class NetworkService(metaclass=Singleton):
                 LOG_ERR,
                 "Call 'iw dev wlan0 interface add wlan1 type managed' timeout",
             )
-        except Exception as e:
+        except Exception as exception:
             syslog(
                 LOG_ERR,
-                f"Call 'iw dev wlan0 interface add wlan1 type managed' failed: {str(e)}",
+                f"Call 'iw dev wlan0 interface add wlan1 type managed' failed: {str(exception)}",
             )
         return False
 
@@ -953,8 +977,8 @@ class NetworkService(metaclass=Singleton):
                 return True
         except TimeoutExpired:
             syslog(LOG_ERR, "Call 'iw dev wlan1 del' timeout")
-        except Exception as e:
-            syslog(LOG_ERR, f"Call 'iw dev wlan1 del' failed: {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Call 'iw dev wlan1 del' failed: {str(exception)}")
         return False
 
     @staticmethod
@@ -1010,10 +1034,10 @@ class NetworkService(metaclass=Singleton):
                     output_stats[stat_name] = int(stat_file.readline().strip())
 
             return (True, output_stats)
-        except FileNotFoundError as e:
-            syslog(f"Invalid interface name - {str(e)}")
-        except Exception as e:
-            syslog(f"Could not read interface statistics - {str(e)}")
+        except FileNotFoundError as file_not_found_error:
+            syslog(f"Invalid interface name - {str(file_not_found_error)}")
+        except Exception as exception:
+            syslog(f"Could not read interface statistics - {str(exception)}")
         return (False, default_result)
 
     @staticmethod
@@ -1024,11 +1048,653 @@ class NetworkService(metaclass=Singleton):
         """
         return await NetworkManagerService().reload_connections()
 
-    @classmethod
-    async def get_active_connection(cls, dev_props: dict) -> dict:
+    @staticmethod
+    async def get_all_connection_profiles(is_legacy: bool = False) -> List[dict] | dict:
+        """
+        Retrieve a list (or dictionary if legacy support is requested) of known, valid
+        NetworkManager connection profiles.
+        """
+        result = {}
+        unmanaged_devices = (
+            ServerConfig()
+            .get_parser()
+            .get("summit-rcm", "unmanaged_hardware_devices", fallback="")
+            .split()
+        )
+
+        # Get a list of all known connections (profiles)
+        settings_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_SETTINGS_OBJ_PATH,
+            NetworkManagerService().NM_SETTINGS_IFACE,
+        )
+
+        connection_obj_paths = settings_props.get("Connections", [])
+
+        manager_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
+            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
+        )
+        active_connection_obj_paths = manager_props.get("ActiveConnections", [])
+
+        # Loop through the connections and build a dictionary to return
+        for conn in connection_obj_paths:
+            try:
+                connection_settings = (
+                    await NetworkManagerService().get_connection_settings(conn)
+                )
+            except Exception as exception:
+                syslog(
+                    LOG_ERR,
+                    f"Unable to read connection settings for {str(conn)} - {str(exception)}",
+                )
+                continue
+
+            connection_settings_connection = connection_settings.get("connection", None)
+            if connection_settings_connection is None:
+                continue
+
+            interface_name = (
+                connection_settings_connection["interface-name"].value
+                if connection_settings_connection.get("interface-name", None)
+                is not None
+                else ""
+            )
+            if unmanaged_devices and interface_name in unmanaged_devices:
+                continue
+
+            entry = {}
+            entry["activated"] = 0
+            for active_connection in active_connection_obj_paths:
+                try:
+                    active_connection_props = (
+                        await NetworkManagerService().get_obj_properties(
+                            active_connection,
+                            NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
+                        )
+                    )
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Unable to read properties of active connection - {str(exception)}",
+                    )
+                    continue
+                active_connection_connection_obj_path = (
+                    active_connection_props["Connection"]
+                    if active_connection_props.get("Connection", None) is not None
+                    else ""
+                )
+                if active_connection_connection_obj_path == conn:
+                    entry["activated"] = 1
+                    break
+            entry["id"] = (
+                connection_settings_connection["id"].value
+                if connection_settings_connection.get("id", None) is not None
+                else ""
+            )
+
+            # Check if the connection is an AP
+            if is_legacy:
+                entry["type"] = "n/a"
+            else:
+                entry["type"] = (
+                    connection_settings_connection["type"].value
+                    if connection_settings_connection.get("type", None) is not None
+                    else "n/a"
+                )
+            try:
+                connenction_settings_wireless = connection_settings.get(
+                    "802-11-wireless", None
+                )
+                if connenction_settings_wireless is not None:
+                    entry["type"] = (
+                        connenction_settings_wireless["mode"].value
+                        if connenction_settings_wireless.get("mode", None) is not None
+                        else "infrastructure"
+                    )
+            except Exception as exception:
+                # Couldn't read the wireless settings, so assume it's not an AP
+                syslog(
+                    LOG_ERR,
+                    f"Unable to read connection settings wireless for {str(conn)} - "
+                    f"{str(exception)}",
+                )
+
+            # Add the connection to the dictionary
+            uuid = (
+                connection_settings_connection["uuid"].value
+                if connection_settings_connection.get("uuid", None) is not None
+                else ""
+            )
+            result[uuid] = entry
+
+        if is_legacy:
+            return result
+
+        # Return a list of connection profiles for non-legacy
+        new_result = []
+        for uuid, entry in result.items():
+            new_result.append(
+                {
+                    "id": entry.get("id", ""),
+                    "uuid": uuid,
+                    "type": entry.get("type", ""),
+                    "activated": entry.get("activated", 0) == 1,
+                }
+            )
+        return new_result
+
+    @staticmethod
+    async def connection_profile_exists_by_uuid(uuid: str) -> bool:
+        """Check if a connection profile with the provided UUID"""
+
+        settings_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_SETTINGS_OBJ_PATH,
+            NetworkManagerService().NM_SETTINGS_IFACE,
+        )
+
+        connection_obj_paths = settings_props.get("Connections", [])
+        for connection_obj_path in connection_obj_paths:
+            connection_props = await NetworkManagerService().get_connection_settings(
+                connection_obj_path
+            )
+
+            connection_settings_connection = connection_props.get("connection", {})
+            connection_uuid = (
+                connection_settings_connection["uuid"].value
+                if connection_settings_connection.get("uuid", None) is not None
+                else ""
+            )
+            if uuid == connection_uuid:
+                return True
+        return False
+
+    @staticmethod
+    async def connection_profile_exists_by_id(id: str) -> bool:
+        """Check if a connection profile with the provided id"""
+
+        settings_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_SETTINGS_OBJ_PATH,
+            NetworkManagerService().NM_SETTINGS_IFACE,
+        )
+
+        connection_obj_paths = settings_props.get("Connections", [])
+        for connection_obj_path in connection_obj_paths:
+            connection_props = await NetworkManagerService().get_connection_settings(
+                connection_obj_path
+            )
+
+            connection_settings_connection = connection_props.get("connection", {})
+            connection_id = (
+                connection_settings_connection["id"].value
+                if connection_settings_connection.get("id", None) is not None
+                else ""
+            )
+            if id == connection_id:
+                return True
+        return False
+
+    @staticmethod
+    async def create_connection_profile(
+        settings: dict,
+        overwrite_existing: bool = True,
+        is_legacy: bool = False,
+    ) -> dict:
+        """
+        Create a new connection profile from the given settings (overwriting an existing connection
+        profile if configured to do so) and, if successful, return the dictionary of settings for
+        the newly created connection profile.
+        """
+        if not settings.get("connection", None):
+            raise Exception("Missing connection section")
+
+        id = settings["connection"].get("id", None)
+        if not id:
+            raise Exception("Missing 'id'")
+
+        if await NetworkService.connection_profile_exists_by_id(id=id):
+            if not overwrite_existing:
+                raise Exception(f"Connection with id '{str(id)}' already exists")
+
+            NetworkService.delete_connection_profile(id=id)
+
+        uuid = settings["connection"].get("uuid", None)
+        if uuid is not None:
+            if uuid == "":
+                # NetworkManager does not like have an empty value for 'uuid' when creating a new
+                # connection profile, so just remove it from the input data here
+                del settings["connection"]["uuid"]
+            elif await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
+                if not overwrite_existing:
+                    raise Exception(
+                        f"Connection with UUID '{str(uuid)}' already exists"
+                    )
+
+                await NetworkService.delete_connection_profile(uuid=uuid)
+
+        new_connection_obj_path = await NetworkManagerService().add_connection(
+            await NetworkManagerService().prepare_new_connection_data(settings)
+        )
+
+        new_connection_settings_connection = (
+            await NetworkManagerService().get_connection_settings(
+                new_connection_obj_path
+            )
+        ).get("connection", {})
+
+        new_connection_uuid = (
+            new_connection_settings_connection["uuid"].value
+            if new_connection_settings_connection.get("uuid", None) is not None
+            else ""
+        )
+        if new_connection_uuid == "":
+            raise ConnectionProfileNotFoundError("New connection profile not found")
+
+        return await NetworkService.get_connection_profile_settings(
+            uuid=new_connection_uuid, id=None, extended=True, is_legacy=is_legacy
+        )
+
+    @staticmethod
+    async def get_connection_profile_uuid_from_id(id: str) -> str:
+        """Lookup the UUID of a connection profile using the provided id (name)"""
+        uuid = ""
+
+        for entry in await NetworkService.get_all_connection_profiles(is_legacy=False):
+            if entry.get("id", "") == id:
+                uuid = entry.get("uuid", "")
+                break
+
+        if not uuid:
+            raise ConnectionProfileNotFoundError(
+                f"Connection with id '{str(id)}' not found"
+            )
+
+        return uuid
+
+    @staticmethod
+    async def get_connection_profile_id_from_uuid(uuid: str) -> str:
+        """Lookup the id (name) of a connection profile using the provided UUID"""
+        id = ""
+
+        for entry in await NetworkService.get_all_connection_profiles(is_legacy=False):
+            if entry.get("uuid", "") == uuid:
+                id = entry.get("id", "")
+                break
+
+        if not id:
+            raise ConnectionProfileNotFoundError(
+                f"Connection with UUID '{str(uuid)}' not found"
+            )
+
+        return id
+
+    @staticmethod
+    async def update_connection_profile(
+        new_settings: dict,
+        uuid: Optional[str] = None,
+        id: Optional[str] = None,
+        is_legacy: bool = False,
+    ) -> dict:
+        """
+        Update a connection profile either by UUID or by id (name) using the provided settings
+        """
+        if not uuid:
+            if not id:
+                raise ConnectionProfileNotFoundError("Invalid parameters")
+
+            # No UUID provided, look up the connection profile by id (name)
+            uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        activate_connection = False
+        new_settings_connection = new_settings.get("connection", None)
+        if new_settings_connection:
+            activated_setting = new_settings_connection.pop("activated", None)
+            activate_connection = activated_setting is not None and (
+                activated_setting == 1 or activated_setting == "1"
+            )
+
+        if new_settings_connection and len(new_settings_connection) > 0:
+            # Retrieve the current settings for the connection profile
+            connection_obj_path = (
+                await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
+            )
+            connection_settings = await NetworkManagerService().get_connection_settings(
+                connection_obj_path=connection_obj_path
+            )
+
+            # Update the connection profile settings with the new, incoming ones
+            connection_settings.update(
+                await NetworkManagerService().prepare_new_connection_data(new_settings)
+            )
+
+            await NetworkManagerService().update_connection(
+                connection_obj_path=connection_obj_path, connection=connection_settings
+            )
+
+        if activate_connection:
+            # Activation requested
+            await NetworkService.activate_connection_profile(uuid=uuid)
+            count = 0
+            while not bool(
+                await NetworkService.get_active_connection_obj_path(uuid=uuid)
+            ):
+                if count == 5:
+                    raise Exception("Unable to verify connection activated")
+                await asyncio.sleep(0.1)
+                count += 1
+        elif activated_setting is not None:
+            # Deactivation requested
+            await NetworkService.deactivate_connection_profile(uuid=uuid)
+            count = 0
+            while bool(await NetworkService.get_active_connection_obj_path(uuid=uuid)):
+                if count == 5:
+                    raise Exception("Unable to verify connection deactivated")
+                await asyncio.sleep(0.1)
+                count += 1
+
+        return await NetworkService.get_connection_profile_settings(
+            uuid=uuid, id=None, extended=True, is_legacy=is_legacy
+        )
+
+    @staticmethod
+    async def delete_connection_profile(
+        uuid: Optional[str] = None, id: Optional[str] = None
+    ) -> None:
+        """
+        Delete a connection profile either by UUID or by id (name)
+        """
+        if not uuid:
+            if not id:
+                raise ConnectionProfileNotFoundError("Invalid parameters")
+
+            # No UUID provided, look up the connection profile by id (name)
+            uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        if not await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
+            raise ConnectionProfileNotFoundError("Not found")
+
+        connection_obj_path = (
+            await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
+        )
+
+        if not connection_obj_path:
+            raise ConnectionProfileNotFoundError("Not found")
+
+        await NetworkManagerService().delete_connection(connection_obj_path)
+
+    @staticmethod
+    async def activate_connection_profile(
+        uuid: Optional[str] = None, id: Optional[str] = None
+    ) -> None:
+        """
+        Activate the connection profile with the provided UUID or id (name)
+        """
+        if not uuid:
+            if not id:
+                raise ConnectionProfileNotFoundError("Invalid parameters")
+
+            # No UUID provided, look up the connection profile by id (name)
+            uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        if await NetworkService.get_active_connection_obj_path(uuid=uuid):
+            raise ConnectionProfileAlreadyActiveError("Connection is already active")
+
+        if not await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
+            raise ConnectionProfileNotFoundError("Not found")
+
+        connection_obj_path = (
+            await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
+        )
+
+        if not connection_obj_path:
+            raise ConnectionProfileNotFoundError("Not found")
+
+        connection_setting_connection = (
+            await NetworkManagerService().get_connection_settings(
+                connection_obj_path=connection_obj_path
+            )
+        ).get("connection", {})
+
+        if not connection_setting_connection.get("type", None):
+            raise Exception("Unable to read connection settings")
+
+        if connection_setting_connection["type"].value == "bridge":
+            await NetworkManagerService().activate_connection(
+                connection_obj_path, "/", "/"
+            )
+            return
+
+        interface_name = (
+            connection_setting_connection["interface-name"].value
+            if connection_setting_connection.get("interface-name", None) is not None
+            else ""
+        )
+        if not interface_name:
+            raise Exception("Could not find valid interface for the connection profile")
+
+        all_devices = await NetworkManagerService().get_all_devices()
+        for dev_obj_path in all_devices:
+            dev_props = await NetworkManagerService().get_obj_properties(
+                dev_obj_path,
+                NetworkManagerService().NM_DEVICE_IFACE,
+            )
+
+            dev_interface_name = dev_props.get("Interface", None)
+            if not dev_interface_name:
+                continue
+
+            if dev_interface_name == interface_name:
+                await NetworkManagerService().activate_connection(
+                    connection_obj_path, dev_obj_path, "/"
+                )
+                return
+
+        raise Exception("Appropriate device not found")
+
+    @staticmethod
+    async def deactivate_connection_profile(
+        uuid: Optional[str] = None, id: Optional[str] = None
+    ) -> None:
+        """
+        Deactivate the connection profile with the provided UUID or id (name)
+        """
+        if not uuid:
+            if not id:
+                raise ConnectionProfileNotFoundError("Invalid parameters")
+
+            # No UUID provided, look up the connection profile by id (name)
+            uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        active_connection_obj_path = (
+            await NetworkService.get_active_connection_obj_path(uuid=uuid)
+        )
+        if not active_connection_obj_path:
+            raise ConnectionProfileAlreadyInactiveError(
+                f"Connection was already inactive"
+            )
+
+        await NetworkManagerService().deactivate_connection(
+            active_connection=active_connection_obj_path
+        )
+
+    @staticmethod
+    async def get_active_connection_obj_path(uuid: str) -> str:
+        """
+        Return the object path of the ActiveConnection if the connection profile with the provided
+        UUID is activated; otherwise, return an empty string.
+        """
+        manager_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
+            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
+        )
+        active_connection_obj_paths = manager_props.get("ActiveConnections", [])
+
+        for active_connection_obj_path in active_connection_obj_paths:
+            try:
+                active_connection_props = (
+                    await NetworkManagerService().get_obj_properties(
+                        active_connection_obj_path,
+                        NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
+                    )
+                )
+            except Exception:
+                # Unable to retrieve properties for the 'ActiveConnection' with an object path of
+                # 'active_connection_obj_path', which means this connection is no longer active. So,
+                # just continue through the loop.
+                continue
+
+            active_connection_uuid = active_connection_props.get("Uuid", None)
+            if not active_connection_uuid:
+                continue
+
+            if uuid == active_connection_uuid:
+                return active_connection_obj_path
+
+        return ""
+
+    @staticmethod
+    def cert_to_filename(cert: str):
+        """
+        Return base name only.
+        """
+        if not cert:
+            return ""
+
+        return cert[len(definition.FILEDIR_DICT["cert"]) :]
+
+    @staticmethod
+    async def get_connection_profile_settings(
+        uuid: Optional[str] = None,
+        id: Optional[str] = None,
+        extended: bool = True,
+        is_legacy: bool = False,
+    ) -> dict:
+        """
+        Retrieve the settings configuration of a connection profile identified by either the
+        provided UUID or id (name). Passing 'extended' as False returns a limited set of the
+        connection profile's settings (this was the legacy behavior).
+        """
+        if not uuid:
+            if not id:
+                raise ConnectionProfileNotFoundError("Invalid parameters")
+
+            # No UUID provided, look up the connection profile by id (name)
+            uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        if extended:
+            settings = await NetworkService.get_extended_connection_settings(
+                uuid=uuid, is_legacy=is_legacy
+            )
+            settings.update(
+                {
+                    "activated": bool(
+                        await NetworkService.get_active_connection_obj_path(uuid=uuid)
+                    )
+                }
+            )
+            return settings
+
+        # Get a list of all known connections (profiles)
+        settings_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_SETTINGS_OBJ_PATH,
+            NetworkManagerService().NM_SETTINGS_IFACE,
+        )
+
+        connection_obj_paths = settings_props.get("Connections", [])
+        for connection_obj_path in connection_obj_paths:
+            settings = await NetworkManagerService().get_connection_settings(
+                connection_obj_path
+            )
+            connection_uuid = settings.get("connection", {}).get("uuid", None)
+            if connection_uuid is not None and connection_uuid.value == uuid:
+                for setting in settings:
+                    properties_to_delete = []
+                    for property in settings[setting]:
+                        # Handle SSID special case
+                        if setting == "802-11-wireless" and property == "ssid":
+                            settings[setting][property] = bytearray(
+                                settings[setting][property].value
+                            ).decode("utf-8")
+                            continue
+
+                        # Handle cert special cases
+                        if setting == "802-1x" and property in [
+                            "ca-cert",
+                            "client-cert",
+                            "private-key",
+                            "phase2-ca-cert",
+                            "phase2-client-cert",
+                            "phase2-private-key",
+                        ]:
+                            settings[setting][
+                                property
+                            ] = NetworkService.cert_to_filename(
+                                settings[setting][property].value
+                            )
+                            continue
+
+                        # Handle ip config special cases
+                        if setting in ["ipv4", "ipv6"]:
+                            # Handle address-data special case
+                            if property == "address-data":
+                                address_data = settings[setting][property].value
+                                for addr in address_data:
+                                    addr["address"] = addr["address"].value
+                                    addr["prefix"] = addr["prefix"].value
+                                settings[setting][property] = address_data
+                                continue
+
+                            # Handle route-data special case
+                            if property == "route-data":
+                                route_data = settings[setting][property].value
+                                for route in route_data:
+                                    route["dest"] = route["dest"].value
+                                    route["prefix"] = route["prefix"].value
+                                    route["next-hop"] = (
+                                        route["next-hop"].value
+                                        if route.get("next-hop", None) is not None
+                                        else None
+                                    )
+                                    route["metric"] = (
+                                        route["metric"].value
+                                        if route.get("metric", None) is not None
+                                        else -1
+                                    )
+                                settings[setting][property] = route_data
+                                continue
+
+                            # Handle addresses and routes special cases (these properties are
+                            # deprecated)
+                            if property in ["addresses", "routes"]:
+                                properties_to_delete.append(property)
+                                continue
+
+                        settings[setting][property] = settings[setting][property].value
+
+                    # Remove properties marked for deletion (deprecated properties)
+                    for property in properties_to_delete:
+                        del settings[setting][property]
+
+                settings.update(
+                    {
+                        "activated": bool(
+                            await NetworkService.get_active_connection_obj_path(
+                                uuid=uuid
+                            )
+                        )
+                    }
+                )
+                return settings
+
+        raise ConnectionProfileNotFoundError("Invalid parameters")
+
+    @staticmethod
+    async def get_active_connection(dev_props: dict) -> dict:
+        """
+        Retrieve the 'connection' settings for the 'ActiveConnection' of the provided device
+        """
         # Retrieve the active connection object path from the provided device's properties
         active_connection_obj_path = dev_props.get("ActiveConnection", None)
-        if active_connection_obj_path is None:
+        if not active_connection_obj_path:
             return {}
 
         # Retrieve the active connection's properties
@@ -1063,10 +1729,11 @@ class NetworkService(metaclass=Singleton):
 
         return setting_connection
 
-    @classmethod
+    @staticmethod
     async def extract_general_properties_from_active_connection(
-        cls, active_connection_props: dict
+        active_connection_props: dict, is_legacy: bool = False
     ) -> dict:
+        """Retrieve the 'GENERAL' properties from the provided 'ActiveConnection' properties"""
         # Attempt to match output from:
         # 'nmcli connection show <target_profile>'
         properties = {}
@@ -1081,7 +1748,9 @@ class NetworkService(metaclass=Singleton):
             )
             device = {}
             device["interface"] = device_props.get("Interface", None)
-            device["ip-interface"] = device_props.get("IpInterface", None)
+            device["ip-interface" if is_legacy else "ipInterface"] = device_props.get(
+                "IpInterface", None
+            )
             properties["devices"].append(device)
 
         properties["state"] = definition.SUMMIT_RCM_NM_ACTIVE_CONNECTION_STATE_TEXT.get(
@@ -1092,52 +1761,77 @@ class NetworkService(metaclass=Singleton):
 
         properties["default"] = active_connection_props.get("Default", False)
         properties["default6"] = active_connection_props.get("Default6", False)
-        properties["specific-object-path"] = active_connection_props.get(
-            "SpecificObject", None
-        )
+        properties[
+            "specific-object-path" if is_legacy else "specificObjectPath"
+        ] = active_connection_props.get("SpecificObject", None)
         properties["vpn"] = active_connection_props.get("Vpn", False)
 
         connection_obj_path = active_connection_props.get("Connection", "")
-        properties["con-path"] = connection_obj_path
+        properties["con-path" if is_legacy else "conPath"] = connection_obj_path
         connection_conn_props = await NetworkManagerService().get_connection_settings(
             connection_obj_path
         )
         connection_setting_connection = connection_conn_props.get("connection", None)
         properties["zone"] = (
-            connection_setting_connection.get("zone", None)
+            connection_setting_connection.get("zone", None).value
             if connection_setting_connection is not None
             else None
         )
 
-        properties["master-path"] = active_connection_props.get("Master", None)
+        properties[
+            "master-path" if is_legacy else "masterPath"
+        ] = active_connection_props.get("Master", None)
 
         return properties
 
-    @classmethod
+    @staticmethod
     async def extract_ip4_config_properties_from_active_connection(
-        cls, active_connection_props: dict
+        active_connection_props: dict, is_legacy: bool = False
     ) -> dict:
-        return await cls.extract_ip_config_properties_from_active_connection(
-            active_connection_props=active_connection_props, is_ipv4=True
+        """Retrieve the 'IP4' properties from the provided 'ActiveConnection' properties"""
+        return await NetworkService.extract_ip_config_properties_from_active_connection(
+            active_connection_props=active_connection_props,
+            is_ipv4=True,
+            is_legacy=is_legacy,
         )
 
-    @classmethod
+    @staticmethod
     async def extract_ip6_config_properties_from_active_connection(
-        cls, active_connection_props: dict
+        active_connection_props: dict, is_legacy: bool = False
     ) -> dict:
-        return await cls.extract_ip_config_properties_from_active_connection(
-            active_connection_props=active_connection_props, is_ipv4=False
+        """Retrieve the 'IP6' properties from the provided 'ActiveConnection' properties"""
+        return await NetworkService.extract_ip_config_properties_from_active_connection(
+            active_connection_props=active_connection_props,
+            is_ipv4=False,
+            is_legacy=is_legacy,
         )
 
-    @classmethod
+    @staticmethod
     async def extract_ip_config_properties_from_active_connection(
-        cls, active_connection_props: dict, is_ipv4: bool = True
+        active_connection_props: dict, is_ipv4: bool = True, is_legacy: bool = False
     ) -> dict:
+        """
+        Retrieve the ipconfig properties (v4 or v6) from the provided 'ActiveConnection'
+        properties
+        """
+        # Attempt to match output from:
+        # 'nmcli connection show <target_profile>'
+        properties = {
+            "address-data" if is_legacy else "addressData": [],
+            "domains": [],
+            "gateway": None,
+            "dns": [],
+            "route-data" if is_legacy else "routeData": [],
+        }
+        if is_legacy:
+            # Only include 'addresses' and 'routes' for legacy purposes
+            properties.update({"addresses": [], "routes": []})
+
         ipconfig_obj_path = active_connection_props.get(
             "Ip4Config" if is_ipv4 else "Ip6Config", None
         )
-        if ipconfig_obj_path is None:
-            return None
+        if ipconfig_obj_path is None or ipconfig_obj_path == "/":
+            return properties
 
         ipconfig_props = await NetworkManagerService().get_obj_properties(
             ipconfig_obj_path,
@@ -1146,26 +1840,21 @@ class NetworkService(metaclass=Singleton):
             else NetworkManagerService().NM_IP6CONFIG_IFACE,
         )
 
-        # Attempt to match output from:
-        # 'nmcli connection show <target_profile>'
-        properties = {}
-
-        properties["addresses"] = []
-        properties["address-data"] = []
         for address in ipconfig_props.get("AddressData", []):
             try:
-                properties["addresses"].append(
-                    address["address"].value
-                    if address.get("address", None) is not None
-                    else ""
-                    + "/"
-                    + str(
-                        address["prefix"].value
-                        if address.get("prefix", None) is not None
-                        else 0
+                if is_legacy:
+                    properties["addresses"].append(
+                        address["address"].value
+                        if address.get("address", None) is not None
+                        else ""
+                        + "/"
+                        + str(
+                            address["prefix"].value
+                            if address.get("prefix", None) is not None
+                            else 0
+                        )
                     )
-                )
-                properties["address-data"].append(
+                properties["address-data" if is_legacy else "addressData"].append(
                     {
                         "address": address["address"].value
                         if address.get("address", None) is not None
@@ -1181,7 +1870,6 @@ class NetworkService(metaclass=Singleton):
         properties["domains"] = ipconfig_props.get("Domains", [])
         properties["gateway"] = ipconfig_props.get("Gateway", None)
 
-        properties["dns"] = []
         nameservers = ipconfig_props.get("Nameservers", [])
         for nameserver in nameservers:
             properties["dns"].append(
@@ -1191,28 +1879,27 @@ class NetworkService(metaclass=Singleton):
                 )
             )
 
-        properties["routes"] = []
-        properties["route-data"] = []
         for route in ipconfig_props.get("RouteData", []):
             try:
-                properties["routes"].append(
-                    route["dest"].value
-                    if route.get("dest", None) is not None
-                    else ""
-                    + "/"
-                    + str(
-                        route["prefix"].value
-                        if route.get("prefix", None) is not None
-                        else 0
+                if is_legacy:
+                    properties["routes"].append(
+                        route["dest"].value
+                        if route.get("dest", None) is not None
+                        else ""
+                        + "/"
+                        + str(
+                            route["prefix"].value
+                            if route.get("prefix", None) is not None
+                            else 0
+                        )
+                        + " metirc "
+                        + str(
+                            route["metric"].value
+                            if route.get("metric", None) is not None
+                            else -1
+                        )
                     )
-                    + " metirc "
-                    + str(
-                        route["metric"].value
-                        if route.get("metric", None) is not None
-                        else -1
-                    )
-                )
-                properties["route-data"].append(
+                properties["route-data" if is_legacy else "routeData"].append(
                     {
                         "dest": route["dest"].value
                         if route.get("dest", None) is not None
@@ -1220,7 +1907,9 @@ class NetworkService(metaclass=Singleton):
                         "prefix": route["prefix"].value
                         if route.get("prefix", None) is not None
                         else 0,
-                        "next-hop": route["next-hop"].value
+                        "next-hop"
+                        if is_legacy
+                        else "nextHop": route["next-hop"].value
                         if route.get("next-hop", None) is not None
                         else None,
                         "metric": route["metric"].value
@@ -1233,35 +1922,49 @@ class NetworkService(metaclass=Singleton):
 
         return properties
 
-    @classmethod
+    @staticmethod
     async def extract_dhcp4_config_properties_from_active_connection(
-        cls, active_connection_props: dict
+        active_connection_props: dict, is_legacy: bool = False
     ) -> dict:
-        return await cls.extract_dhcp_config_properties_from_active_connection(
-            active_connection_props=active_connection_props, is_ipv4=True
+        """Retrieve the 'DHCP4' properties from the provided 'ActiveConnection' properties"""
+        return (
+            await NetworkService.extract_dhcp_config_properties_from_active_connection(
+                active_connection_props=active_connection_props,
+                is_ipv4=True,
+                is_legacy=is_legacy,
+            )
         )
 
-    @classmethod
+    @staticmethod
     async def extract_dhcp6_config_properties_from_active_connection(
-        cls, active_connection_props: dict
+        active_connection_props: dict, is_legacy: bool = False
     ) -> dict:
-        return await cls.extract_dhcp_config_properties_from_active_connection(
-            active_connection_props=active_connection_props, is_ipv4=False
+        """Retrieve the 'DHCP6' properties from the provided 'ActiveConnection' properties"""
+        return (
+            await NetworkService.extract_dhcp_config_properties_from_active_connection(
+                active_connection_props=active_connection_props,
+                is_ipv4=False,
+                is_legacy=is_legacy,
+            )
         )
 
-    @classmethod
+    @staticmethod
     async def extract_dhcp_config_properties_from_active_connection(
-        cls, active_connection_props: dict, is_ipv4: bool = True
+        active_connection_props: dict, is_ipv4: bool = True, is_legacy: bool = False
     ) -> dict:
+        """
+        Retrieve the DHCP config properties (v4 or v6) from the provided 'ActiveConnection'
+        properties
+        """
+        # Attempt to match output from:
+        # 'nmcli connection show <target_profile>'
+        properties = {"options": {} if is_legacy else []}
+
         dhcpconfig_obj_path = active_connection_props.get(
             "Dhcp4Config" if is_ipv4 else "Dhcp6Config", None
         )
-        if dhcpconfig_obj_path is None:
-            return None
-
-        # Attempt to match output from:
-        # 'nmcli connection show <target_profile>'
-        properties = {}
+        if dhcpconfig_obj_path is None or dhcpconfig_obj_path == "/":
+            return properties
 
         try:
             dhcpconfig_props = await NetworkManagerService().get_obj_properties(
@@ -1271,20 +1974,36 @@ class NetworkService(metaclass=Singleton):
                 else NetworkManagerService().NM_DHCP6CONFIG_IFACE,
             )
 
-            properties["options"] = dhcpconfig_props.get("Options", [])
-
-            if properties["options"] is not None:
-                for option in properties["options"]:
+            for option in dhcpconfig_props.get("Options", []):
+                if is_legacy:
                     properties["options"][option] = properties["options"][option].value
+                else:
+                    properties["options"].append(
+                        {
+                            "option": option,
+                            "value": properties["options"][option].value,
+                        }
+                    )
         except Exception:
-            return None
+            return {"options": {} if is_legacy else []}
 
         return properties
 
-    @classmethod
-    async def get_extended_connection_settings(cls, uuid: str) -> Tuple[int, str, dict]:
+    @staticmethod
+    async def get_extended_connection_settings(
+        uuid: str, is_legacy: bool = False
+    ) -> dict:
+        """
+        Retrieve an extended dictionary of settings for the connection profile with the provided
+        UUID.
+        """
         if not uuid or uuid == "":
-            return (-1, "Invalid UUID", {})
+            raise Exception("Invalid UUID")
+
+        if not await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
+            raise ConnectionProfileNotFoundError(
+                f"Invalid UUID - connection with UUID '{str(uuid)}' not found"
+            )
 
         settings = {}
 
@@ -1292,11 +2011,11 @@ class NetworkService(metaclass=Singleton):
             connection_obj_path = (
                 await NetworkManagerService().get_connection_obj_path_by_uuid(str(uuid))
             )
-        except Exception as e:
-            return (-1, f"Invalid UUID - {str(e)}", {})
+        except Exception as exception:
+            raise Exception(f"Invalid UUID - {str(exception)}")
 
         if connection_obj_path == "":
-            return (-1, "Invalid UUID", {})
+            raise Exception("Invalid UUID")
 
         connection_conn_props = await NetworkManagerService().get_connection_settings(
             connection_obj_path
@@ -1431,29 +2150,29 @@ class NetworkService(metaclass=Singleton):
             if active_connection_props.get("Uuid", "") == uuid:
                 settings[
                     "GENERAL"
-                ] = await cls.extract_general_properties_from_active_connection(
-                    active_connection_props
+                ] = await NetworkService.extract_general_properties_from_active_connection(
+                    active_connection_props=active_connection_props, is_legacy=is_legacy
                 )
                 settings["GENERAL"]["dbus-path"] = active_connection_obj_path
                 settings[
                     "IP4"
-                ] = await cls.extract_ip4_config_properties_from_active_connection(
-                    active_connection_props
+                ] = await NetworkService.extract_ip4_config_properties_from_active_connection(
+                    active_connection_props=active_connection_props, is_legacy=is_legacy
                 )
                 settings[
                     "IP6"
-                ] = await cls.extract_ip6_config_properties_from_active_connection(
-                    active_connection_props
+                ] = await NetworkService.extract_ip6_config_properties_from_active_connection(
+                    active_connection_props=active_connection_props, is_legacy=is_legacy
                 )
                 settings[
                     "DHCP4"
-                ] = await cls.extract_dhcp4_config_properties_from_active_connection(
-                    active_connection_props
+                ] = await NetworkService.extract_dhcp4_config_properties_from_active_connection(
+                    active_connection_props=active_connection_props, is_legacy=is_legacy
                 )
                 settings[
                     "DHCP6"
-                ] = await cls.extract_dhcp6_config_properties_from_active_connection(
-                    active_connection_props
+                ] = await NetworkService.extract_dhcp6_config_properties_from_active_connection(
+                    active_connection_props=active_connection_props, is_legacy=is_legacy
                 )
                 break
 
@@ -1568,4 +2287,22 @@ class NetworkService(metaclass=Singleton):
                         param
                     ] = setting_8021x[param].value
 
-        return (0, "", settings)
+        return settings
+
+
+class ConnectionProfileNotFoundError(Exception):
+    """Custom error class for when the requested connection profile was not found."""
+
+
+class ConnectionProfileAlreadyActiveError(Exception):
+    """
+    Custom error class for when the user requests to activate a connection profile that is already
+    active.
+    """
+
+
+class ConnectionProfileAlreadyInactiveError(Exception):
+    """
+    Custom error class for when the user requests to deactivate a connection profile that is already
+    inactive.
+    """
