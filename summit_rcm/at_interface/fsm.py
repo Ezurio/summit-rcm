@@ -27,6 +27,7 @@ from summit_rcm.at_interface.commands.network_interface_statistics import (
     NetworkInterfaceStatisticsCommand
 )
 from summit_rcm.at_interface.commands.network_interfaces_command import NetworkInterfacesCommand
+from summit_rcm.at_interface.commands.modify_connection_command import ModifyConnectionCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -48,6 +49,7 @@ AT_COMMANDS: List[Command] = [
     ClearHTTPConfiguration,
     NetworkInterfaceStatisticsCommand,
     NetworkInterfacesCommand,
+    ModifyConnectionCommand,
 ]
 
 
@@ -214,24 +216,25 @@ class ATInterfaceFSM(metaclass=Singleton):
         if command == "":
             return (EmptyCommand, "", False)
 
+        command_lower = command.lower()
+
         # Check for a valid command prefix
-        if not command.lower().startswith("at"):
+        if not command_lower.startswith("at"):
             return (None, "", False)
 
-        command = command.lower()
-        print_usage = command.lower().endswith("?")
+        print_usage = command_lower.endswith("?")
         if print_usage:
             command = command.rstrip(command[-1])
         if "=" in command:
             # 'value' command
             command_split = command.split("=")
             for at_command in AT_COMMANDS:
-                if command_split[0] == at_command.signature():
+                if command_split[0].lower() == at_command.signature():
                     return (at_command, "=".join(command_split[1:]), print_usage)
         else:
             # not a 'value' command
             for at_command in AT_COMMANDS:
-                if command == at_command.signature():
+                if command_lower == at_command.signature():
                     return (at_command, "", print_usage)
         return (None, "", False)
 
