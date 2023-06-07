@@ -1,8 +1,13 @@
+"""
+Module to handle BLE control.
+"""
+
 from syslog import syslog, LOG_ERR
 from typing import Tuple
-from ..dbus_manager import DBusManager
-from dbus_next import DBusError
-from dbus_next.service import ServiceInterface, method
+from dbus_fast import DBusError
+from dbus_fast.service import ServiceInterface, method
+from summit_rcm.dbus_manager import DBusManager
+from summit_rcm.utils import variant_to_python
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
@@ -21,63 +26,6 @@ ADAPTER_IFACE = "org.bluez.Adapter1"
 DEVICE_IFACE = "org.bluez.Device1"
 BLUEZ_PATH_PREPEND = "/org/bluez/"
 AGENT_PATH = "/com/lairdconnectivity/agent"
-
-
-# def python_to_dbus(data, datatype=None):
-#     # Convert python native data types to dbus data types
-#     if not datatype:
-#         datatype = type(data)
-
-#     if datatype is bool or datatype is dbus.Boolean:
-#         data = dbus.Boolean(data)
-#     elif datatype is int or datatype is dbus.Int64:
-#         data = dbus.Int64(data)
-#     elif datatype is bytes or datatype is bytearray or datatype is dbus.ByteArray:
-#         data = dbus.ByteArray(data)
-#     elif isinstance(data, bytes):
-#         data = [python_to_dbus(value) for value in data]
-#     elif isinstance(data, bytearray):
-#         data = [python_to_dbus(value) for value in data]
-#     elif datatype is str:
-#         data = dbus.String(data)
-#     elif datatype is dict:
-#         new_data = dbus.Dictionary()
-#         for key in data.keys():
-#             new_key = python_to_dbus(key)
-#             new_data[new_key] = python_to_dbus(data[key])
-#         data = new_data
-
-#     return data
-
-
-# def dbus_to_python_ex(data, datatype=None):
-#     # Convert dbus data types to python native data types
-#     if not datatype:
-#         datatype = type(data)
-
-#     if datatype is dbus.String:
-#         data = str(data)
-#     elif datatype is dbus.Boolean:
-#         data = bool(data)
-#     elif datatype is dbus.Int64:
-#         data = int(data)
-#     elif datatype is dbus.Byte:
-#         data = int(data)
-#     elif datatype is dbus.UInt32:
-#         data = int(data)
-#     elif datatype is dbus.Double:
-#         data = float(data)
-#     elif datatype is bytes or datatype is bytearray or datatype is dbus.ByteArray:
-#         data = bytearray(data)
-#     elif datatype is dbus.Array:
-#         data = [dbus_to_python_ex(value) for value in data]
-#     elif datatype is dbus.Dictionary:
-#         new_data = dict()
-#         for key in data.keys():
-#             new_key = dbus_to_python_ex(key)
-#             new_data[new_key] = dbus_to_python_ex(data[key])
-#         data = new_data
-#     return data
 
 
 def controller_pretty_name(name: str):
@@ -99,14 +47,14 @@ def uri_to_uuid(uri_uuid: str) -> str:
     return uri_uuid.upper().replace("_", ":")
 
 
-def find_controllers(bus):
+async def find_controllers(bus):
     """
     Returns objects that have the bluez service and a GattManager1 interface
     """
     remote_om = bus.get_proxy_object(
-        "BLUEZ_SERVICE_NAME", "/", bus.introspect_sync("BLUEZ_SERVICE_NAME", "/")
+        BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
     ).get_interface(DBUS_OM_IFACE)
-    objects = remote_om.call_get_managed_objects_sync()
+    objects = await remote_om.call_get_managed_objects()
 
     controllers = []
 
@@ -117,14 +65,15 @@ def find_controllers(bus):
     return controllers
 
 
-def find_controller(bus, name: str = ""):
+async def find_controller(bus, name: str = ""):
     """
-    Returns the first object that has the bluez service and a GattManager1 interface and the provided name, if provided.
+    Returns the first object that has the bluez service and a GattManager1 interface and the
+    provided name, if provided.
     """
     remote_om = bus.get_proxy_object(
-        "BLUEZ_SERVICE_NAME", "/", bus.introspect_sync("BLUEZ_SERVICE_NAME", "/")
+        BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
     ).get_interface(DBUS_OM_IFACE)
-    objects = remote_om.call_get_managed_objects_sync()
+    objects = await remote_om.call_get_managed_objects()
 
     for o, props in objects.items():
         if GATT_MANAGER_IFACE in props.keys():
@@ -138,69 +87,89 @@ def find_controller(bus, name: str = ""):
     return None
 
 
-def find_devices(bus):
+def normalize_device_data(device_data: dict) -> dict:
+    """Normalize the provided device property data for proper JSON formatting."""
+    new_device_data = {}
+    for prop_key, prop_value in device_data.items():
+        if isinstance(prop_value, bool):
+            new_device_data[prop_key] = 1 if prop_value else 0
+            continue
+        if prop_key in ["ManufacturerData" or "ServiceData"] and isinstance(
+            prop_value, dict
+        ):
+            data_entry = {}
+            for data_key, data_value in prop_value.items():
+                data_entry[data_key] = list(bytes.fromhex(data_value))
+            new_device_data[prop_key] = data_entry
+            continue
+        new_device_data[prop_key] = prop_value
+    return new_device_data
+
+
+async def find_devices(bus):
     """
     Returns the objects that have the bluez service and a DEVICE_IFACE interface
     """
     remote_om = bus.get_proxy_object(
-        "BLUEZ_SERVICE_NAME", "/", bus.introspect_sync("BLUEZ_SERVICE_NAME", "/")
+        BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
     ).get_interface(DBUS_OM_IFACE)
-    objects = remote_om.call_get_managed_objects_sync()
+    objects = await remote_om.call_get_managed_objects()
 
     devices = []
 
-    for o, props in objects.items():
+    for _, props in objects.items():
         if DEVICE_IFACE in props.keys():
-            devices.append(props[DEVICE_IFACE])
+            devices.append(
+                normalize_device_data(variant_to_python(props[DEVICE_IFACE]))
+            )
 
     return devices
 
 
-def find_device(bus, uuid) -> Tuple[str, dict]:
+async def find_device(bus, uuid) -> Tuple[str, dict]:
     """
     Returns the first object that has the bluez service and a DEVICE_IFACE interface.
     """
     remote_om = bus.get_proxy_object(
-        "BLUEZ_SERVICE_NAME", "/", bus.introspect_sync("BLUEZ_SERVICE_NAME", "/")
+        BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
     ).get_interface(DBUS_OM_IFACE)
-    objects = remote_om.call_get_managed_objects_sync()
+    objects = await remote_om.call_get_managed_objects()
 
     for o, props in objects.items():
         if DEVICE_IFACE in props.keys():
             device = props[DEVICE_IFACE]
-            if device["Address"].lower() == uuid.lower():
-                return o, props[DEVICE_IFACE]
+            if str(variant_to_python(device["Address"])).lower() == uuid.lower():
+                return o, normalize_device_data(variant_to_python(props[DEVICE_IFACE]))
 
     return None, None
 
 
-def set_trusted(path):
-    bus = DBusManager().get_bus()
+async def set_trusted(path):
+    bus = await DBusManager().get_bus()
     props = bus.get_proxy_object(
-        "org.bluez", path, bus.introspect_sync("org.bluez", path)
-    ).get_interface("org.freedesktop.DBus.Properties")
-    props.call_set_sync("org.bluez.Device1", "Trusted", True)
+        BLUEZ_SERVICE_NAME, path, await bus.introspect(BLUEZ_SERVICE_NAME, path)
+    ).get_interface(DBUS_PROP_IFACE)
+    await props.call_set(DEVICE_IFACE, "Trusted", True)
 
 
-def device_is_connected(bus, device):
+async def device_is_connected(bus, device):
     device_obj = bus.get_proxy_object(
-        BLUEZ_SERVICE_NAME, device, bus.introspect_sync(BLUEZ_SERVICE_NAME, device)
+        BLUEZ_SERVICE_NAME, device, await bus.introspect(BLUEZ_SERVICE_NAME, device)
     )
-    device_properties = device_obj.get_interface("org.freedesktop.DBus.Properties")
-    connected_state = device_properties.call_get_sync(DEVICE_IFACE, "Connected")
+    device_interface = device_obj.get_interface(DEVICE_IFACE)
+    connected_state = variant_to_python(await device_interface.get_connected())
     return connected_state
 
 
-def dev_connect(path):
-    bus = DBusManager().get_bus()
+async def dev_connect(path):
+    bus = await DBusManager().get_bus()
     dev = bus.get_proxy_object(
-        "org.bluez", path, bus.introspect_sync("org.bluez", path)
-    ).get_interface("org.bluez.Device1")
-    dev.call_connect_sync()
+        BLUEZ_SERVICE_NAME, path, await bus.introspect(BLUEZ_SERVICE_NAME, path)
+    ).get_interface(DEVICE_IFACE)
+    await dev.call_connect()
 
 
 class Rejected(DBusError):
-    # class Rejected(dbus.DBusException):
     _dbus_error_name = "org.bluez.Error.Rejected"
 
 
@@ -208,10 +177,10 @@ class AgentSingleton:
     __instance = None
 
     @staticmethod
-    def get_instance():
+    async def get_instance():
         """Static access method."""
         if AgentSingleton.__instance is None:
-            AgentSingleton()
+            await create_agent_singleton()
         return AgentSingleton.__instance
 
     @staticmethod
@@ -224,30 +193,37 @@ class AgentSingleton:
         if AgentSingleton.__instance is None:
             AgentSingleton.__instance = self
 
-            syslog("Registering agent for auto-pairing...")
-            try:
-                # get the system bus
-                bus = DBusManager.get_bus()
-                agent = AuthenticationAgent(AGENT_IFACE)
-                bus.export(AGENT_PATH, agent)
 
-                obj = bus.get_proxy_object(
-                    BLUEZ_SERVICE_NAME,
-                    "/org/bluez",
-                    bus.introspect_sync(BLUEZ_SERVICE_NAME, "/org/bluez"),
-                )
+async def create_agent_singleton() -> AgentSingleton:
+    """
+    Async wrapper to create/generate the AgentSingleton
+    """
 
-                agent_manager = obj.get_interface("org.bluez.AgentManager1")
-                agent_manager.call_register_agent_sync(AGENT_PATH, "NoInputNoOutput")
-            except Exception as e:
-                syslog(LOG_ERR, str(e))
+    agent_singleton = AgentSingleton()
+
+    syslog("Registering agent for auto-pairing...")
+    try:
+        # get the system bus
+        bus = await DBusManager().get_bus()
+        agent = AuthenticationAgent(AGENT_IFACE)
+        bus.export(AGENT_PATH, agent)
+
+        obj = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME,
+            "/org/bluez",
+            await bus.introspect(BLUEZ_SERVICE_NAME, "/org/bluez"),
+        )
+
+        agent_manager = obj.get_interface("org.bluez.AgentManager1")
+        await agent_manager.call_register_agent(AGENT_PATH, "NoInputNoOutput")
+    except Exception as exception:
+        syslog(LOG_ERR, str(exception))
+
+    return agent_singleton
 
 
 class AuthenticationAgent(ServiceInterface):
     exit_on_release = True
-
-    def __init__(self, name):
-        super().__init__(name)
 
     def set_exit_on_release(self, exit_on_release):
         self.exit_on_release = exit_on_release
@@ -258,19 +234,19 @@ class AuthenticationAgent(ServiceInterface):
 
     @method()
     def AuthorizeService(self, device: "o", uuid: "s"):
-        syslog("AuthenticationAgent AuthorizeService (%s, %s)" % (device, uuid))
+        syslog(f"AuthenticationAgent AuthorizeService ({str(device)}, {str(uuid)})")
         return
 
     @method()
-    def RequestPinCode(self, device: "o") -> "s":
-        syslog("AuthenticationAgent RequestPinCode (%s)" % (device))
-        set_trusted(device)
+    async def RequestPinCode(self, device: "o") -> "s":
+        syslog(f"AuthenticationAgent RequestPinCode ({str(device)})")
+        await set_trusted(device)
         return "000000"
 
     @method()
-    def RequestPasskey(self, device: "o") -> "u":
-        syslog("AuthenticationAgent RequestPasskey (%s)" % (device))
-        set_trusted(device)
+    async def RequestPasskey(self, device: "o") -> "u":
+        syslog(f"AuthenticationAgent RequestPasskey ({str(device)})")
+        await set_trusted(device)
         # passkey = ask("Enter passkey: ")
         # TODO: Implement with RESTful set
         passkey = 0
@@ -283,28 +259,29 @@ class AuthenticationAgent(ServiceInterface):
     @method()
     def DisplayPasskey(self, device: "o", passkey: "u", entered: "q"):
         syslog(
-            "AuthenticationAgent DisplayPasskey (%s, %06u entered %u)"
-            % (device, passkey, entered)
+            f"AuthenticationAgent DisplayPasskey ({str(device)}, {passkey:06d} entered {entered:})"
         )
 
     @method()
     def DisplayPinCode(self, device: "o", pincode: "s"):
-        syslog("AuthenticationAgent DisplayPinCode (%s, %s)" % (device, pincode))
+        syslog(f"AuthenticationAgent DisplayPinCode ({str(device)}, {str(pincode)})")
 
     @method()
-    def RequestConfirmation(self, device: "o", passkey: "u"):
-        syslog("AuthenticationAgent RequestConfirmation (%s, %06d)" % (device, passkey))
+    async def RequestConfirmation(self, device: "o", passkey: "u"):
+        syslog(
+            f"AuthenticationAgent RequestConfirmation ({str(device)}, {passkey:06d})"
+        )
         # TODO:  Check if provided passkey matches customer-preset passkey.
-        set_trusted(device)
+        await set_trusted(device)
         return
 
     # Alcon Smart Remote utilizes RequestAuthorization
-    # "used for requesting authorization for pairing requests which would otherwise not trigger any action for the user
-    # The main situation where this would occur is an incoming SSP pairing request that would trigger the just-works
-    # model."
+    # "used for requesting authorization for pairing requests which would otherwise not trigger any
+    # action for the user The main situation where this would occur is an incoming SSP pairing
+    # request that would trigger the just-works model."
     @method()
     def RequestAuthorization(self, device: "o"):
-        syslog("AuthenticationAgent RequestAuthorization (%s)" % (device))
+        syslog(f"AuthenticationAgent RequestAuthorization ({str(device)})")
         return
 
     @method()

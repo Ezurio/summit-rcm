@@ -8,20 +8,21 @@ from syslog import syslog
 from typing import Optional, Tuple, List, Dict
 
 import dbus
+from dbus_fast.aio.proxy_object import ProxyInterface
 import pyudev
 
-from ..bluetooth.bt_plugin import BluetoothPlugin
-from ..tcp_connection import (
+from summit_rcm.bluetooth.bt_plugin import BluetoothPlugin
+from summit_rcm.tcp_connection import (
     TcpConnection,
     TCP_SOCKET_HOST,
     SOCK_TIMEOUT,
 )
-from ..bluetooth.ble import device_is_connected
+from summit_rcm.bluetooth.ble import device_is_connected
 
+AUTO_CONNECT = False
 """ AUTO_CONNECT allows clients to open a server port for a specific device, before that device
 is actually present in the system.
 """
-AUTO_CONNECT = False
 
 # From https://github.com/julzhk/usb_barcode_scanner/blob/master/scanner.py
 CHARMAP_LOWERCASE = {
@@ -144,15 +145,15 @@ class HidBarcodeScannerPlugin(BluetoothPlugin):
     def adapter_commands(self) -> List[str]:
         return ["hidList"]
 
-    def ProcessDeviceCommand(
+    async def ProcessDeviceCommand(
         self,
         bus,
         command,
         device_uuid: str,
-        device: dbus.ObjectPath,
-        adapter_obj: dbus.ObjectPath,
+        device_interface: Optional[ProxyInterface],
+        adapter_interface: Optional[ProxyInterface],
         post_data,
-        remove_device_method,
+        remove_device_method=None,
     ):
         processed = False
         error_message = None
@@ -165,8 +166,8 @@ class HidBarcodeScannerPlugin(BluetoothPlugin):
                 )
             else:
                 hid_connection = HidBarcodeScanner()
-                error_message = hid_connection.connect(
-                    bus, device_uuid, device, post_data
+                error_message = await hid_connection.connect(
+                    bus, device_uuid, device_interface.path, post_data
                 )
                 if not error_message:
                     self.hid_connections[device_uuid] = hid_connection
@@ -179,12 +180,12 @@ class HidBarcodeScannerPlugin(BluetoothPlugin):
                 hid_connection.disconnect(bus, device_uuid, post_data)
         return processed, error_message
 
-    def ProcessAdapterCommand(
+    async def ProcessAdapterCommand(
         self,
         bus,
         command,
         controller_name: str,
-        adapter_obj: dbus.ObjectPath,
+        adapter_interface: Optional[ProxyInterface],
         post_data,
     ) -> Tuple[bool, str, dict]:
         processed = False
@@ -237,9 +238,9 @@ class HidBarcodeScanner(TcpConnection):
             elif action == "remove":
                 if self.active_device_node == device.device_node:
                     self.send_connected_state(False)
-        except Exception as e:
-            syslog("udev_event:" + str(e))
-            self.tcp_connection_try_send(f'{{"Error": "{str(e)}"}}\n'.encode())
+        except Exception as exception:
+            syslog("udev_event:" + str(exception))
+            self.tcp_connection_try_send(f'{{"Error": "{str(exception)}"}}\n'.encode())
 
     def barcode_reader(self, dev_node: str):
         barcode_string_output = ""
@@ -309,14 +310,14 @@ class HidBarcodeScanner(TcpConnection):
         connected_packet = {"Connected": int(connected_state)}
         self.tcp_connection_try_send((json.dumps(connected_packet) + "\n").encode())
 
-    def connect(
+    async def connect(
         self, bus, device_uuid: str = "", device: dbus.ObjectPath = None, params=None
     ):
         device_uuid = device_uuid.upper()
         if AUTO_CONNECT:
             self.device_uuid = device_uuid
         elif device:
-            if not device_is_connected(bus, device):
+            if not await device_is_connected(bus, device):
                 return f"Device {device_uuid} is not connected."
 
         # Note that for BT keyboard / scanner operation, kernel uhid module
@@ -386,9 +387,9 @@ class HidBarcodeScanner(TcpConnection):
         except FileNotFoundError:
             self.send_connected_state(False)
 
-        except Exception as e:
-            syslog("barcode_scanner_read_thread: " + str(e))
-            self.tcp_connection_try_send(f'{{"Error": "{str(e)}"}}\n'.encode())
+        except Exception as exception:
+            syslog("barcode_scanner_read_thread: " + str(exception))
+            self.tcp_connection_try_send(f'{{"Error": "{str(exception)}"}}\n'.encode())
 
         finally:
             self._barcode_read_thread_count -= 1
@@ -411,17 +412,18 @@ class HidBarcodeScanner(TcpConnection):
                         while self._tcp_connection.recv(16):
                             pass
 
-                    except OSError as e:
+                    except OSError as error:
                         # If sock is closed, exit.
-                        if e.errno == socket.EBADF:
+                        if error.errno == socket.EBADF:
                             break
-                        syslog("hid_tcp_server_thread:" + str(e))
-                    except Exception as e:
+                        syslog("hid_tcp_server_thread:" + str(error))
+                    except Exception as exception:
                         syslog(
-                            "hid_tcp_server_thread: non-OSError Exception: " + str(e)
+                            "hid_tcp_server_thread: non-OSError Exception: "
+                            + str(exception)
                         )
                         self.tcp_connection_try_send(
-                            f'{{"Error": "{str(e)}"}}\n'.encode()
+                            f'{{"Error": "{str(exception)}"}}\n'.encode()
                         )
                     finally:
                         syslog(
@@ -433,9 +435,9 @@ class HidBarcodeScanner(TcpConnection):
                             self._tcp_connection, client_address = None, None
                 except socket.timeout:
                     continue
-                except OSError as e:
+                except OSError as error:
                     # If the socket was closed by another thread, exit
-                    if e.errno == socket.EBADF:
+                    if error.errno == socket.EBADF:
                         break
                     else:
                         raise

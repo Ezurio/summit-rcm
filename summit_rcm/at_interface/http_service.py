@@ -3,6 +3,7 @@ Service file to handle all HTTP configurations and executions
 """
 
 import http.client
+from typing import Dict
 from summit_rcm.utils import Singleton
 from summit_rcm.utils import InProgressException
 import summit_rcm.at_interface.fsm as fsm
@@ -20,7 +21,7 @@ class HTTPService(object, metaclass=Singleton):
         method: str = "",
         url: str = "",
         body: str = "",
-        headers: dict[str:str] = {},
+        headers: Dict[str, str] = {},
         rspheader: bool = False,
         ssl: int = 0,
         ssl_ca: list = [],

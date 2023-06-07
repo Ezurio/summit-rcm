@@ -105,10 +105,7 @@ class SessionsMiddleware:
             session_base64 = base64.urlsafe_b64encode(
                 json.dumps(resp.context._session).encode()
             ).decode()
-            resp.set_cookie(
-                self._session_cookie,
-                session_base64,
-            )
+            resp.set_cookie(self._session_cookie, session_base64, path="/")
             if hasattr(resp.context, "valid_session"):
                 if resp.context.valid_session:
                     session_found = False
