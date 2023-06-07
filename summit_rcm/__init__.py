@@ -55,14 +55,12 @@ X509_V_FLAG_NO_CHECK_TIME = 0x200000
 Flags for OpenSSL 1.1.1 or newer to disable time checking during certificate verification
 """
 
-"""
-Note: Authenticating websocket users by header token is non-standard; an alternative method
-may be required for Javascript browser clients.
-"""
+# Note: Authenticating websocket users by header token is non-standard; an alternative method may be
+# required for Javascript browser clients.
 
 try:
-    from .bluetooth.bt import Bluetooth
-    from .bluetooth.bt_ble import websockets_auth_by_header_token
+    from summit_rcm.bluetooth.bt import Bluetooth
+    from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
 
     summit_rcm_plugins.append("bluetooth")
 except ImportError:
@@ -464,9 +462,10 @@ async def add_ntp():
 async def add_bluetooth():
     if Bluetooth:
         bluetooth = Bluetooth()
-        await bluetooth.setup()
+        await bluetooth.setup(app)
 
-        app.add_route("/bluetooth", bluetooth)
+        app.add_route("/bluetooth/{controller}", bluetooth, suffix="no_device")
+        app.add_route("/bluetooth/{controller}/{device}", bluetooth)
         syslog("Bluetooth loaded")
     else:
         syslog("Bluetooth NOT loaded")

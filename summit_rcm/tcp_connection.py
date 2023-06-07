@@ -32,7 +32,7 @@ class TcpConnection(object):
         except Exception:
             return False
 
-    def tcp_server(self, host, params) -> socket.socket:
+    def tcp_server(self, host, params, backlog: Optional[int] = None) -> socket.socket:
         # Create a TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -40,7 +40,7 @@ class TcpConnection(object):
         self.port = port
         server_address = (host, port)
         sock.bind(server_address)
-        sock.listen()
+        sock.listen(backlog) if backlog is not None else sock.listen()
         return sock
 
     def stop_tcp_server(self, sock: socket.SOCK_STREAM):
