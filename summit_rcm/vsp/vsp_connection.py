@@ -1,32 +1,511 @@
+"""
+Module to support a Virtual Serial Port (VSP) between Bluetooth GATT Rx/Tx characteristics and
+a TCP socket connection.
+"""
+
+import asyncio
 import logging
-import threading
-import time
-import socket
-from syslog import syslog, LOG_INFO, LOG_ERR
-from typing import Optional, Any, Tuple, List, Dict
-
-import dbus
-
-from ..bluetooth.ble import (
+from syslog import LOG_WARNING, syslog, LOG_INFO, LOG_ERR
+from typing import Optional, Tuple, List, Dict
+import dbus_fast
+from dbus_fast.aio.proxy_object import ProxyInterface, ProxyObject
+from summit_rcm.bluetooth.ble import (
     BLUEZ_SERVICE_NAME,
     GATT_CHRC_IFACE,
     DBUS_PROP_IFACE,
-    dbus_to_python_ex,
     GATT_SERVICE_IFACE,
     DBUS_OM_IFACE,
+    DEVICE_IFACE,
     find_device,
 )
-from ..bluetooth.bt_plugin import BluetoothPlugin
-from ..tcp_connection import (
+from summit_rcm.bluetooth.bt_plugin import BluetoothPlugin
+from summit_rcm.tcp_connection import (
     TcpConnection,
     TCP_SOCKET_HOST,
-    SOCK_TIMEOUT,
 )
+from summit_rcm.dbus_manager import DBusManager
+from summit_rcm.utils import variant_to_python
 
 MAX_RECV_LEN = 512
 """ Maximum bytes to read over TCP"""
 DEFAULT_WRITE_SIZE = 1
 """ Default GATT write size """
+
+
+class VspConnection:
+    """
+    Represent a VSP connection with GATT read and write characteristics to a device, and an
+    associated TCP socket connection.
+    """
+
+    def __init__(self, device_uuid: str, on_connection_closed=None):
+        self.device_interface: Optional[ProxyInterface] = None
+        self.adapter_interface: Optional[ProxyInterface] = None
+        self.remove_device_method = None
+        self._waiting_for_services_resolved: bool = False
+        self.vsp_svc_uuid = None
+        self.vsp_read_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
+        self.vsp_read_chr_uuid = None
+        self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
+        self.vsp_write_chr_uuid = None
+        self.socket_rx_type: str = "JSON"
+        self._logger = logging.getLogger(__name__)
+        self.auth_failure_unpair = False
+        self.write_size: int = DEFAULT_WRITE_SIZE
+        self.device_uuid = device_uuid
+        self.on_connection_closed = on_connection_closed
+        self.rx_buffer: list = []
+        self.server: Optional[asyncio.Server] = None
+        self.reader: Optional[asyncio.StreamReader] = None
+        self.writer: Optional[asyncio.StreamWriter] = None
+        self.connected: bool = False
+        self.port: int = 0
+
+    def log_exception(self, exception, message: str = ""):
+        self._logger.exception(exception)
+        syslog(LOG_ERR, message + str(exception))
+
+    async def process_chrc(self, chrc_path, vsp_read_chr_uuid, vsp_write_chr_uuid):
+        try:
+            bus = await DBusManager().get_bus()
+            chrc = bus.get_proxy_object(
+                BLUEZ_SERVICE_NAME,
+                chrc_path,
+                await bus.introspect(BLUEZ_SERVICE_NAME, chrc_path),
+            )
+            chrc_iface = chrc.get_interface(GATT_CHRC_IFACE)
+
+            uuid = variant_to_python(await chrc_iface.get_uuid())
+
+            if uuid == vsp_read_chr_uuid:
+                self.vsp_read_chrc = (chrc, chrc_iface)
+            elif uuid == vsp_write_chr_uuid:
+                self.vsp_write_chrc = (chrc, chrc_iface)
+
+            return True
+        except Exception:
+            return False
+
+    async def device_prop_changed_cb(self, iface, changed_props, invalidated_props):
+        if "Connected" in changed_props:
+            try:
+                syslog(
+                    LOG_INFO,
+                    f"VSP device_prop_changed_cb: Connected: "
+                    f"{variant_to_python(changed_props['Connected'])}",
+                )
+                if self.writer and self.socket_rx_type == "JSON":
+                    self.writer.write(
+                        '{"Connected": '
+                        f"{variant_to_python(changed_props['Connected'])}}}\n".encode()
+                    )
+            except Exception as exception:
+                self.log_exception(exception)
+        if (
+            self.auth_failure_unpair
+            and "DisconnectReason" in changed_props
+            and changed_props["DisconnectReason"] == "auth failure"
+        ):
+            try:
+                syslog(
+                    LOG_INFO,
+                    "VSP device_prop_changed_cb: disconnect auth failure, auto-unpairing",
+                )
+                if self.remove_device_method:
+                    await self.remove_device_method(
+                        self.adapter_interface, self.device_interface
+                    )
+            except Exception as exception:
+                self.log_exception(exception)
+        if "ServicesResolved" in changed_props:
+            try:
+                syslog(
+                    LOG_INFO,
+                    f"VSP device_prop_changed_cb: ServicesResolved: "
+                    f"{variant_to_python(changed_props['ServicesResolved'])}",
+                )
+                if variant_to_python(changed_props["ServicesResolved"]):
+                    if self._waiting_for_services_resolved:
+                        self._waiting_for_services_resolved = False
+                        await self.gatt_only_connected()
+            except Exception as exception:
+                self.log_exception(exception)
+
+    def vsp_read_prop_changed_cb(self, iface, changed_props, invalidated_props):
+        if iface != GATT_CHRC_IFACE:
+            syslog("vsp_read_prop_changed_cb: iface != GATT_CHRC_IFACE")
+
+        if len(changed_props) == 0:
+            return
+
+        value = changed_props.get("Value", None)
+
+        if value:
+            self.gatt_vsp_read_val_cb(
+                value.value if isinstance(value, dbus_fast.Variant) else value
+            )
+
+    def gatt_vsp_read_val_cb(self, value):
+        try:
+            if self.connected and self.writer:
+                self.writer.write(
+                    f'{{"Received": "0x{value.hex()}"}}\n'.encode()
+                    if self.socket_rx_type == "JSON"
+                    else value
+                )
+        except OSError as error:
+            syslog("gatt_vsp_read_val_cb:" + str(error))
+
+    def generic_val_error_cb(self, error):
+        syslog("generic_val_error_cb: D-Bus call failed: " + str(error))
+        if "Not connected" in error.args:
+            if self.connected and self.writer and self.socket_rx_type == "JSON":
+                self.writer.write('{"Connected": 0}\n'.encode())
+
+    def gatt_vsp_write_val_error_cb(self, error):
+        if self.connected and self.socket_rx_type == "JSON" and self.writer:
+            self.writer.write('{"Error": "Transmit failed"}\n'.encode())
+        self.generic_val_error_cb(error)
+
+    async def start_client(self) -> bool:
+        syslog("VSP: start_client")
+        if not self.vsp_read_chrc:
+            return False
+
+        # Subscribe to VSP read value notifications.
+        try:
+            await self.vsp_read_chrc[1].call_start_notify()
+            syslog("VSP: subscribed for GATT notifications")
+        except dbus_fast.DBusError as error:
+            syslog("VSP: unable to subscribe for GATT notifications")
+            self.generic_val_error_cb(error)
+            return False
+
+        # Listen to PropertiesChanged signals from the Read Value
+        # Characteristic.
+        try:
+            vsp_read_prop_iface = self.vsp_read_chrc[0].get_interface(DBUS_PROP_IFACE)
+            vsp_read_prop_iface.on_properties_changed(self.vsp_read_prop_changed_cb)
+        except Exception as exception:
+            syslog(
+                f"VSP: start_client, could not subscribe to read prop changes: {str(exception)}"
+            )
+
+        return True
+
+    async def stop_client(self):
+        # Stop client suppresses all errors, because it can be invoked during a failed startup,
+        # in which case we want to focus attention on the startup error, not errors in
+        # subsequently attempting to tear down.
+        syslog("VSP: stop_client")
+        vsp_read_prop_iface = None
+        if self.vsp_read_chrc and len(self.vsp_read_chrc):
+            try:
+                vsp_read_prop_iface = self.vsp_read_chrc[0].get_interface(
+                    DBUS_PROP_IFACE
+                )
+                await self.vsp_read_chrc[1].call_stop_notify()
+            except Exception as exception:
+                syslog(LOG_ERR, "stop_client: " + str(exception))
+            self.vsp_read_chrc = None
+        if vsp_read_prop_iface:
+            try:
+                vsp_read_prop_iface.off_properties_changed(
+                    self.vsp_read_prop_changed_cb
+                )
+            except Exception as exception:
+                syslog(LOG_ERR, "stop_client: " + str(exception))
+
+    async def gatt_send_data(self, data) -> bool:
+        try:
+            if self.vsp_write_chrc and len(self.vsp_write_chrc):
+                try:
+                    await self.vsp_write_chrc[1].call_write_value(bytearray(data), {})
+                    return True
+                except dbus_fast.DBusError as error:
+                    self.gatt_vsp_write_val_error_cb(error)
+            return False
+        except Exception as exception:
+            syslog(LOG_ERR, f"VSP: gatt_send_data error: {str(exception)}")
+            return False
+
+    async def process_vsp_service(
+        self,
+        service_path,
+        chrc_paths,
+        vsp_svc_uuid,
+        vsp_read_chr_uuid,
+        vsp_write_chr_uuid,
+    ):
+        try:
+            bus = await DBusManager().get_bus()
+            service = bus.get_proxy_object(
+                BLUEZ_SERVICE_NAME,
+                service_path,
+                await bus.introspect(BLUEZ_SERVICE_NAME, service_path),
+            )
+            service_iface = service.get_interface(GATT_SERVICE_IFACE)
+
+            uuid = variant_to_python(await service_iface.get_uuid())
+
+            if uuid != vsp_svc_uuid:
+                raise Exception("Invalid UUID")
+
+            # Process the characteristics.
+            for chrc_path in chrc_paths:
+                await self.process_chrc(
+                    chrc_path, vsp_read_chr_uuid, vsp_write_chr_uuid
+                )
+
+            if self.vsp_read_chrc and self.vsp_write_chrc:
+                vsp_service = (service, service_iface, service_path)
+                return vsp_service
+        except Exception:
+            pass
+        return None
+
+    async def gatt_connect(
+        self,
+        bus,
+        adapter_interface: ProxyInterface,
+        device_interface: ProxyInterface,
+        params=None,
+        remove_device_method=None,
+    ):
+        if not params:
+            return "no params specified"
+        self.device_interface = device_interface
+        self.adapter_interface = adapter_interface
+        self.remove_device_method = remove_device_method
+        if "authFailureUnpair" in params:
+            self.auth_failure_unpair = params["authFailureUnpair"]
+        if "vspSvcUuid" not in params:
+            return "vspSvcUuid param not specified"
+        self.vsp_svc_uuid = params["vspSvcUuid"]
+        if "vspReadChrUuid" not in params:
+            return "vspReachChrUuid param not specified"
+        self.vsp_read_chr_uuid = params["vspReadChrUuid"]
+        if "vspWriteChrUuid" not in params:
+            return "vspWriteChrUuid param not specified"
+        self.vsp_write_chr_uuid = params["vspWriteChrUuid"]
+        if "tcpPort" not in params:
+            return "tcpPort param not specified"
+        try:
+            self.port = int(params["tcpPort"])
+            if not TcpConnection.validate_port(self.port):
+                raise ValueError
+        except ValueError:
+            return "invalid value for tcpPort param"
+        if "socketRxType" in params:
+            self.socket_rx_type = params["socketRxType"]
+        if "vspWriteChrSize" in params:
+            try:
+                self.write_size = int(params["vspWriteChrSize"])
+                if self.write_size < 1:
+                    raise ValueError
+            except ValueError:
+                return "invalid value for vspWriteChrSize param"
+
+        vsp_service = await self.create_vsp_service()
+        if not vsp_service:
+            return f"no VSP Service found for device {self.device_uuid}"
+
+        if not await self.start_client():
+            return "could not start GATT client"
+
+        self.server = await asyncio.start_server(
+            self.client_connected_callback,
+            host=TCP_SOCKET_HOST,
+            port=self.port,
+            backlog=1,
+        )
+
+        dev_props_iface = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME,
+            self.device_interface.path,
+            await bus.introspect(BLUEZ_SERVICE_NAME, self.device_interface.path),
+        ).get_interface(DBUS_PROP_IFACE)
+        dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
+
+        try:
+            asyncio.create_task(self.server.serve_forever())
+        except Exception as exception:
+            syslog(
+                f"VSP: gatt_connect() - error serving TCP connection - {str(exception)}"
+            )
+
+    async def gatt_only_disconnect(self):
+        self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
+        try:
+            bus = await DBusManager().get_bus()
+            dev_props_iface = bus.get_proxy_object(
+                BLUEZ_SERVICE_NAME,
+                self.device_interface.path,
+                await bus.introspect(BLUEZ_SERVICE_NAME, self.device_interface.path),
+            ).get_interface(DBUS_PROP_IFACE)
+            dev_props_iface.off_properties_changed(self.device_prop_changed_cb)
+        except Exception as exception:
+            syslog(LOG_ERR, "gatt_only_disconnect: " + str(exception))
+        await self.stop_client()
+
+    async def gatt_only_reconnect(self):
+        """
+        Reconnect VSP gatt connection, assuming it was prior connected and TCP server/
+        websocket service is still running.
+        Note: Services will NOT resolve if connect was not issued through LCM, as connect
+        will not have been performed by controller_restore in that case.
+        """
+        bus = await DBusManager().get_bus()
+        dev_obj_path, device_props = await find_device(bus, self.device_uuid)
+
+        if not dev_obj_path:
+            syslog(
+                LOG_ERR,
+                f"gatt_only_reconnect: device {self.device_uuid} not found on bus",
+            )
+            return
+        self.device_interface = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME,
+            dev_obj_path,
+            await bus.introspect(BLUEZ_SERVICE_NAME, dev_obj_path),
+        ).get_interface(DEVICE_IFACE)
+
+        dev_props_iface = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME,
+            dev_obj_path,
+            await bus.introspect(BLUEZ_SERVICE_NAME, dev_obj_path),
+        ).get_interface(DBUS_PROP_IFACE)
+        dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
+
+        services_resolved = device_props.get("ServicesResolved")
+
+        if services_resolved:
+            await self.gatt_only_connected()
+        else:
+            syslog(
+                LOG_INFO,
+                f"services not resolved ({services_resolved}), schedule for "
+                "later connection...",
+            )
+            self._waiting_for_services_resolved = True
+
+    async def gatt_only_connected(self):
+        syslog(LOG_INFO, f"gatt_only_connected {self.device_uuid}")
+        vsp_service = await self.create_vsp_service()
+        if not vsp_service:
+            syslog(
+                LOG_ERR,
+                f"Failed to reconnect vsp_service for {self.device_uuid}",
+            )
+        if not await self.start_client():
+            syslog(
+                LOG_ERR,
+                f"Failed to restart GATT client for {self.device_uuid}",
+            )
+
+    async def create_vsp_service(self):
+        bus = await DBusManager().get_bus()
+        om = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
+        ).get_interface(DBUS_OM_IFACE)
+        objects = await om.call_get_managed_objects()
+        chrcs = []
+        # List characteristics found
+        for path, interfaces in objects.items():
+            if GATT_CHRC_IFACE not in interfaces.keys():
+                continue
+            chrcs.append(path)
+        # List sevices found
+        vsp_service = None
+        for path, interfaces in objects.items():
+            if GATT_SERVICE_IFACE not in interfaces.keys():
+                continue
+
+            chrc_paths = [d for d in chrcs if d.startswith(path + "/")]
+
+            if not self.device_interface or path.startswith(self.device_interface.path):
+                vsp_service = await self.process_vsp_service(
+                    path,
+                    chrc_paths,
+                    self.vsp_svc_uuid,
+                    self.vsp_read_chr_uuid,
+                    self.vsp_write_chr_uuid,
+                )
+                if vsp_service:
+                    break
+        return vsp_service
+
+    async def vsp_close(self):
+        """
+        Close the VSP connection down, including the REST host connection, and perform any necessary
+        cleanup
+        """
+        # Signal to the VspConnectionPlugin that this VspConnection instance is closing
+        if self.on_connection_closed:
+            self.on_connection_closed(self)
+
+        # Other cleanup
+        self.connected = False
+        await self.gatt_only_disconnect()
+        self.server.close()
+        syslog(LOG_INFO, f"VSP: closed for device {self.device_uuid}")
+
+    async def client_connected_callback(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+        """
+        Callback fired when a client connects to the server socket.
+        """
+
+        # Log the connection
+        addr = writer.get_extra_info("peername")
+        syslog(f"VSP: TCP client connected: {addr!r}")
+
+        # Expose the reader and writer to the rest of the class instance
+        self.reader = reader
+        self.writer = writer
+
+        self.connected = True
+        try:
+            while self.connected:
+                # Make sure the writer is in a good state
+                await writer.drain()
+
+                # Read some data
+                data = await reader.read(self.write_size)
+                if not data:
+                    # When read() returns 0 bytes this indicates that the TCP client socket was
+                    # closed
+                    syslog(f"VSP: closing TCP client socket {addr!r}")
+                    self.connected = False
+
+                # Add the incoming data to the Rx buffer
+                self.rx_buffer += data
+                if len(self.rx_buffer) < self.write_size:
+                    # Not enough data to transmit
+                    continue
+
+                # Send the data out via GATT
+                success: bool = await self.gatt_send_data(
+                    self.rx_buffer[: self.write_size]
+                )
+
+                # Update the Rx buffer to remove the now-sent chunk of data
+                self.rx_buffer = self.rx_buffer[self.write_size :]
+
+                # If the GATT Tx wasn't successful and the socket is configured for 'JSON', send a
+                # notification to the TCP client.
+                if not success and self.socket_rx_type == "JSON":
+                    writer.write('{"Error": "Transmit failed"}\n'.encode())
+        except Exception as exception:
+            syslog(f"VSP: server_socket_event_handler error - {str(exception)}")
+
+        # Perform any cleanup
+        writer.close()
+        await writer.wait_closed()
+        await self.vsp_close()
+        self.writer = None
+        self.reader = None
 
 
 class VspConnectionPlugin(BluetoothPlugin):
@@ -42,16 +521,18 @@ class VspConnectionPlugin(BluetoothPlugin):
     def adapter_commands(self) -> List[str]:
         return ["gattList"]
 
-    def ProcessDeviceCommand(
+    async def ProcessDeviceCommand(
         self,
         bus,
         command,
         device_uuid: str,
-        device: dbus.ObjectPath,
-        adapter_obj: dbus.ObjectPath,
+        device_interface: Optional[ProxyInterface],
+        adapter_interface: Optional[ProxyInterface],
         post_data,
-        remove_device_method,
+        remove_device_method=None,
     ):
+        TIMEOUT_S: float = 5.0
+
         processed = False
         error_message = None
         if command == "gattConnect":
@@ -62,15 +543,20 @@ class VspConnectionPlugin(BluetoothPlugin):
                     f"{self.vsp_connections[device_uuid].port}"
                 )
             else:
-                vsp_connection = VspConnection()
-                error_message = vsp_connection.gatt_connect(
-                    bus,
-                    adapter_obj,
-                    device_uuid,
-                    device,
-                    post_data,
-                    remove_device_method,
-                )
+                vsp_connection = VspConnection(device_uuid, self.on_connection_closed)
+                try:
+                    error_message = await asyncio.wait_for(
+                        vsp_connection.gatt_connect(
+                            bus,
+                            adapter_interface,
+                            device_interface,
+                            post_data,
+                            remove_device_method,
+                        ),
+                        timeout=TIMEOUT_S,
+                    )
+                except TimeoutError:
+                    error_message = "command timed out"
                 if not error_message:
                     self.vsp_connections[device_uuid] = vsp_connection
         elif command == "gattDisconnect":
@@ -78,16 +564,21 @@ class VspConnectionPlugin(BluetoothPlugin):
             if device_uuid not in self.vsp_connections:
                 error_message = f"device {device_uuid} has no vsp connection"
             else:
-                vsp_connection = self.vsp_connections.pop(device_uuid)
-                vsp_connection.vsp_close(bus, device_uuid, post_data)
+                syslog("Closing VSP due to gattDisconnect command")
+                try:
+                    await asyncio.wait_for(
+                        self.vsp_connections[device_uuid].vsp_close(), timeout=TIMEOUT_S
+                    )
+                except TimeoutError:
+                    syslog(LOG_WARNING, "VSP: close command timed out")
         return processed, error_message
 
-    def ProcessAdapterCommand(
+    async def ProcessAdapterCommand(
         self,
         bus,
         command,
         controller_name: str,
-        adapter_obj: dbus.ObjectPath,
+        adapter_interface: Optional[ProxyInterface],
         post_data,
     ) -> Tuple[bool, str, dict]:
         processed = False
@@ -101,494 +592,32 @@ class VspConnectionPlugin(BluetoothPlugin):
             ]
         return processed, error_message, result
 
-    def DeviceRemovedNotify(self, device_uuid: str, device: dbus.ObjectPath):
+    async def DeviceRemovedNotify(
+        self, device_uuid: str, device_interface: ProxyInterface
+    ):
         """Called when user has requested device be unpaired."""
         if device_uuid in self.vsp_connections:
-            bus = dbus.SystemBus()
-            vsp_connection = self.vsp_connections.pop(device_uuid)
-            vsp_connection.vsp_close(bus, device_uuid)
+            syslog("Closing VSP because the device was removed")
+            await self.vsp_connections[device_uuid].vsp_close()
 
-    def ControllerRemovedNotify(
-        self, controller_name: str, adapter_obj: dbus.ObjectPath
+    async def ControllerRemovedNotify(
+        self, controller_name: str, adapter_obj: ProxyObject
     ):
-        for vsp_uuid, vsp_connection in self.vsp_connections.items():
+        for _, vsp_connection in self.vsp_connections.items():
+            syslog("Controller removed, removing GATT change subscriptions")
             vsp_connection.gatt_only_disconnect()
 
-    def DeviceAddedNotify(
-        self, device: str, device_uuid: str, device_obj: dbus.ObjectPath
+    async def DeviceAddedNotify(
+        self, device: str, device_uuid: str, device_obj: ProxyObject
     ):
         for vsp_uuid, vsp_connection in self.vsp_connections.items():
             if vsp_uuid == device_uuid:
-                vsp_connection.gatt_only_reconnect()
+                syslog(f"Re-connecting GATT subscriptions for device {device_uuid}")
+                await vsp_connection.gatt_only_reconnect()
 
-
-class VspConnection(TcpConnection):
-    """Represent a VSP connection with GATT read and write characteristics to a
-    device, and an associated TCP socket connection.
-    """
-
-    def __init__(self):
-        self.device: Optional[dbus.ObjectPath] = None
-        self._waiting_for_services_resolved: bool = False
-        self.recent_error: Optional[str] = None
-        self.vsp_svc_uuid = None
-        self.vsp_read_chrc: Optional[Tuple[dbus.proxies.ProxyObject, Any]] = None
-        self.vsp_read_chr_uuid = None
-        self.signal_vsp_read_prop_changed = None
-        self.signal_device_prop_changed = None
-        self.vsp_write_chrc: Optional[Tuple[dbus.proxies.ProxyObject, Any]] = None
-        self.vsp_write_chr_uuid = None
-        self.sock: Optional[socket.socket] = None
-        self.socket_rx_type: str = "JSON"
-        self.thread: Optional[threading.Thread] = None
-        self.tx_wait_event = threading.Event()
-        self.tx_complete = False
-        self.tx_error = False
-        self._logger = logging.getLogger(__name__)
-        self.auth_failure_unpair = False
-        self.write_size: int = DEFAULT_WRITE_SIZE
-        self.rx_buffer: bytes = b""
-        super().__init__()
-
-    def log_exception(self, e, message: str = ""):
-        self._logger.exception(e)
-        syslog(LOG_ERR, message + str(e))
-
-    def process_chrc(self, chrc_path, vsp_read_chr_uuid, vsp_write_chr_uuid):
-        bus = dbus.SystemBus()
-        chrc = bus.get_object(BLUEZ_SERVICE_NAME, chrc_path)
-        chrc_props = chrc.GetAll(GATT_CHRC_IFACE, dbus_interface=DBUS_PROP_IFACE)
-
-        if not chrc_props:
-            return False
-
-        uuid = chrc_props["UUID"]
-
-        if uuid == vsp_read_chr_uuid:
-            self.vsp_read_chrc = (chrc, chrc_props)
-        elif uuid == vsp_write_chr_uuid:
-            self.vsp_write_chrc = (chrc, chrc_props)
-
-        return True
-
-    def device_prop_changed_cb(self, iface, changed_props, invalidated_props):
-        if "Connected" in changed_props:
-            try:
-                syslog(
-                    LOG_INFO,
-                    f"vsp device_prop_changed_cb: Connected: "
-                    f"{changed_props['Connected']}",
-                )
-                if self._tcp_connection and self.socket_rx_type == "JSON":
-                    self._tcp_connection.sendall(
-                        f"{{\"Connected\": {changed_props['Connected']}}}\n".encode()
-                    )
-            except Exception as e:
-                self.log_exception(e)
-        if (
-            self.auth_failure_unpair
-            and "DisconnectReason" in changed_props
-            and changed_props["DisconnectReason"] == "auth failure"
-        ):
-            try:
-                syslog(
-                    LOG_INFO,
-                    f"vsp device_prop_changed_cb: disconnect auth failure, auto-unpairing",
-                )
-                if self.remove_device_method:
-                    self.remove_device_method(self.adapter_obj, self.device)
-            except Exception as e:
-                self.log_exception(e)
-        if "ServicesResolved" in changed_props:
-            try:
-                syslog(
-                    LOG_INFO,
-                    f"vsp device_prop_changed_cb: ServicesResolved: "
-                    f"{changed_props['ServicesResolved']}",
-                )
-                if changed_props["ServicesResolved"]:
-                    if self._waiting_for_services_resolved:
-                        self._waiting_for_services_resolved = False
-                        self.gatt_only_connected()
-            except Exception as e:
-                self.log_exception(e)
-
-        if len(changed_props):
-            syslog(
-                LOG_INFO,
-                "device_prop_changed_cb: property changed " + str(changed_props),
-            )
-
-    def vsp_read_prop_changed_cb(self, iface, changed_props, invalidated_props):
-        if iface != GATT_CHRC_IFACE:
-            syslog("vsp_read_prop_changed_cb: iface != GATT_CHRC_IFACE")
-
-        if not len(changed_props):
-            return
-
-        value = changed_props.get("Value", None)
-
-        # cherrypy.log("vsp_read_prop_changed_cb: property changed " + str(changed_props))
-        if value:
-            self.gatt_vsp_read_val_cb(value)
-
-    @staticmethod
-    def gatt_vsp_notify_cb():
+    def on_connection_closed(self, connection: VspConnection) -> None:
         """
-        gatt_vsp_notify_cb performs no operation at present, but should be supplied to StartNotify,
-        which is necessary to begin receiving PropertiesChanged signals on the VSP data read.
+        Callback to be fired by the connection once it's closed
         """
-        return
-
-    def gatt_vsp_read_val_cb(self, value):
-        python_value = dbus_to_python_ex(value, bytearray)
-        if self._tcp_connection:
-            try:
-                if self.socket_rx_type == "JSON":
-                    self._tcp_connection.sendall(
-                        f'{{"Received": "0x{python_value.hex()}"}}\n'.encode()
-                    )
-                else:
-                    self._tcp_connection.sendall(python_value)
-            except OSError as e:
-                syslog("gatt_vsp_read_val_cb:" + str(e))
-
-    def write_val_cb(self):
-        self.tx_complete = True
-        self.tx_wait_event.set()
-
-    def generic_val_error_cb(self, error):
-        self.recent_error = str(error)
-        syslog("generic_val_error_cb: D-Bus call failed: " + str(error))
-        if "Not connected" in error.args:
-            self.bt_disconnected()
-
-    def write_val_error_cb(self, error):
-        self.tx_error = True
-        self.tx_wait_event.set()
-        self.generic_val_error_cb(error)
-
-    def start_client(self):
-        if not self.vsp_read_chrc:
-            return
-
-        # Subscribe to VSP read value notifications.
-        self.vsp_read_chrc[0].StartNotify(
-            reply_handler=self.gatt_vsp_notify_cb,
-            error_handler=self.generic_val_error_cb,
-            dbus_interface=GATT_CHRC_IFACE,
-        )
-
-        # Listen to PropertiesChanged signals from the Read Value
-        # Characteristic.
-        vsp_read_prop_iface = dbus.Interface(self.vsp_read_chrc[0], DBUS_PROP_IFACE)
-        self.signal_vsp_read_prop_changed = vsp_read_prop_iface.connect_to_signal(
-            "PropertiesChanged", self.vsp_read_prop_changed_cb
-        )
-
-    def stop_client(self):
-        # Stop client suppresses all errors, because it can be invoked during a failed startup,
-        # in which case we want to focus attention on the startup error, not errors in
-        # subsequently attempting to tear down.
-        if self.vsp_read_chrc and len(self.vsp_read_chrc):
-            try:
-                self.vsp_read_chrc[0].StopNotify(dbus_interface=GATT_CHRC_IFACE)
-                self.vsp_read_chrc = None
-            except Exception as e:
-                syslog(LOG_ERR, "stop_client: " + str(e))
-        if self.signal_vsp_read_prop_changed:
-            try:
-                self.signal_vsp_read_prop_changed.remove()
-                self.signal_vsp_read_prop_changed = None
-            except Exception as e:
-                syslog(LOG_ERR, "stop_client: " + str(e))
-
-    def bt_disconnected(self):
-        syslog("vsp bt_disconnected: Connected: 0")
-        if self._tcp_connection and self.socket_rx_type == "JSON":
-            self._tcp_connection.sendall('{"Connected": 0}\n'.encode())
-
-    def gatt_send_data(self, data) -> bool:
-        if self.vsp_write_chrc and len(self.vsp_write_chrc):
-            self.vsp_write_chrc[0].WriteValue(
-                data,
-                {},
-                reply_handler=self.write_val_cb,
-                error_handler=self.write_val_error_cb,
-                dbus_interface=GATT_CHRC_IFACE,
-            )
-            return True
-        else:
-            self.tx_error = True
-            return False
-
-    def process_vsp_service(
-        self,
-        service_path,
-        chrc_paths,
-        vsp_svc_uuid,
-        vsp_read_chr_uuid,
-        vsp_write_chr_uuid,
-    ):
-        bus = dbus.SystemBus()
-        service = bus.get_object(BLUEZ_SERVICE_NAME, service_path)
-        service_props = service.GetAll(
-            GATT_SERVICE_IFACE, dbus_interface=DBUS_PROP_IFACE
-        )
-
-        if not service_props:
-            return None
-
-        uuid = service_props["UUID"]
-
-        if uuid != vsp_svc_uuid:
-            return None
-
-        # Process the characteristics.
-        for chrc_path in chrc_paths:
-            self.process_chrc(chrc_path, vsp_read_chr_uuid, vsp_write_chr_uuid)
-
-        if self.vsp_read_chrc and self.vsp_write_chrc:
-            vsp_service = (service, service_props, service_path)
-            return vsp_service
-        else:
-            return None
-
-    def gatt_connect(
-        self,
-        bus,
-        adapter_obj: dbus.ObjectPath,
-        device_uuid: str,
-        device: dbus.ObjectPath,
-        params=None,
-        remove_device_method=None,
-    ):
-        if not params:
-            return "no params specified"
-        self.device = device
-        self.adapter_obj = adapter_obj
-        self.device_uuid = device_uuid
-        self.remove_device_method = remove_device_method
-        if "authFailureUnpair" in params:
-            self.auth_failure_unpair = params["authFailureUnpair"]
-        if "vspSvcUuid" not in params:
-            return "vspSvcUuid param not specified"
-        self.vsp_svc_uuid = params["vspSvcUuid"]
-        if "vspReadChrUuid" not in params:
-            return "vspReachChrUuid param not specified"
-        self.vsp_read_chr_uuid = params["vspReadChrUuid"]
-        if "vspWriteChrUuid" not in params:
-            return "vspWriteChrUuid param not specified"
-        self.vsp_write_chr_uuid = params["vspWriteChrUuid"]
-        if "tcpPort" not in params:
-            return "tcpPort param not specified"
-        if "socketRxType" in params:
-            self.socket_rx_type = params["socketRxType"]
-        if "vspWriteChrSize" in params:
-            try:
-                self.write_size = int(params["vspWriteChrSize"])
-            except ValueError:
-                return "invalid value for vspWriteChrSize param"
-
-        vsp_service = self.create_vsp_service()
-        if not vsp_service:
-            return f"No VSP Service found for device {device_uuid}"
-
-        # TODO: Enhance for simultaneous clients
-        self.recent_error = None
-        try:
-            self.start_client()
-            time.sleep(0.5)
-            # For RESTful API, return BT connection errors if they occur within 0.5 seconds.
-            if self.recent_error:
-                self.stop_client()
-                return self.recent_error
-
-            if "tcpPort" in params:
-                port = params["tcpPort"]
-                if not self.validate_port(int(port)):
-                    return f"port {port} not valid"
-                host = TCP_SOCKET_HOST  # cherrypy.server.socket_host
-                self.sock = self.tcp_server(host, params)
-                if self.sock:
-                    self.thread = threading.Thread(
-                        target=self.vsp_tcp_server_thread,
-                        name="vsp_tcp_server_thread",
-                        daemon=True,
-                        args=(self.sock,),
-                    )
-                    self.thread.start()
-                device_obj = bus.get_object(BLUEZ_SERVICE_NAME, device)
-                device_iface = dbus.Interface(device_obj, DBUS_PROP_IFACE)
-                self.signal_device_prop_changed = device_iface.connect_to_signal(
-                    "PropertiesChanged", self.device_prop_changed_cb
-                )
-        except Exception:
-            self.stop_client()
-            raise
-
-    def gatt_only_disconnect(self):
-        self.vsp_write_chrc: Optional[Tuple[dbus.proxies.ProxyObject, Any]] = None
-        if self.signal_device_prop_changed:
-            try:
-                self.signal_device_prop_changed.remove()
-                self.signal_device_prop_changed = None
-            except Exception as e:
-                syslog(LOG_ERR, "gatt_only_disconnect: " + str(e))
-        self.stop_client()
-
-    def vsp_close(self, bus, device_uuid: str = "", params=None):
-        """Close the VSP connection down, including the REST host connection."""
-        self.gatt_only_disconnect()
-        self.stop_tcp_server(self.sock)
-        if self.thread:
-            self.thread.join()
-        syslog(LOG_INFO, f"vsp_close: closed for device {self.device_uuid}")
-
-    def gatt_only_reconnect(self):
-        """
-        Reconnect VSP gatt connection, assuming it was prior connected and TCP server/
-        websocket service is still running.
-        Note: Services will NOT resolve if connect was not issued through LCM, as connect
-        will not have been performed by controller_restore in that case.
-        """
-        bus = dbus.SystemBus()
-        self.device, device_props = find_device(bus, self.device_uuid)
-
-        if not self.device:
-            syslog(
-                LOG_ERR,
-                f"gatt_only_reconnect: device {self.device_uuid} not found on bus",
-            )
-            return
-
-        device_obj = bus.get_object(BLUEZ_SERVICE_NAME, self.device)
-        device_iface = dbus.Interface(device_obj, DBUS_PROP_IFACE)
-        self.signal_device_prop_changed = device_iface.connect_to_signal(
-            "PropertiesChanged", self.device_prop_changed_cb
-        )
-
-        services_resolved = device_props.get("ServicesResolved")
-
-        if services_resolved:
-            self.gatt_only_connected()
-        else:
-            syslog(
-                LOG_INFO,
-                f"services not resolved ({services_resolved}), schedule for "
-                "later connection...",
-            )
-            self._waiting_for_services_resolved = True
-
-    def gatt_only_connected(self):
-        syslog(LOG_INFO, f"gatt_only_connected {self.device}")
-        vsp_service = self.create_vsp_service()
-        if not vsp_service:
-            syslog(LOG_ERR, f"Failed to reconnect vsp_service for {str(self.device)}")
-        self.start_client()
-
-    def create_vsp_service(self):
-        bus = dbus.SystemBus()
-        om = dbus.Interface(bus.get_object(BLUEZ_SERVICE_NAME, "/"), DBUS_OM_IFACE)
-        objects = om.GetManagedObjects()
-        chrcs = []
-        # List characteristics found
-        for path, interfaces in objects.items():
-            if GATT_CHRC_IFACE not in interfaces.keys():
-                continue
-            chrcs.append(path)
-        # List sevices found
-        vsp_service = None
-        for path, interfaces in objects.items():
-            if GATT_SERVICE_IFACE not in interfaces.keys():
-                continue
-
-            chrc_paths = [d for d in chrcs if d.startswith(path + "/")]
-
-            if not self.device or path.startswith(self.device):
-                vsp_service = self.process_vsp_service(
-                    path,
-                    chrc_paths,
-                    self.vsp_svc_uuid,
-                    self.vsp_read_chr_uuid,
-                    self.vsp_write_chr_uuid,
-                )
-                if vsp_service:
-                    break
-        return vsp_service
-
-    def vsp_tcp_server_write_data(self, data: bytes):
-        # Convert string to array of DBus Bytes & send
-        val = [dbus.Byte(b) for b in bytearray(data)]
-        self.tx_complete = False
-        self.tx_error = False
-        self.tx_wait_event.clear()
-        # Use simple wait event rather than private queue, to inform network
-        # to wait for Bluetooth to consume stream and simplify buffer management.
-        if self.gatt_send_data(val):
-            if not self.tx_wait_event.wait():
-                syslog("vsp_tcp_server_thread: ERROR: gatt tx no completion")
-        if self.tx_error:
-            syslog(f"vsp transmit failed, data: 0x{data.hex()}")
-            if self.socket_rx_type == "JSON":
-                self._tcp_connection.sendall(
-                    '{"Error": "Transmit failed"'
-                    f', "Data": "0x{data.hex()}'
-                    '"}\n'.encode()
-                )
-
-    def vsp_tcp_server_thread(self, sock):
-        try:
-            sock.settimeout(SOCK_TIMEOUT)
-            while True:
-                try:
-                    tcp_connection, client_address = sock.accept()
-                    with self._tcp_lock:
-                        self._tcp_connection = tcp_connection
-                        self.rx_buffer = b""
-                    syslog(
-                        "vsp_tcp_server_thread: tcp client connected:"
-                        + str(client_address)
-                    )
-                    try:
-                        while True:
-                            data = self._tcp_connection.recv(MAX_RECV_LEN)
-                            if data:
-                                # Add the incoming data to the Rx buffer
-                                self.rx_buffer += data
-
-                                while len(self.rx_buffer) >= self.write_size:
-                                    # Grab a chunk of 'write_size' bytes from the Rx buffer and send
-                                    # it
-                                    self.vsp_tcp_server_write_data(
-                                        self.rx_buffer[: self.write_size]
-                                    )
-
-                                    # Update the Rx buffer to remove the now-sent chunk of data
-                                    self.rx_buffer = self.rx_buffer[self.write_size :]
-                            else:
-                                break
-                    except OSError as e:
-                        # If sock is closed, exit.
-                        if e.errno == socket.EBADF:
-                            break
-                        syslog("vsp_tcp_server_thread:" + str(e))
-                    except Exception as e:
-                        self.log_exception(e)
-                    finally:
-                        with self._tcp_lock:
-                            self.close_tcp_connection()
-                            self._tcp_connection, client_address = None, None
-                            self.rx_buffer = b""
-                except socket.timeout:
-                    continue
-                except OSError as e:
-                    # If the socket was closed by another thread, exit
-                    if e.errno == socket.EBADF:
-                        break
-                    else:
-                        raise
-        finally:
-            # TODO: Consider flagging to manager thread for vsp_connections.pop(device_uuid)
-            sock.close()
-            self._tcp_connection, client_address = None, None
+        if connection.device_uuid in self.vsp_connections:
+            self.vsp_connections.pop(connection.device_uuid)
