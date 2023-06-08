@@ -1773,8 +1773,9 @@ class NetworkService(metaclass=Singleton):
         )
         connection_setting_connection = connection_conn_props.get("connection", None)
         properties["zone"] = (
-            connection_setting_connection.get("zone", None).value
-            if connection_setting_connection is not None
+            connection_setting_connection["zone"].value
+            if connection_setting_connection
+            and connection_setting_connection.get("zone", None)
             else None
         )
 
