@@ -43,6 +43,10 @@ from summit_rcm.rest_api.v2.network.connections import (
     NetworkConnectionsResource,
     NetworkConnectionResourceByUuid,
 )
+from summit_rcm.rest_api.v2.network.access_points import (
+    AccessPointsResource,
+    AccessPointsScanResource,
+)
 from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
 
 summit_rcm_plugins: List[str] = []
@@ -304,6 +308,8 @@ async def add_network():
         app.add_route(
             "/api/v2/network/connections/uuid/{uuid}", NetworkConnectionResourceByUuid()
         )
+        app.add_route("/api/v2/network/accessPoints", AccessPointsResource())
+        app.add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
         syslog("network loaded")
     except ImportError:
         syslog("network NOT loaded")
