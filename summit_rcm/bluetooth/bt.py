@@ -34,7 +34,6 @@ from summit_rcm.bluetooth.ble import (
 from summit_rcm.bluetooth.bt_controller_state import BluetoothControllerState
 from summit_rcm.utils import variant_to_python
 
-# TODO: USER_PERMISSION_TYPES for Bluetooth
 
 PAIR_TIMEOUT_SECONDS = 60
 CONNECT_TIMEOUT_SECONDS = 60

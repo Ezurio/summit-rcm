@@ -2290,6 +2290,115 @@ class NetworkService(metaclass=Singleton):
 
         return settings
 
+    @staticmethod
+    async def get_access_points(is_legacy: bool = False) -> list:
+        """
+        Retrieve a list of info on the cached APs know to NetworkManager
+        """
+        access_points = []
+        dev_obj_paths = await NetworkManagerService().get_all_devices()
+        for dev_obj_path in dev_obj_paths:
+            dev_properties = await NetworkManagerService().get_obj_properties(
+                dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
+            )
+            if (
+                dev_properties.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
+                == NMDeviceType.NM_DEVICE_TYPE_WIFI
+            ):
+                wireless_properties = await NetworkManagerService().get_obj_properties(
+                    dev_obj_path,
+                    NetworkManagerService().NM_DEVICE_WIRELESS_IFACE,
+                )
+                for ap_obj_path in wireless_properties.get("AccessPoints", []):
+                    ap = await NetworkManagerService().get_obj_properties(
+                        ap_obj_path,
+                        NetworkManagerService().NM_ACCESS_POINT_IFACE,
+                    )
+                    security_string = ""
+                    keymgmt = "none"
+                    flags = ap.get("Flags", NM80211ApFlags.NM_802_11_AP_FLAGS_NONE)
+                    wpa_flags = ap.get(
+                        "WpaFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+                    )
+                    rsn_flags = ap.get(
+                        "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+                    )
+                    if (
+                        flags & NM80211ApFlags.NM_802_11_AP_FLAGS_PRIVACY
+                        and wpa_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+                        and rsn_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+                    ):
+                        security_string = security_string + "WEP "
+                        keymgmt = "static"
+
+                    if wpa_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
+                        security_string = security_string + "WPA1 "
+
+                    if rsn_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
+                        security_string = security_string + "WPA2 "
+
+                    if (
+                        wpa_flags
+                        & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X
+                        or rsn_flags
+                        & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X
+                    ):
+                        security_string = security_string + "802.1X "
+                        keymgmt = "wpa-eap"
+
+                    if (
+                        wpa_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
+                    ) or (
+                        rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
+                    ):
+                        security_string = security_string + "PSK"
+                        keymgmt = "wpa-psk"
+
+                    ssid = ap.get("Ssid", None)
+                    ap_data = {}
+                    ap_data["SSID" if is_legacy else "ssid"] = (
+                        ssid.decode("utf-8") if ssid is not None else ""
+                    )
+                    ap_data["HwAddress" if is_legacy else "hwAddress"] = ap.get(
+                        "HwAddress", ""
+                    )
+                    ap_data["Strength" if is_legacy else "strength"] = ap.get(
+                        "Strength", 0
+                    )
+                    ap_data["MaxBitrate" if is_legacy else "maxBitrate"] = ap.get(
+                        "MaxBitrate", 0
+                    )
+                    ap_data["Frequency" if is_legacy else "frequency"] = ap.get(
+                        "Frequency", 0
+                    )
+                    ap_data["Flags" if is_legacy else "flags"] = flags
+                    ap_data["WpaFlags" if is_legacy else "wpaFlags"] = wpa_flags
+                    ap_data["RsnFlags" if is_legacy else "rsnFlags"] = rsn_flags
+                    ap_data["LastSeen" if is_legacy else "lastSeen"] = ap.get(
+                        "LastSeen", -1
+                    )
+                    ap_data["Security" if is_legacy else "security"] = security_string
+                    ap_data["Keymgmt" if is_legacy else "keymgmt"] = keymgmt
+                    access_points.append(ap_data)
+        return access_points
+
+    @staticmethod
+    async def request_ap_scan():
+        """Request NetworkManager to perform an access point scan"""
+        dev_obj_paths = await NetworkManagerService().get_all_devices()
+        for dev_obj_path in dev_obj_paths:
+            dev_properties = await NetworkManagerService().get_obj_properties(
+                dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
+            )
+            if (
+                dev_properties.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
+                == NMDeviceType.NM_DEVICE_TYPE_WIFI
+            ):
+                await NetworkManagerService().wifi_device_request_scan(dev_obj_path, {})
+                return
+
+        raise WifiDeviceNotFoundError("Wi-Fi interface not found")
+
 
 class ConnectionProfileNotFoundError(Exception):
     """Custom error class for when the requested connection profile was not found."""
@@ -2306,4 +2415,10 @@ class ConnectionProfileAlreadyInactiveError(Exception):
     """
     Custom error class for when the user requests to deactivate a connection profile that is already
     inactive.
+    """
+
+
+class WifiDeviceNotFoundError(Exception):
+    """
+    Custom error class for when the user requests a scan for access points, but no Wi-Fi device is found.
     """

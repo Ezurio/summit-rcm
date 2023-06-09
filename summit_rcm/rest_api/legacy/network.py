@@ -1,11 +1,6 @@
 from syslog import syslog, LOG_ERR
 import falcon
-from summit_rcm.services.network_manager_service import (
-    NM80211ApFlags,
-    NM80211ApSecurityFlags,
-    NMDeviceType,
-    NetworkManagerService,
-)
+from summit_rcm.services.network_manager_service import NetworkManagerService
 from summit_rcm.services.network_service import NetworkService
 from summit_rcm import definition
 from summit_rcm.settings import ServerConfig
@@ -225,25 +220,11 @@ class NetworkAccessPoints:
         result = {"SDCERR": 1, "InfoMsg": ""}
 
         try:
-            dev_obj_paths = await NetworkManagerService().get_all_devices()
-            for dev_obj_path in dev_obj_paths:
-                dev_properties = await NetworkManagerService().get_obj_properties(
-                    dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-                )
-                if (
-                    dev_properties.get(
-                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
-                    )
-                    == NMDeviceType.NM_DEVICE_TYPE_WIFI
-                ):
-                    await NetworkManagerService().wifi_device_request_scan(
-                        dev_obj_path, {}
-                    )
-                    result["SDCERR"] = 0
-                    result["InfoMsg"] = "Scan requested"
-                    break
-        except Exception as e:
-            result["InfoMsg"] = f"Unable to start scan request: {str(e)}"
+            await NetworkService.request_ap_scan()
+            result["SDCERR"] = 0
+            result["InfoMsg"] = "Scan requested"
+        except Exception as exception:
+            result["InfoMsg"] = f"Unable to start scan request: {str(exception)}"
 
         resp.media = result
 
@@ -260,97 +241,19 @@ class NetworkAccessPoints:
         }
 
         try:
-            dev_obj_paths = await NetworkManagerService().get_all_devices()
-            for dev_obj_path in dev_obj_paths:
-                dev_properties = await NetworkManagerService().get_obj_properties(
-                    dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
-                )
-                if (
-                    dev_properties.get(
-                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
-                    )
-                    == NMDeviceType.NM_DEVICE_TYPE_WIFI
-                ):
-                    wireless_properties = (
-                        await NetworkManagerService().get_obj_properties(
-                            dev_obj_path,
-                            NetworkManagerService().NM_DEVICE_WIRELESS_IFACE,
-                        )
-                    )
-                    for ap_obj_path in wireless_properties.get("AccessPoints", []):
-                        ap = await NetworkManagerService().get_obj_properties(
-                            ap_obj_path,
-                            NetworkManagerService().NM_ACCESS_POINT_IFACE,
-                        )
-                        security_string = ""
-                        keymgmt = "none"
-                        flags = ap.get("Flags", NM80211ApFlags.NM_802_11_AP_FLAGS_NONE)
-                        wpa_flags = ap.get(
-                            "WpaFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                        )
-                        rsn_flags = ap.get(
-                            "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                        )
-                        if (
-                            flags & NM80211ApFlags.NM_802_11_AP_FLAGS_PRIVACY
-                            and wpa_flags
-                            == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                            and rsn_flags
-                            == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                        ):
-                            security_string = security_string + "WEP "
-                            keymgmt = "static"
+            result["accesspoints"] = await NetworkService.get_access_points(
+                is_legacy=True
+            )
 
-                        if wpa_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
-                            security_string = security_string + "WPA1 "
+            if len(result["accesspoints"]) > 0:
+                result["SDCERR"] = 0
+                result["count"] = len(result["accesspoints"])
+            else:
+                result["InfoMsg"] = "No access points found"
 
-                        if rsn_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
-                            security_string = security_string + "WPA2 "
-
-                        if (
-                            wpa_flags
-                            & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X
-                            or rsn_flags
-                            & NM80211ApSecurityFlags.M_802_11_AP_SEC_KEY_MGMT_802_1X
-                        ):
-                            security_string = security_string + "802.1X "
-                            keymgmt = "wpa-eap"
-
-                        if (
-                            wpa_flags
-                            & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
-                        ) or (
-                            rsn_flags
-                            & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
-                        ):
-                            security_string = security_string + "PSK"
-                            keymgmt = "wpa-psk"
-
-                        ssid = ap.get("Ssid", None)
-                        ap_data = {
-                            "SSID": ssid.decode("utf-8") if ssid is not None else "",
-                            "HwAddress": ap.get("HwAddress", ""),
-                            "Strength": ap.get("Strength", 0),
-                            "MaxBitrate": ap.get("MaxBitrate", 0),
-                            "Frequency": ap.get("Frequency", 0),
-                            "Flags": flags,
-                            "WpaFlags": wpa_flags,
-                            "RsnFlags": rsn_flags,
-                            "LastSeen": ap.get("LastSeen", -1),
-                            "Security": security_string,
-                            "Keymgmt": keymgmt,
-                        }
-                        result["accesspoints"].append(ap_data)
-
-                    if len(result["accesspoints"]) > 0:
-                        result["SDCERR"] = 0
-                        result["count"] = len(result["accesspoints"])
-                    else:
-                        result["InfoMsg"] = "No access points found"
-
-        except Exception as e:
+        except Exception as exception:
             result["InfoMsg"] = "Unable to get access point list"
-            syslog(f"NetworkAccessPoints GET exception: {e}")
+            syslog(f"NetworkAccessPoints GET exception: {exception}")
 
         resp.media = result
 
