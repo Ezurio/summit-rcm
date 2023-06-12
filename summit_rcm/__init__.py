@@ -4,12 +4,12 @@ from typing import List
 import falcon.asgi
 from summit_rcm import definition
 from summit_rcm.log import LogData, LogSetting, LogForwarding
+from summit_rcm.services.date_time_service import DateTimeService
 from summit_rcm.swupdate import SWUpdate
 from summit_rcm.unauthenticated import AllowUnauthenticatedResetReboot
 from summit_rcm.users import UserManage, LoginManage
 from summit_rcm.files import FileManage, FilesManage
 from summit_rcm.certificates import Certificates
-from summit_rcm.date_time import DateTimeSetting
 from summit_rcm.settings import SystemSettingsManage, ServerConfig
 from summit_rcm.version import Version
 from summit_rcm.rest_api.legacy.network import (
@@ -29,6 +29,7 @@ from summit_rcm.rest_api.legacy.advanced import (
     FactoryReset,
     Fips,
 )
+from summit_rcm.rest_api.legacy.date_time import DateTimeSetting
 from summit_rcm.rest_api.v2.system.power import PowerResource
 from summit_rcm.rest_api.v2.system.fips import FipsResource
 from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
@@ -42,6 +43,7 @@ from summit_rcm.rest_api.v2.network.connections import (
     NetworkConnectionsResource,
     NetworkConnectionResourceByUuid,
 )
+from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
 
 summit_rcm_plugins: List[str] = []
 
@@ -352,7 +354,7 @@ async def add_date_time():
         date_time_setting = DateTimeSetting()
 
         app.add_route("/datetime", date_time_setting)
-        await date_time_setting.populate_time_zone_list()
+        await DateTimeService().populate_time_zone_list()
         syslog("datetime loaded")
     except ImportError:
         syslog("datetime NOT loaded")
@@ -475,6 +477,8 @@ async def add_system():
     app.add_route("/api/v2/system/power", PowerResource())
     app.add_route("/api/v2/system/fips", FipsResource())
     app.add_route("/api/v2/system/factoryReset", FactoryResetResource())
+    app.add_route("/api/v2/system/datetime", DateTimeResource())
+    await DateTimeService().populate_time_zone_list()
     syslog("/api/v2/system loaded")
 
 
