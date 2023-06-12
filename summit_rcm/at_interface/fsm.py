@@ -29,6 +29,8 @@ from summit_rcm.at_interface.commands.network_interface_statistics import (
 from summit_rcm.at_interface.commands.network_interfaces_command import NetworkInterfacesCommand
 from summit_rcm.at_interface.commands.modify_connection_command import ModifyConnectionCommand
 from summit_rcm.at_interface.commands.virtual_interface_command import VirtualInterfaceCommand
+from summit_rcm.at_interface.commands.wifi_list_command import WifiListCommand
+from summit_rcm.at_interface.commands.wifi_scan_command import WifiScanCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -52,6 +54,8 @@ AT_COMMANDS: List[Command] = [
     NetworkInterfacesCommand,
     ModifyConnectionCommand,
     VirtualInterfaceCommand,
+    WifiListCommand,
+    WifiScanCommand,
 ]
 
 
