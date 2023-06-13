@@ -4,8 +4,8 @@ import uuid
 import hashlib
 from threading import Lock
 from datetime import datetime
-from .definition import SUMMIT_RCM_ERRORS, USER_PERMISSION_TYPES
-from .settings import ServerConfig, SummitRCMConfigManage, SystemSettingsManage
+from summit_rcm.definition import SUMMIT_RCM_ERRORS, USER_PERMISSION_TYPES
+from summit_rcm.settings import ServerConfig, SummitRCMConfigManage, SystemSettingsManage
 from syslog import syslog
 
 

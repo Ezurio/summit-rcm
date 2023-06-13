@@ -1,161 +1,62 @@
+"""
+Summit RCM main module
+"""
+
 import asyncio
-from syslog import syslog
-from typing import List
+from syslog import LOG_ERR, syslog, openlog
+from typing import Any, List
 import falcon.asgi
-from summit_rcm import definition
-from summit_rcm.log import LogData, LogSetting, LogForwarding
 from summit_rcm.services.date_time_service import DateTimeService
-from summit_rcm.swupdate import SWUpdate
-from summit_rcm.unauthenticated import AllowUnauthenticatedResetReboot
-from summit_rcm.users import UserManage, LoginManage
-from summit_rcm.files import FileManage, FilesManage
-from summit_rcm.certificates import Certificates
-from summit_rcm.settings import SystemSettingsManage, ServerConfig
-from summit_rcm.version import Version
-from summit_rcm.rest_api.legacy.network import (
-    NetworkInterfaces,
-    NetworkInterface,
-    NetworkInterfaceStatistics,
-    NetworkConnections,
-    NetworkConnection,
-    NetworkAccessPoints,
-    WifiEnable,
-)
-from summit_rcm.rest_api.legacy.network_status import NetworkStatus
-from summit_rcm.rest_api.legacy.advanced import (
-    PowerOff,
-    Suspend,
-    Reboot,
-    FactoryReset,
-    Fips,
-)
-from summit_rcm.rest_api.legacy.date_time import DateTimeSetting
-from summit_rcm.rest_api.v2.system.power import PowerResource
-from summit_rcm.rest_api.v2.system.fips import FipsResource
-from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
-from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
-from summit_rcm.rest_api.v2.network.interfaces import (
-    NetworkInterfacesResource,
-    NetworkInterfaceResource,
-    NetworkInterfaceStatsResource,
-)
-from summit_rcm.rest_api.v2.network.connections import (
-    NetworkConnectionsResource,
-    NetworkConnectionResourceByUuid,
-)
-from summit_rcm.rest_api.v2.network.access_points import (
-    AccessPointsResource,
-    AccessPointsScanResource,
-)
-from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
+from summit_rcm.settings import ServerConfig
 
 summit_rcm_plugins: List[str] = []
 
-PY_SSL_CERT_REQUIRED_NO_CHECK_TIME = 3
-"""
-Custom OpenSSL verify mode to disable time checking during certificate verification
-"""
-
-X509_V_FLAG_NO_CHECK_TIME = 0x200000
-"""
-Flags for OpenSSL 1.1.1 or newer to disable time checking during certificate verification
-"""
-
-# Note: Authenticating websocket users by header token is non-standard; an alternative method may be
-# required for Javascript browser clients.
-
-try:
-    from summit_rcm.bluetooth.bt import Bluetooth
-    from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
-
-    summit_rcm_plugins.append("bluetooth")
-except ImportError:
-    Bluetooth = None
-
-try:
-    from .awm.awm_cfg_manage import AWMCfgManage
-
-    summit_rcm_plugins.append("awm")
-except ImportError:
-    AWMCfgManage = None
-
-try:
-    from .stunnel.stunnel import Stunnel
-
-    summit_rcm_plugins.append("stunnel")
-except ImportError:
-    Stunnel = None
-
-try:
-    from .modem.modem import (
-        PositioningSwitch,
-        Positioning,
-        ModemFirmwareUpdate,
-        ModemEnable,
-    )
-
-    summit_rcm_plugins.append("positioning")
-    summit_rcm_plugins.append("positioningSwitch")
-    summit_rcm_plugins.append("modemFirmwareUpdate")
-    summit_rcm_plugins.append("modemEnable")
-except ImportError:
-    PositioningSwitch = None
-
-try:
-    from .iptables.firewall import Firewall
-
-    summit_rcm_plugins.append("firewall")
-except ImportError:
-    Firewall = None
-
-try:
-    from .radio_siso_mode.radio_siso_mode import RadioSISOMode
-
-    summit_rcm_plugins.append("radioSISOMode")
-except ImportError:
-    RadioSISOMode = None
-
-try:
-    from .chrony.ntp import NTP
-
-    summit_rcm_plugins.append("ntp")
-except ImportError:
-    NTP = None
-
-try:
-    from .at_interface.at_interface import ATInterface
-except ImportError:
-    ATInterface = None
 
 app = falcon.asgi.App()
 
 
 class SecureHeadersMiddleware:
+    """Middleware that enables the use of secure headers"""
+
     async def process_response(self, req, resp, resource, req_succeeded):
+        """Add secure headers to the response before it's returned to the client"""
         headers = resp.headers
         headers["X-Frame-Options"] = "DENY"
         headers["X-XSS-Protection"] = "1; mode=block"
         headers["X-Content-Type-Options"] = "nosniff"
         headers["Content-Security-Policy"] = "default-src 'self'"
         # Add Strict-Transport headers
-        headers["Strict-Transport-Security"] = "max-age=31536000"  # one year
+        headers["Strict-Transport-Security"] = "max-age=600"  # ten minutes
 
 
 class LifespanMiddleware:
+    """Middleware that handles ASGI lifespan events"""
+
     async def process_startup(self, scope, event):
+        """Add logic to run at the startup event"""
+
+        # If enabled, load the AT interface
+        try:
+            from summit_rcm.at_interface.at_interface import ATInterface
+        except ImportError:
+            ATInterface = None
+
         if ATInterface:
             syslog("Starting AT interface")
             asyncio.create_task(ATInterface(asyncio.get_event_loop()).start())
+
+        # Load the routes
         await add_routes()
 
 
 class SessionCheckingMiddleware:
+    """Middleware that handles enforcing checking for a valid session"""
+
     def __init__(self) -> None:
         self.paths = [
             "connections",
             "connection",
             "accesspoints",
-            "allowUnauthenticatedResetReboot",
             "networkInterfaces",
             "networkInterface",
             "file",
@@ -173,13 +74,8 @@ class SessionCheckingMiddleware:
             "modemEnable",
         ]
 
-        if not AllowUnauthenticatedResetReboot().allow_unauthenticated_reset_reboot:
-            self.paths += ["factoryReset", "reboot"]
-
-        if Bluetooth and websockets_auth_by_header_token:
-            self.paths.append("ws")
-
     def session_is_valid(self, req) -> bool:
+        """Determinte if the current request's session is valid"""
         if not hasattr(req.context, "valid_session"):
             return False
 
@@ -210,291 +106,513 @@ class SessionCheckingMiddleware:
                 resp.complete = True
 
 
-class IndexResource(object):
+class IndexResource:
+    """Main index resource"""
+
     async def on_get(self, req, resp):
+        """GET handler for / endpoint"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_TEXT
         resp.text = "Summit RCM"
 
 
-class DefinitionsResource(object):
-    async def on_get(self, req, resp):
-        plugins = []
-        for k in ServerConfig().get_parser().options("plugins"):
-            plugins.append(k)
-        plugins.sort()
+async def add_definitions_legacy():
+    """Add the legacy /definition route, if enabled"""
+    try:
+        from summit_rcm.rest_api.legacy.definitions import DefinitionsResource
+    except ImportError:
+        DefinitionsResource = None
 
-        settings = {}
-        # If sessions aren't enabled, set the session_timeout to -1 to alert the frontend that we
-        # don't need to auto log out.
-        settings["session_timeout"] = (
-            SystemSettingsManage.get_session_timeout()
-            if ServerConfig()
-            .get_parser()
-            .getboolean("/", "tools.sessions.on", fallback=True)
-            else -1
-        )
-
-        resp.status = falcon.HTTP_200
-        resp.content_type = falcon.MEDIA_JSON
-        resp.media = {
-            "SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"],
-            "InfoMsg": "",
-            "Definitions": {
-                "SDCERR": definition.SUMMIT_RCM_ERRORS,
-                "PERMISSIONS": definition.USER_PERMISSION_TYPES,
-                "DEVICE_TYPES": definition.SUMMIT_RCM_DEVTYPE_TEXT,
-                "DEVICE_STATES": definition.SUMMIT_RCM_STATE_TEXT,
-                "PLUGINS": plugins,
-                "SETTINGS": settings,
-            },
-        }
+    if DefinitionsResource:
+        add_route("/definitions", DefinitionsResource())
 
 
-async def add_definitions():
-    app.add_route("/definitions", DefinitionsResource())
-    syslog("definitions loaded")
+async def add_firewall_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /firewall
+    - /firewall/{command}
+    """
+    try:
+        from summit_rcm.iptables.firewall import Firewall
 
+        summit_rcm_plugins.append("firewall")
+    except ImportError:
+        Firewall = None
 
-async def add_firewall():
     if Firewall:
-        firewall = Firewall()
+        try:
+            add_route("/firewall", Firewall())
+            add_route("/firewall/{command}", Firewall())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load firewall endpoints - {str(exception)}")
+            raise exception
 
-        app.add_route("/firewall", firewall)
-        app.add_route("/firewall/{command}", firewall)
-        syslog("firewall loaded")
-    else:
-        syslog("firewall NOT loaded")
 
-
-async def add_users():
+async def add_users_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /login
+    - /users
+    """
     try:
-        login_manage = LoginManage()
-        user_manage = UserManage()
-
-        app.add_route("/login", login_manage)
-        app.add_route("/users", user_manage)
-        syslog("users loaded")
+        from summit_rcm.rest_api.legacy.users import UserManage, LoginManage
     except ImportError:
-        syslog("users NOT loaded")
+        UserManage = None
+
+    if UserManage:
+        try:
+            add_route("/login", LoginManage())
+            add_route("/users", UserManage())
+        except Exception as exception:
+            syslog(
+                LOG_ERR, f"Could not load user management endpoints - {str(exception)}"
+            )
+            raise exception
 
 
-async def add_network():
+async def add_network_v2():
+    """
+    Add the following v2 routes, if enabled:
+    - /api/v2/network/status
+    - /api/v2/network/interfaces
+    - /api/v2/network/interfaces/{name}
+    - /api/v2/network/interfaces/{name}/stats
+    - /api/v2/network/connections
+    - /api/v2/network/connections/uuid/{uuid}
+    - /api/v2/network/accessPoints
+    - /api/v2/network/accessPoints/scan
+    """
     try:
-        status = NetworkStatus()
-        network_interface = NetworkInterface()
-        network_interfaces = NetworkInterfaces()
-        network_interface_stats = NetworkInterfaceStatistics()
-        connections = NetworkConnections()
-        connection = NetworkConnection()
-        access_points = NetworkAccessPoints()
-        wifi_enable = WifiEnable()
-
-        app.add_route("/networkStatus", status)
-        app.add_route("/networkInterface", network_interface)
-        app.add_route("/networkInterfaces", network_interfaces)
-        app.add_route("/networkInterfaceStatistics", network_interface_stats)
-        app.add_route("/connections", connections)
-        app.add_route("/connection", connection)
-        app.add_route("/accesspoints", access_points)
-        app.add_route("/wifiEnable", wifi_enable)
-        app.add_route("/api/v2/network/status", NetworkStatusResource())
-        app.add_route("/api/v2/network/interfaces", NetworkInterfacesResource())
-        app.add_route("/api/v2/network/interfaces/{name}", NetworkInterfaceResource())
-        app.add_route(
-            "/api/v2/network/interfaces/{name}/stats", NetworkInterfaceStatsResource()
+        from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
+        from summit_rcm.rest_api.v2.network.interfaces import (
+            NetworkInterfacesResource,
+            NetworkInterfaceResource,
+            NetworkInterfaceStatsResource,
         )
-        app.add_route("/api/v2/network/connections", NetworkConnectionsResource())
-        app.add_route(
-            "/api/v2/network/connections/uuid/{uuid}", NetworkConnectionResourceByUuid()
+        from summit_rcm.rest_api.v2.network.connections import (
+            NetworkConnectionsResource,
+            NetworkConnectionResourceByUuid,
         )
-        app.add_route("/api/v2/network/accessPoints", AccessPointsResource())
-        app.add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
-        syslog("network loaded")
+        from summit_rcm.rest_api.v2.network.access_points import (
+            AccessPointsResource,
+            AccessPointsScanResource,
+        )
     except ImportError:
-        syslog("network NOT loaded")
+        NetworkStatusResource = None
+
+    if NetworkStatusResource:
+        try:
+            add_route("/api/v2/network/status", NetworkStatusResource())
+            add_route("/api/v2/network/interfaces", NetworkInterfacesResource())
+            add_route("/api/v2/network/interfaces/{name}", NetworkInterfaceResource())
+            add_route(
+                "/api/v2/network/interfaces/{name}/stats",
+                NetworkInterfaceStatsResource(),
+            )
+            add_route("/api/v2/network/connections", NetworkConnectionsResource())
+            add_route(
+                "/api/v2/network/connections/uuid/{uuid}",
+                NetworkConnectionResourceByUuid(),
+            )
+            add_route("/api/v2/network/accessPoints", AccessPointsResource())
+            add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_advanced():
+async def add_network_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /networkStatus
+    - /networkInterface
+    - /networkInterfaces
+    - /networkInterfaceStatistics
+    - /connections
+    - /connection
+    - /accesspoints
+    - /wifiEnable
+    """
     try:
-        power_off = PowerOff()
-        suspend = Suspend()
-        reboot = Reboot()
-        factory_reset = FactoryReset()
-        fips = Fips()
-
-        app.add_route("/poweroff", power_off)
-        app.add_route("/suspend", suspend)
-        app.add_route("/reboot", reboot)
-        app.add_route("/factoryReset", factory_reset)
-        app.add_route("/fips", fips)
-        syslog("advanced loaded")
+        from summit_rcm.rest_api.legacy.network import (
+            NetworkInterfaces,
+            NetworkInterface,
+            NetworkInterfaceStatistics,
+            NetworkConnections,
+            NetworkConnection,
+            NetworkAccessPoints,
+            WifiEnable,
+        )
+        from summit_rcm.rest_api.legacy.network_status import NetworkStatus
     except ImportError:
-        syslog("advanced NOT loaded")
+        NetworkInterfaces = None
+
+    if NetworkInterfaces:
+        try:
+            add_route("/networkStatus", NetworkStatus())
+            add_route("/networkInterface", NetworkInterface())
+            add_route("/networkInterfaces", NetworkInterfaces())
+            add_route("/networkInterfaceStatistics", NetworkInterfaceStatistics())
+            add_route("/connections", NetworkConnections())
+            add_route("/connection", NetworkConnection())
+            add_route("/accesspoints", NetworkAccessPoints())
+            add_route("/wifiEnable", WifiEnable())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_certificates():
+async def add_advanced_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /poweroff
+    - /suspend
+    - /reboot
+    - /factoryReset
+    - /fips
+    """
     try:
-        certs = Certificates()
-
-        app.add_route("/certificates", certs)
-        syslog("certificates loaded")
+        from summit_rcm.rest_api.legacy.advanced import (
+            PowerOff,
+            Suspend,
+            Reboot,
+            FactoryReset,
+            Fips,
+        )
     except ImportError:
-        syslog("certificates NOT loaded")
+        PowerOff = None
+
+    if PowerOff:
+        try:
+            add_route("/poweroff", PowerOff())
+            add_route("/suspend", Suspend())
+            add_route("/reboot", Reboot())
+            add_route("/factoryReset", FactoryReset())
+            add_route("/fips", Fips())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load advanced endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_files():
+async def add_certificates_legacy():
+    """Add the /certificates legacy route, if enabled"""
     try:
-        file_manage = FileManage()
-        files_manage = FilesManage()
-
-        app.add_route("/files", files_manage)
-        app.add_route("/file", file_manage)
-        syslog("files loaded")
+        from summit_rcm.rest_api.legacy.certificates import Certificates
     except ImportError:
-        syslog("files NOT loaded")
+        Certificates = None
+
+    if Certificates:
+        try:
+            add_route("/certificates", Certificates())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load certificates endpoint - {str(exception)}")
+            raise exception
 
 
-async def add_date_time():
+async def add_files_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /files
+    - /file
+    """
     try:
-        date_time_setting = DateTimeSetting()
-
-        app.add_route("/datetime", date_time_setting)
-        await DateTimeService().populate_time_zone_list()
-        syslog("datetime loaded")
+        from summit_rcm.rest_api.legacy.files import FileManage, FilesManage
     except ImportError:
-        syslog("datetime NOT loaded")
+        FileManage = None
+
+    if FileManage:
+        try:
+            add_route("/files", FileManage())
+            add_route("/file", FilesManage())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load file endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_logs():
+async def add_date_time_legacy():
+    """Add the /datetime legacy route, if enabled"""
     try:
-        log_data = LogData()
-        log_setting = LogSetting()
-        log_forwarding = LogForwarding()
-
-        app.add_route("/logData", log_data)
-        app.add_route("/logSetting", log_setting)
-        app.add_route("/logForwarding", log_forwarding)
-        syslog("logs loaded")
+        from summit_rcm.rest_api.legacy.date_time import DateTimeSetting
     except ImportError:
-        syslog("logs NOT loaded")
+        DateTimeSetting = None
+
+    if DateTimeSetting:
+        try:
+            add_route("/datetime", DateTimeSetting())
+            await DateTimeService().populate_time_zone_list()
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load datetime endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_version():
+async def add_logs_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /logData
+    - /logSetting
+    - /logForwarding
+    """
     try:
-        version = Version()
-
-        app.add_route("/version", version)
-        syslog("version loaded")
+        from summit_rcm.rest_api.legacy.log import LogData, LogSetting, LogForwarding
     except ImportError:
-        syslog("version NOT loaded")
+        LogData = None
+
+    if LogData:
+        try:
+            add_route("/logData", LogData())
+            add_route("/logSetting", LogSetting())
+            add_route("/logForwarding", LogForwarding())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load logging endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_firmware():
+async def add_version_legacy():
+    """Add the /version legacy route, if enabled"""
     try:
-        swupdate = SWUpdate()
-
-        app.add_route("/firmware", swupdate)
-        syslog("firmware loaded")
+        from summit_rcm.rest_api.legacy.version import Version
     except ImportError:
-        syslog("firmware NOT loaded")
+        Version = None
+
+    if Version:
+        try:
+            add_route("/version", Version())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load version endpoint - {str(exception)}")
+            raise exception
 
 
-async def add_unauthenticated():
+async def add_firmware_legacy():
+    """Add the /firmware legacy route, if enabled"""
     try:
-        unauthenticated = AllowUnauthenticatedResetReboot()
-
-        app.add_route("/allowUnauthenticatedResetReboot", unauthenticated)
-        syslog("allowUnauthenticatedResetReboot loaded")
+        from summit_rcm.rest_api.legacy.swupdate import SWUpdate
     except ImportError:
-        syslog("allowUnauthenticatedResetReboot NOT loaded")
+        SWUpdate = None
+
+    if SWUpdate:
+        try:
+            add_route("/firmware", SWUpdate())
+        except Exception as exception:
+            syslog(
+                LOG_ERR, f"Could not load firmware update endpoint - {str(exception)}"
+            )
+            raise exception
 
 
-async def add_awm():
+async def add_unauthenticated_legacy():
+    """Add the /allowUnauthenticatedResetReboot legacy route, if enabled, and configure the logic
+    for requiring a valid, authenticated session for access to the /reboot and /factoryReset
+    endpoints"""
+    try:
+        from summit_rcm.rest_api.legacy.unauthenticated import (
+            AllowUnauthenticatedResetReboot,
+        )
+
+        summit_rcm_plugins.append("allowUnauthenticatedResetReboot")
+    except ImportError:
+        AllowUnauthenticatedResetReboot = None
+
+    if AllowUnauthenticatedResetReboot:
+        try:
+            unauthenticated = AllowUnauthenticatedResetReboot()
+            if not unauthenticated.allow_unauthenticated_reset_reboot:
+                summit_rcm_plugins.append("factoryReset")
+                summit_rcm_plugins.append("reboot")
+
+            add_route("/allowUnauthenticatedResetReboot", unauthenticated)
+            return
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                "Could not load endpoint to allow unauthenticated access to reset/reboot - "
+                f"{str(exception)}",
+            )
+            raise exception
+
+    summit_rcm_plugins.append("factoryReset")
+    summit_rcm_plugins.append("reboot")
+
+
+async def add_awm_legacy():
+    """Add the /awm legacy route, if enabled"""
+    try:
+        from summit_rcm.awm.awm_cfg_manage import AWMCfgManage
+
+        summit_rcm_plugins.append("awm")
+    except ImportError:
+        AWMCfgManage = None
+
     if AWMCfgManage:
-        awm = AWMCfgManage()
+        try:
+            add_route("/awm", AWMCfgManage())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load AWM endpoint - {str(exception)}")
+            raise exception
 
-        app.add_route("/awm", awm)
-        syslog("AWM loaded")
-    else:
-        syslog("AWM NOT loaded")
 
+async def add_stunnel_legacy():
+    """Add the /stunnel legacy route, if enabled"""
+    try:
+        from summit_rcm.stunnel.stunnel import Stunnel
 
-async def add_stunnel():
+        summit_rcm_plugins.append("stunnel")
+    except ImportError:
+        Stunnel = None
+
     if Stunnel:
-        stunnel = Stunnel()
+        try:
+            add_route("/stunnel", Stunnel())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load stunnel endpoint - {str(exception)}")
+            raise exception
 
-        app.add_route("/stunnel", stunnel)
-        syslog("stunnel loaded")
-    else:
-        syslog("stunnel NOT loaded")
 
+async def add_modem_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /positioning
+    - /positioningSwitch
+    - /modemFirmwareUpdate
+    - /modemEnable
+    """
+    try:
+        from summit_rcm.modem.modem import (
+            PositioningSwitch,
+            Positioning,
+            ModemFirmwareUpdate,
+            ModemEnable,
+        )
 
-async def add_modem():
+        summit_rcm_plugins.append("positioning")
+        summit_rcm_plugins.append("positioningSwitch")
+        summit_rcm_plugins.append("modemFirmwareUpdate")
+        summit_rcm_plugins.append("modemEnable")
+    except ImportError:
+        PositioningSwitch = None
+
     if PositioningSwitch:
-        positioning = Positioning()
-        positioning_switch = PositioningSwitch()
-        modem_firmware_update = ModemFirmwareUpdate()
-        modem_enable = ModemEnable()
-
-        app.add_route("/positioning", positioning)
-        app.add_route("/positioningSwitch", positioning_switch)
-        app.add_route("/modemFirmwareUpdate", modem_firmware_update)
-        app.add_route("/modemEnable", modem_enable)
-        syslog("modem loaded")
-    else:
-        syslog("modem NOT loaded")
+        try:
+            add_route("/positioning", Positioning())
+            add_route("/positioningSwitch", PositioningSwitch())
+            add_route("/modemFirmwareUpdate", ModemFirmwareUpdate())
+            add_route("/modemEnable", ModemEnable())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load modem endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_radio_siso_mode():
+async def add_radio_siso_mode_legacy():
+    """Add the /radioSISOMode legacy route, if enabled"""
+    try:
+        from summit_rcm.radio_siso_mode.radio_siso_mode import RadioSISOMode
+
+        summit_rcm_plugins.append("radioSISOMode")
+    except ImportError:
+        RadioSISOMode = None
+
     if RadioSISOMode:
-        radioSISOMode = RadioSISOMode()
+        try:
+            add_route("/radioSISOMode", RadioSISOMode())
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                f"Could not load Radio SISO mode control endpoint - {str(exception)}",
+            )
+            raise exception
 
-        app.add_route("/radioSISOMode", radioSISOMode)
-        syslog("Radio SISO mode loaded")
-    else:
-        syslog("Radio SISO mode NOT loaded")
 
+async def add_ntp_legacy():
+    """
+    Add the following legacy routes, if enabled:
+    - /ntp
+    - /ntp/{command}
+    """
+    try:
+        from summit_rcm.chrony.ntp import NTP
 
-async def add_ntp():
+        summit_rcm_plugins.append("ntp")
+    except ImportError:
+        NTP = None
+
     if NTP:
-        ntp = NTP()
+        try:
+            add_route("/ntp", NTP())
+            add_route("/ntp/{command}", NTP())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load NTP endpoints - {str(exception)}")
+            raise exception
 
-        app.add_route("/ntp", ntp)
-        app.add_route("/ntp/{command}", ntp)
-        syslog("chrony NTP loaded")
-    else:
-        syslog("chrony NTP NOT loaded")
 
+async def add_bluetooth_legacy():
+    """
+    Add the following legacy routes, if enabled, and determine if websockets access should require a
+    valid, authenticated session:
+    - /bluetooth/{controller}
+    - /bluetooth/{controller}/{device}
+    """
+    try:
+        # Note: Authenticating websocket users by header token is non-standard; an alternative
+        # method may be required for Javascript browser clients.
 
-async def add_bluetooth():
+        from summit_rcm.bluetooth.bt import Bluetooth
+        from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
+
+        summit_rcm_plugins.append("bluetooth")
+
+        if Bluetooth and websockets_auth_by_header_token:
+            summit_rcm_plugins.append("ws")
+    except ImportError:
+        Bluetooth = None
+
     if Bluetooth:
-        bluetooth = Bluetooth()
-        await bluetooth.setup(app)
+        try:
+            bluetooth = Bluetooth()
+            await bluetooth.setup(app)
 
-        app.add_route("/bluetooth/{controller}", bluetooth, suffix="no_device")
-        app.add_route("/bluetooth/{controller}/{device}", bluetooth)
-        syslog("Bluetooth loaded")
-    else:
-        syslog("Bluetooth NOT loaded")
+            add_route("/bluetooth/{controller}", bluetooth, suffix="no_device")
+            add_route("/bluetooth/{controller}/{device}", bluetooth)
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load Bluetooth endpoints - {str(exception)}")
+            raise exception
 
 
-async def add_system():
-    app.add_route("/api/v2/system/power", PowerResource())
-    app.add_route("/api/v2/system/fips", FipsResource())
-    app.add_route("/api/v2/system/factoryReset", FactoryResetResource())
-    app.add_route("/api/v2/system/datetime", DateTimeResource())
-    await DateTimeService().populate_time_zone_list()
-    syslog("/api/v2/system loaded")
+async def add_system_v2():
+    """
+    Add the following v2 routes, if enabled:
+    - /api/v2/system/power
+    - /api/v2/system/fips
+    - /api/v2/system/factoryReset
+    - /api/v2/system/datetime
+    """
+    try:
+        from summit_rcm.rest_api.v2.system.power import PowerResource
+        from summit_rcm.rest_api.v2.system.fips import FipsResource
+        from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
+        from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
+    except ImportError:
+        PowerResource = None
+
+    if PowerResource:
+        try:
+            add_route("/api/v2/system/power", PowerResource())
+            add_route("/api/v2/system/fips", FipsResource())
+            add_route("/api/v2/system/factoryReset", FactoryResetResource())
+            add_route("/api/v2/system/datetime", DateTimeResource())
+            await DateTimeService().populate_time_zone_list()
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load system endpoints - {str(exception)}")
+            raise exception
 
 
 def add_middleware(enable_session_checking: bool) -> None:
+    """Add middleware to the ASGI application"""
     # Add ASGI lifespan middleware
     app.add_middleware(LifespanMiddleware())
 
     # Add middleware to force session checking if enabled
     if enable_session_checking:
-        from .sessions_middleware import SessionsMiddleware
+        from summit_rcm.sessions_middleware import SessionsMiddleware
 
         app.add_middleware(SessionsMiddleware())
         app.add_middleware(SessionCheckingMiddleware())
@@ -504,28 +622,41 @@ def add_middleware(enable_session_checking: bool) -> None:
 
 
 async def add_routes() -> None:
-    await add_network()
-    await add_firewall()
-    await add_firmware()
-    await add_definitions()
-    await add_users()
-    await add_version()
-    await add_advanced()
-    await add_system()
-    await add_files()
-    await add_certificates()
-    await add_logs()
-    await add_unauthenticated()
-    await add_awm()
-    await add_stunnel()
-    await add_modem()
-    await add_date_time()
-    await add_ntp()
-    await add_bluetooth()
-    await add_radio_siso_mode()
+    """Add routes to the ASGI application"""
+    await asyncio.gather(
+        # v2 routes
+        add_network_v2(),
+        add_system_v2(),
+        # legacy routes
+        add_network_legacy(),
+        add_firewall_legacy(),
+        add_firmware_legacy(),
+        add_definitions_legacy(),
+        add_users_legacy(),
+        add_version_legacy(),
+        add_advanced_legacy(),
+        add_files_legacy(),
+        add_certificates_legacy(),
+        add_logs_legacy(),
+        add_unauthenticated_legacy(),
+        add_awm_legacy(),
+        add_stunnel_legacy(),
+        add_modem_legacy(),
+        add_date_time_legacy(),
+        add_ntp_legacy(),
+        add_bluetooth_legacy(),
+        add_radio_siso_mode_legacy(),
+    )
+
+
+def add_route(route_path: str, resource: Any, **kwargs):
+    """Add a route to the app and log it"""
+    app.add_route(uri_template=route_path, resource=resource, kwargs=kwargs)
+    syslog(f"route loaded: {str(route_path)}")
 
 
 def start_server():
+    """Start the webserver and add middleware"""
     parser = ServerConfig().get_parser()
     enable_sessions = parser.getboolean(
         section="/", option="tools.sessions.on", fallback=True
@@ -534,5 +665,7 @@ def start_server():
     add_middleware(enable_sessions)
 
 
+# Configure logging and start the application
+openlog("summit-rcm")
 syslog("Starting webserver")
 start_server()

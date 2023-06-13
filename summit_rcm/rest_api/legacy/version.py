@@ -4,7 +4,7 @@ from summit_rcm.services.network_manager_service import (
     NMDeviceType,
     NetworkManagerService,
 )
-from . import definition
+from summit_rcm import definition
 
 
 class Version:
