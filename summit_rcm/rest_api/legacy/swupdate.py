@@ -6,8 +6,8 @@ from typing import Tuple, Optional
 import falcon
 import swclient
 
-from . import swuclient
-from .somutil import get_current_side
+from summit_rcm import swuclient
+from summit_rcm.somutil import get_current_side
 
 swclient_fd: int = -1
 
