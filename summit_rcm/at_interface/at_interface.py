@@ -1,4 +1,6 @@
 import asyncio
+from summit_rcm.at_interface.fsm import ATInterfaceFSM
+from summit_rcm.services.date_time_service import DateTimeService
 import serial_asyncio
 from syslog import LOG_ERR, syslog
 from summit_rcm.settings import ServerConfig
@@ -41,6 +43,7 @@ class ATInterface:
         )
         ATInterfaceFSM()._transport = transport
         ATInterfaceFSM()._protocol = protocol
+        await DateTimeService().populate_time_zone_list()
         self.loop.call_later(0.1, self.repeat)
 
     def repeat(self):

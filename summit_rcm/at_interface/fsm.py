@@ -31,6 +31,9 @@ from summit_rcm.at_interface.commands.modify_connection_command import ModifyCon
 from summit_rcm.at_interface.commands.virtual_interface_command import VirtualInterfaceCommand
 from summit_rcm.at_interface.commands.wifi_list_command import WifiListCommand
 from summit_rcm.at_interface.commands.wifi_scan_command import WifiScanCommand
+from summit_rcm.at_interface.commands.datetime_command import DatetimeCommand
+from summit_rcm.at_interface.commands.timezone_set_command import TimezoneSetCommand
+from summit_rcm.at_interface.commands.timezone_get_command import TimezoneGetCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -56,6 +59,9 @@ AT_COMMANDS: List[Command] = [
     VirtualInterfaceCommand,
     WifiListCommand,
     WifiScanCommand,
+    DatetimeCommand,
+    TimezoneSetCommand,
+    TimezoneGetCommand,
 ]
 
 
