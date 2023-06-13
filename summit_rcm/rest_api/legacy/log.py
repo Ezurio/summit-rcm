@@ -4,12 +4,12 @@ from syslog import LOG_ERR, syslog
 from dbus_fast import Message, MessageType
 import falcon
 import time
-from .dbus_manager import DBusManager
+from summit_rcm.dbus_manager import DBusManager
 from datetime import datetime
-from .systemd_unit import SystemdUnit
-from .settings import SystemSettingsManage
+from summit_rcm.systemd_unit import SystemdUnit
+from summit_rcm.settings import SystemSettingsManage
 from subprocess import run
-from .definition import (
+from summit_rcm.definition import (
     LOG_FORWARDING_ENABLED_FLAG_FILE,
     SUMMIT_RCM_ERRORS,
     WPA_IFACE,

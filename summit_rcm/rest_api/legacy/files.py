@@ -7,8 +7,8 @@ from typing import Any, List, Tuple
 import falcon
 from summit_rcm.services.system_service import FACTORY_RESET_SCRIPT
 from summit_rcm.services.network_service import NetworkService
-from . import definition
-from .settings import SystemSettingsManage
+from summit_rcm import definition
+from summit_rcm.settings import SystemSettingsManage
 import aiofiles
 
 CONNECTION_TMP_ARCHIVE_FILE = "/tmp/archive.zip"

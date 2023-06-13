@@ -2,8 +2,8 @@ import os
 from syslog import LOG_ERR, syslog
 from typing import Optional, Tuple
 import falcon
-from .files import FilesManage
-from . import definition
+from summit_rcm.rest_api.legacy.files import FilesManage
+from summit_rcm import definition
 
 import openssl_extension
 

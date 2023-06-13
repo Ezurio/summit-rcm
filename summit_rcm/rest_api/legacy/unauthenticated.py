@@ -2,8 +2,8 @@ from syslog import syslog, LOG_ERR
 
 import falcon
 
-from .definition import SUMMIT_RCM_ERRORS
-from .settings import ServerConfig, SystemSettingsManage
+from summit_rcm.definition import SUMMIT_RCM_ERRORS
+from summit_rcm.settings import ServerConfig, SystemSettingsManage
 
 
 class AllowUnauthenticatedResetReboot:
