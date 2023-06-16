@@ -1,6 +1,5 @@
 from syslog import syslog, LOG_ERR
 import falcon
-from summit_rcm.services.network_manager_service import NetworkManagerService
 from summit_rcm.services.network_service import NetworkService
 from summit_rcm import definition
 from summit_rcm.settings import ServerConfig
@@ -426,19 +425,15 @@ class WifiEnable:
         result = {"SDCERR": definition.SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")}
 
         try:
-            connection_manager_props = await NetworkManagerService().get_obj_properties(
-                NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
-                NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
-            )
-            result["wifi_radio_software_enabled"] = connection_manager_props.get(
-                "WirelessEnabled", False
-            )
-            result["wifi_radio_hardware_enabled"] = connection_manager_props.get(
-                "WirelessHardwareEnabled", False
-            )
+            result[
+                "wifi_radio_software_enabled"
+            ] = await NetworkService.get_wireless_enabled()
+            result[
+                "wifi_radio_hardware_enabled"
+            ] = await NetworkService.get_wireless_hardware_enabled()
             result["InfoMsg"] = "wifi enable results"
-        except Exception as e:
-            syslog(f"Unable to read WirelessEnabled status - {str(e)}")
+        except Exception as exception:
+            syslog(f"Unable to read WirelessEnabled status - {str(exception)}")
             result["InfoMsg"] = "Unable to read WirelessEnabled status"
             result["wifi_radio_software_enabled"] = False
             result["wifi_radio_hardware_enabled"] = False
@@ -475,40 +470,26 @@ class WifiEnable:
 
         # Set the value
         try:
-            await NetworkManagerService().set_obj_properties(
-                NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
-                NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
-                "WirelessEnabled",
-                enable_test == 1,
-                "b",
-            )
-        except Exception as e:
-            syslog(f"Unable to set WirelessEnabled property - {str(e)}")
+            await NetworkService.set_wireless_enabled(enable_test == 1)
+        except Exception as exception:
+            syslog(f"Unable to set WirelessEnabled property - {str(exception)}")
             result["InfoMsg"] = "Unable to set WirelessEnabled property"
             result["wifi_radio_software_enabled"] = False
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS.get("SDCERR_FAIL")
             resp.media = result
             return
 
-        result["SDCERR"] = definition.SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
-        result["InfoMsg"] = "wireless_radio_software_enabled: %s" % (
-            "true" if enable_test == 1 else "false"
-        )
-
         # Read the new value
         try:
-            connection_manager_props = await NetworkManagerService().get_obj_properties(
-                NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
-                NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
-            )
-        except Exception as e:
-            syslog(f"Unable to read WirelessEnabled status - {str(e)}")
+            result[
+                "wifi_radio_software_enabled"
+            ] = await NetworkService.get_wireless_enabled()
+        except Exception as exception:
+            syslog(f"Unable to read WirelessEnabled status - {str(exception)}")
             result["InfoMsg"] = "Unable to read WirelessEnabled status"
             result["wifi_radio_software_enabled"] = False
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
-            resp.media = result
-            return
-        result["wifi_radio_software_enabled"] = connection_manager_props.get(
-            "WirelessEnabled", False
-        )
+
+        result["SDCERR"] = definition.SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
+        result["InfoMsg"] = ""
         resp.media = result
