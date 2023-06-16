@@ -2399,6 +2399,57 @@ class NetworkService(metaclass=Singleton):
 
         raise WifiDeviceNotFoundError("Wi-Fi interface not found")
 
+    @staticmethod
+    async def get_wireless_enabled() -> bool:
+        """Retrieve whether or not wireless (Wi-Fi) is enabled in NetworkManager"""
+        connection_manager_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
+            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
+        )
+        result = connection_manager_props.get("WirelessEnabled", None)
+        if result is None:
+            raise Exception("Unable to read NM properties")
+
+        return result
+
+    @staticmethod
+    async def set_wireless_enabled(enabled: bool, verify: bool = True):
+        """Set whether or not wireless (Wi-Fi) is enabled in NetworkManager"""
+        await NetworkManagerService().set_obj_properties(
+            NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
+            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
+            "WirelessEnabled",
+            enabled,
+            "b",
+        )
+        if not verify:
+            return
+
+        count = 0
+        while await NetworkService.get_wireless_enabled() != enabled:
+            if count == 5:
+                raise Exception(
+                    f"Unable to verify wireless {'enabled' if enabled else 'disabled'}"
+                )
+            await asyncio.sleep(0.1)
+            count += 1
+
+    @staticmethod
+    async def get_wireless_hardware_enabled() -> bool:
+        """
+        Retrieve whether or not wireless (Wi-Fi) hardware is enabled in NetworkManager, i.e. the
+        state of the RF kill switch.
+        """
+        connection_manager_props = await NetworkManagerService().get_obj_properties(
+            NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
+            NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
+        )
+        result = connection_manager_props.get("WirelessHardwareEnabled", None)
+        if result is None:
+            raise Exception("Unable to read NM properties")
+
+        return result
+
 
 class ConnectionProfileNotFoundError(Exception):
     """Custom error class for when the requested connection profile was not found."""
