@@ -183,6 +183,7 @@ async def add_network_v2():
     - /api/v2/network/accessPoints
     - /api/v2/network/accessPoints/scan
     - /api/v2/network/certificates
+    - /api/v2/network/wifi
     """
     try:
         from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
@@ -200,6 +201,7 @@ async def add_network_v2():
             AccessPointsScanResource,
         )
         from summit_rcm.rest_api.v2.network.certificates import CertificatesResource
+        from summit_rcm.rest_api.v2.network.wifi import WiFiResource
     except ImportError:
         NetworkStatusResource = None
 
@@ -220,6 +222,7 @@ async def add_network_v2():
             add_route("/api/v2/network/accessPoints", AccessPointsResource())
             add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
             add_route("/api/v2/network/certificates", CertificatesResource())
+            add_route("/api/v2/network/wifi", WiFiResource())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
             raise exception
@@ -326,8 +329,8 @@ async def add_files_legacy():
 
     if FileManage:
         try:
-            add_route("/files", FileManage())
-            add_route("/file", FilesManage())
+            add_route("/files", FilesManage())
+            add_route("/file", FileManage())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load file endpoints - {str(exception)}")
             raise exception
@@ -440,15 +443,17 @@ async def add_unauthenticated_legacy():
 async def add_awm_legacy():
     """Add the /awm legacy route, if enabled"""
     try:
-        from summit_rcm.awm.awm_cfg_manage import AWMCfgManage
+        from summit_rcm.awm.awm_config_service import AWMConfigService
+        from summit_rcm.rest_api.legacy.awm import AWMResourceLegacy
 
         summit_rcm_plugins.append("awm")
     except ImportError:
-        AWMCfgManage = None
+        AWMConfigService = None
+        AWMResourceLegacy = None
 
-    if AWMCfgManage:
+    if AWMConfigService and AWMResourceLegacy:
         try:
-            add_route("/awm", AWMCfgManage())
+            add_route("/awm", AWMResourceLegacy())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load AWM endpoint - {str(exception)}")
             raise exception
@@ -508,15 +513,21 @@ async def add_modem_legacy():
 async def add_radio_siso_mode_legacy():
     """Add the /radioSISOMode legacy route, if enabled"""
     try:
-        from summit_rcm.radio_siso_mode.radio_siso_mode import RadioSISOMode
+        from summit_rcm.radio_siso_mode.radio_siso_mode_service import (
+            RadioSISOModeService,
+        )
+        from summit_rcm.rest_api.legacy.radio_siso_mode import (
+            RadioSISOModeResourceLegacy,
+        )
 
         summit_rcm_plugins.append("radioSISOMode")
     except ImportError:
-        RadioSISOMode = None
+        RadioSISOModeService = None
+        RadioSISOModeResourceLegacy = None
 
-    if RadioSISOMode:
+    if RadioSISOModeService and RadioSISOModeResourceLegacy:
         try:
-            add_route("/radioSISOMode", RadioSISOMode())
+            add_route("/radioSISOMode", RadioSISOModeResourceLegacy())
         except Exception as exception:
             syslog(
                 LOG_ERR,
