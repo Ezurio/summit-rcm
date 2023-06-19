@@ -35,6 +35,11 @@ from summit_rcm.at_interface.commands.datetime_command import DatetimeCommand
 from summit_rcm.at_interface.commands.timezone_set_command import TimezoneSetCommand
 from summit_rcm.at_interface.commands.timezone_get_command import TimezoneGetCommand
 from summit_rcm.at_interface.commands.certificates_get_command import CertificatesGetCommand
+try:
+    from summit_rcm.at_interface.commands.awm_scan_command import AWMScanCommand
+    from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
+except ImportError:
+    AWMScanCommand = None
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -65,6 +70,9 @@ AT_COMMANDS: List[Command] = [
     TimezoneGetCommand,
     CertificatesGetCommand,
 ]
+if AWMScanCommand:
+    AT_COMMANDS.append(AWMScanCommand)
+    AT_COMMANDS.append(AWMModeCommand)
 
 
 class ATInterfaceFSM(metaclass=Singleton):
