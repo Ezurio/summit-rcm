@@ -29,7 +29,7 @@ class AWMConfigService(metaclass=Singleton):
         # if configuration file does not exist, scan_attempts is not disabled
         f = ServerConfig().get_parser()["summit-rcm"].get("awm_cfg", None).strip('"')
         if not f or not os.path.isfile(f):
-            raise Exception("Not found")
+            raise ConfigFileNotFoundError("Not found")
 
         with self._lock:
             with open(f, "r", encoding="utf-8") as fp:
@@ -37,7 +37,7 @@ class AWMConfigService(metaclass=Singleton):
             if "scan_attempts" in config:
                 return config["scan_attempts"]
 
-        raise Exception("Not found")
+        raise ConfigFileNotFoundError("Not found")
 
     def set_scan_attempts(self, geolocation_scanning_enable: int):
         """
@@ -49,7 +49,7 @@ class AWMConfigService(metaclass=Singleton):
 
         f = ServerConfig().get_parser()["summit-rcm"].get("awm_cfg", None).strip('"')
         if not f:
-            raise Exception("Not found")
+            raise ConfigFileNotFoundError("Not found")
 
         os.makedirs(os.path.dirname(f), exist_ok=True)
 
@@ -78,9 +78,13 @@ class AWMConfigService(metaclass=Singleton):
         """Get whether or not "LITE" mode is enabled."""
         try:
             with open(ADAPTIVE_WW_CONFIG_FILE, "r") as file:
-                if "LITE" in file.read():
+                if "lite" in file.read().lower():
                     return True
         except Exception as exception:
             syslog(f"Unable to read adaptive_ww config file: {str(exception)}")
 
         return False
+
+
+class ConfigFileNotFoundError(Exception):
+    """Custom error class for when the AWM config file is not found"""
