@@ -34,6 +34,7 @@ from summit_rcm.at_interface.commands.wifi_scan_command import WifiScanCommand
 from summit_rcm.at_interface.commands.datetime_command import DatetimeCommand
 from summit_rcm.at_interface.commands.timezone_set_command import TimezoneSetCommand
 from summit_rcm.at_interface.commands.timezone_get_command import TimezoneGetCommand
+from summit_rcm.at_interface.commands.certificates_get_command import CertificatesGetCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -62,6 +63,7 @@ AT_COMMANDS: List[Command] = [
     DatetimeCommand,
     TimezoneSetCommand,
     TimezoneGetCommand,
+    CertificatesGetCommand,
 ]
 
 
