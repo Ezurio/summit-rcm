@@ -182,6 +182,7 @@ async def add_network_v2():
     - /api/v2/network/connections/uuid/{uuid}
     - /api/v2/network/accessPoints
     - /api/v2/network/accessPoints/scan
+    - /api/v2/network/certificates
     """
     try:
         from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
@@ -198,6 +199,7 @@ async def add_network_v2():
             AccessPointsResource,
             AccessPointsScanResource,
         )
+        from summit_rcm.rest_api.v2.network.certificates import CertificatesResource
     except ImportError:
         NetworkStatusResource = None
 
@@ -217,6 +219,7 @@ async def add_network_v2():
             )
             add_route("/api/v2/network/accessPoints", AccessPointsResource())
             add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
+            add_route("/api/v2/network/certificates", CertificatesResource())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
             raise exception
