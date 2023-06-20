@@ -41,6 +41,8 @@ try:
 except ImportError:
     AWMScanCommand = None
 from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
+from summit_rcm.at_interface.commands.wifi_enabled_command import WiFiEnabledCommand
+from summit_rcm.at_interface.commands.wifi_hardware_command import WiFiHardwareCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -71,6 +73,8 @@ AT_COMMANDS: List[Command] = [
     TimezoneGetCommand,
     CertificatesGetCommand,
     SISOModeCommand,
+    WiFiEnabledCommand,
+    WiFiHardwareCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
