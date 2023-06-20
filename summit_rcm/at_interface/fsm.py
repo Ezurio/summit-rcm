@@ -40,6 +40,7 @@ try:
     from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
 except ImportError:
     AWMScanCommand = None
+from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -69,6 +70,7 @@ AT_COMMANDS: List[Command] = [
     TimezoneSetCommand,
     TimezoneGetCommand,
     CertificatesGetCommand,
+    SISOModeCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
