@@ -1,43 +1,16 @@
-import os
+"""Module to handle legacy certificates endpoint"""
+
 from syslog import LOG_ERR, syslog
-from typing import Optional, Tuple
 import falcon
 from summit_rcm.rest_api.legacy.files import FilesManage
 from summit_rcm import definition
-
-import openssl_extension
+from summit_rcm.services.certificates_service import CertificatesService
 
 
 class Certificates:
     """
     Certificate management
     """
-
-    @classmethod
-    def get_cert_info(
-        self, cert_name: str, password: Optional[str] = None
-    ) -> Tuple[dict, str]:
-        """
-        Retrieve the basic meta data info about the given certificate name from the certificates
-        managed by Summit RCM/NetworkManager.
-
-        Return value is a tuple in the form (cert_info, info_msg)
-        """
-
-        cert_file_path = "{0}/{1}".format(
-            str(definition.FILEDIR_DICT.get("cert")), cert_name
-        )
-
-        if not os.path.exists(cert_file_path):
-            return ({}, f"Cannot find certificate with name {cert_name}")
-
-        try:
-            cert_info = openssl_extension.get_cert_info(cert_file_path, password)
-            return (cert_info, "")
-        except Exception as e:
-            error_msg = f"{str(e)}"
-            syslog(LOG_ERR, error_msg)
-            return ({}, error_msg)
 
     async def on_get(self, req, resp):
         """
@@ -55,8 +28,8 @@ class Certificates:
         password = req.params.get("password", None)
         try:
             if cert_name:
-                (cert_info, info_msg) = self.get_cert_info(
-                    cert_name, password if password else None
+                cert_info, info_msg = CertificatesService.get_cert_info(
+                    cert_name, password
                 )
                 result["cert_info"] = cert_info
                 result["InfoMsg"] = info_msg
@@ -69,8 +42,8 @@ class Certificates:
                 result["count"] = len(files)
                 result["InfoMsg"] = "cert files"
                 result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-        except Exception as e:
-            syslog(LOG_ERR, f"Could not read certificate info: {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not read certificate info: {str(exception)}")
             result["InfoMsg"] = "Could not read certificate info"
 
         resp.media = result

@@ -91,11 +91,8 @@ static PyObject * get_cert_info(PyObject *self, PyObject *args)
 		cert = d2i_X509_fp(fp, NULL);
 		if (!cert) {
 			// Could not open the cert as a DER either, let's try PKCS12
-			if (!(password && *password)) {
-				PyErr_SetString(PyExc_RuntimeError,
-					"get_cert_info: PKCS certificate requires a password");
-				goto exit;
-			}
+			if (!(password && *password))
+				password = "";
 			rewind(fp);
 			p12 = d2i_PKCS12_fp(fp, NULL);
 			if (!p12) {
