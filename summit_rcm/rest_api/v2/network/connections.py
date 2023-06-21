@@ -2,8 +2,10 @@
 Module to interact with network connection profiles
 """
 
+import os
 from syslog import LOG_ERR, syslog
-import falcon.asgi
+import falcon.asgi.multipart
+from summit_rcm.services.files_service import FilesService
 from summit_rcm.services.network_service import (
     ConnectionProfileAlreadyActiveError,
     ConnectionProfileAlreadyInactiveError,
@@ -62,6 +64,79 @@ class NetworkConnectionsResource(object):
                 LOG_ERR,
                 f"Unable to create network connection: {str(exception)}",
             )
+            resp.status = falcon.HTTP_500
+
+
+class NetworkConnectionsExportResource:
+    """
+    Resource to handle queries and requests for exporting network connections
+    """
+
+    async def on_get(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
+        """
+        GET handler for the /network/connections/export endpoint
+        """
+        archive = ""
+        try:
+            get_data = await req.get_media()
+            password = get_data.get("password", "")
+            if not password:
+                resp.status = falcon.HTTP_400
+                return
+
+            success, msg, archive = FilesService.export_connections(password)
+            if not success:
+                raise Exception(msg)
+
+            resp.stream = await FilesService.handle_file_download(archive)
+            resp.content_type = falcon.MEDIA_TEXT
+            resp.status = 200
+        except Exception as exception:
+            syslog(f"Could not export connections - {str(exception)}")
+            resp.status = falcon.HTTP_500
+        finally:
+            if os.path.isfile(archive):
+                os.unlink(archive)
+
+
+class NetworkConnectionsImportResource:
+    """
+    Resource to handle queries and requests for importing network connections
+    """
+
+    async def on_put(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
+        """
+        PUT handler for the /network/connections/import endpoint
+        """
+        try:
+            password = ""
+
+            form = await req.get_media()
+            if not isinstance(form, falcon.asgi.multipart.MultipartForm):
+                resp.status = falcon.HTTP_400
+                return
+
+            async for part in form:
+                if part.name == "archive":
+                    if not await FilesService.handle_connection_import_file_upload(part):
+                        raise Exception("error uploading file")
+                elif part.name == "password":
+                    password = str(await part.text)
+
+            if not password:
+                resp.status = falcon.HTTP_400
+                return
+
+            success, msg = await FilesService.import_connections(password)
+            if not success:
+                raise Exception(msg)
+            resp.status = 200
+        except Exception as exception:
+            syslog(f"Could not import connections - {str(exception)}")
             resp.status = falcon.HTTP_500
 
 

@@ -180,9 +180,12 @@ async def add_network_v2():
     - /api/v2/network/interfaces/{name}/stats
     - /api/v2/network/connections
     - /api/v2/network/connections/uuid/{uuid}
+    - /api/v2/network/connections/import
+    - /api/v2/network/connections/export
     - /api/v2/network/accessPoints
     - /api/v2/network/accessPoints/scan
     - /api/v2/network/certificates
+    - /api/v2/network/certificates/{name}
     - /api/v2/network/wifi
     """
     try:
@@ -195,12 +198,15 @@ async def add_network_v2():
         from summit_rcm.rest_api.v2.network.connections import (
             NetworkConnectionsResource,
             NetworkConnectionResourceByUuid,
+            NetworkConnectionsImportResource,
+            NetworkConnectionsExportResource,
         )
         from summit_rcm.rest_api.v2.network.access_points import (
             AccessPointsResource,
             AccessPointsScanResource,
         )
         from summit_rcm.rest_api.v2.network.certificates import CertificatesResource
+        from summit_rcm.rest_api.v2.network.certificates import CertificateResource
         from summit_rcm.rest_api.v2.network.wifi import WiFiResource
     except ImportError:
         NetworkStatusResource = None
@@ -219,9 +225,16 @@ async def add_network_v2():
                 "/api/v2/network/connections/uuid/{uuid}",
                 NetworkConnectionResourceByUuid(),
             )
+            add_route(
+                "/api/v2/network/connections/import", NetworkConnectionsImportResource()
+            )
+            add_route(
+                "/api/v2/network/connections/export", NetworkConnectionsExportResource()
+            )
             add_route("/api/v2/network/accessPoints", AccessPointsResource())
             add_route("/api/v2/network/accessPoints/scan", AccessPointsScanResource())
             add_route("/api/v2/network/certificates", CertificatesResource())
+            add_route("/api/v2/network/certificates/{name}", CertificateResource())
             add_route("/api/v2/network/wifi", WiFiResource())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
@@ -598,12 +611,22 @@ async def add_system_v2():
     - /api/v2/system/fips
     - /api/v2/system/factoryReset
     - /api/v2/system/datetime
+    - /api/v2/system/config/import
+    - /api/v2/system/config/export
+    - /api/v2/system/logs/export
+    - /api/v2/system/debug/export
     """
     try:
         from summit_rcm.rest_api.v2.system.power import PowerResource
         from summit_rcm.rest_api.v2.system.fips import FipsResource
         from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
         from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
+        from summit_rcm.rest_api.v2.system.config import (
+            SystemConfigImportResource,
+            SystemConfigExportResource,
+        )
+        from summit_rcm.rest_api.v2.system.logs import LogsExportResource
+        from summit_rcm.rest_api.v2.system.debug import DebugExportResource
     except ImportError:
         PowerResource = None
 
@@ -614,6 +637,10 @@ async def add_system_v2():
             add_route("/api/v2/system/factoryReset", FactoryResetResource())
             add_route("/api/v2/system/datetime", DateTimeResource())
             await DateTimeService().populate_time_zone_list()
+            add_route("/api/v2/system/config/import", SystemConfigImportResource())
+            add_route("/api/v2/system/config/export", SystemConfigExportResource())
+            add_route("/api/v2/system/logs/export", LogsExportResource())
+            add_route("/api/v2/system/debug/export", DebugExportResource())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load system endpoints - {str(exception)}")
             raise exception

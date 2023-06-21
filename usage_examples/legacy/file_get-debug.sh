@@ -10,6 +10,5 @@ ${CURL_APP} -s --location \
     --data-raw '' \
     --output debug.encrypt
 
-echo -e "\ndebug.encrtpt file downloaded. To decrypt:"
+echo -e "\ndebug.encrypt file downloaded. To decrypt:"
 echo "openssl smime -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip --inform DER"
-
