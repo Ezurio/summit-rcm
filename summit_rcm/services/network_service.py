@@ -1041,14 +1041,6 @@ class NetworkService(metaclass=Singleton):
         return (False, default_result)
 
     @staticmethod
-    async def reload_nm_connections() -> bool:
-        """
-        Trigger NetworkManager to reload all connection files from disk, including noticing any
-        added or deleted connection files.
-        """
-        return await NetworkManagerService().reload_connections()
-
-    @staticmethod
     async def get_all_connection_profiles(is_legacy: bool = False) -> List[dict] | dict:
         """
         Retrieve a list (or dictionary if legacy support is requested) of known, valid

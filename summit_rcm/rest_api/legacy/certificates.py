@@ -2,7 +2,7 @@
 
 from syslog import LOG_ERR, syslog
 import falcon
-from summit_rcm.rest_api.legacy.files import FilesManage
+from summit_rcm.services.files_service import FilesService
 from summit_rcm import definition
 from summit_rcm.services.certificates_service import CertificatesService
 
@@ -37,7 +37,7 @@ class Certificates:
                     result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             else:
                 # No cert name give, so just return the list of certs available
-                files = FilesManage.get_cert_or_pac_files("cert")
+                files = FilesService.get_cert_files()
                 result["files"] = files
                 result["count"] = len(files)
                 result["InfoMsg"] = "cert files"
