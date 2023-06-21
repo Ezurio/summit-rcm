@@ -1,7 +1,6 @@
 #! /bin/bash
 
 CERT_NAME="${CERT_NAME:-"test.crt"}"
-REQUEST_URL="${URL}/api/v2/network/certificates?name=${CERT_NAME}"
 
 source ../global_settings
 
@@ -12,6 +11,8 @@ echo
 
 echo "Certificate Name: ${CERT_NAME}"
 echo -n "Status Code: "
+
+REQUEST_URL="${URL}/api/v2/network/certificates/${CERT_NAME}"
 
 if [ -z "${PASSWORD+set}" ]; then
     curl -s --location \
@@ -24,6 +25,7 @@ else
         -w "%{http_code}\nResponse:\n" \
         --request GET "${REQUEST_URL}" \
         -b cookie -c cookie --insecure \
+        --header "Content-Type: application/json" \
         --data '{"password": "'"${PASSWORD}"'"}' \
         -o >(${JQ_APP})
 fi

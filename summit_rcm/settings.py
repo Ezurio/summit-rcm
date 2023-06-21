@@ -234,7 +234,9 @@ class SystemSettingsManage(object):
     @classmethod
     def get_cert_for_file_encryption(cls):
         return SummitRCMConfigManage.get_key_from_section(
-            cls.section, "cert_for_file_encryption", "/etc/summit-rcm/ssl/server.crt"
+            cls.section,
+            "cert_for_file_encryption",
+            "/etc/nginx-unit/state/certs/summit-rcm-bundle",
         )
 
 
