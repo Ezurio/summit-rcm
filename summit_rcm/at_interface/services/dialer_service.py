@@ -1,3 +1,6 @@
+"""
+Module to handle AT Interface Socket Implementation
+"""
 import asyncio
 import asyncio.transports
 import socket
@@ -8,6 +11,7 @@ from typing import Optional
 
 
 class StreamingProtocol(asyncio.Protocol):
+    """Transport Protocol for a TCP or SSL socket"""
     def __init__(self, dialer):
         self.dialer = dialer
         self.dialer.protocol = self
@@ -28,6 +32,7 @@ class StreamingProtocol(asyncio.Protocol):
 
 
 class UserDatagramProtocol(asyncio.DatagramProtocol):
+    """Transport Protocol for a UDP socket"""
     def __init__(self, dialer):
         self.dialer = dialer
         self.dialer.protocol = self
@@ -48,6 +53,7 @@ class UserDatagramProtocol(asyncio.DatagramProtocol):
 
 
 class Dialer:
+    """Dialer class to handle creation of transports and protocols for AT Interface Sockets"""
     def __init__(self, loop):
         self.loop = loop
         self.protocol = None
@@ -57,6 +63,7 @@ class Dialer:
         self.on_connection_lost = None
 
     def dial(self, number: str, keepalive: int, type: str):
+        """Create Socket"""
         (host, port) = number.split(":")
         if type == "udp":
             c = self.loop.create_datagram_endpoint(
@@ -78,10 +85,12 @@ class Dialer:
         return (None, "", "")
 
     def hangup(self):
+        """Hangup socket"""
         if self.protocol and self.protocol.transport:
             self.protocol.transport.abort()
 
     def write(self, s):
+        """Write to socket"""
         if isinstance(self.protocol, StreamingProtocol) and self.protocol.transport:
             self.protocol.transport.write(s)
         else:
@@ -89,6 +98,7 @@ class Dialer:
 
 
 def create_protocol(dialer, type: str) -> asyncio.BaseProtocol | None:
+    """Create socket protocol"""
     if type == "tcp" or type == "ssl":
         return StreamingProtocol(dialer)
     elif type == "udp":
@@ -98,6 +108,7 @@ def create_protocol(dialer, type: str) -> asyncio.BaseProtocol | None:
 
 
 def setup_tcp_socket(host: str, port: str, keepalive: int) -> socket:
+    """Set up TCP Socket"""
     socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     socks.connect((host, int(port)))
     if keepalive != 0:
@@ -106,6 +117,7 @@ def setup_tcp_socket(host: str, port: str, keepalive: int) -> socket:
 
 
 def setup_ssl_socket(host: str, port: str, keepalive: int):
+    """Set up SSL socket"""
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
@@ -117,6 +129,7 @@ def setup_ssl_socket(host: str, port: str, keepalive: int):
 
 
 def setup_keepalive(sock: socket, keepalive: int):
+    """Set up socket keepalive"""
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, keepalive)
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)

@@ -5,7 +5,7 @@ File that consists of the ClearHTTPConfiguration Command Functionality
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from summit_rcm.at_interface.commands.command import Command
-from summit_rcm.at_interface.http_service import HTTPService
+from summit_rcm.at_interface.services.http_service import HTTPService
 
 
 class ClearHTTPConfiguration(Command):

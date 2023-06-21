@@ -43,6 +43,10 @@ except ImportError:
 from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
 from summit_rcm.at_interface.commands.wifi_enabled_command import WiFiEnabledCommand
 from summit_rcm.at_interface.commands.wifi_hardware_command import WiFiHardwareCommand
+from summit_rcm.at_interface.commands.files_delete_command import FilesDeleteCommand
+from summit_rcm.at_interface.commands.files_export_command import FilesExportCommand
+from summit_rcm.at_interface.commands.files_list_command import FilesListCommand
+from summit_rcm.at_interface.commands.files_upload_command import FilesUploadCommand
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -75,6 +79,10 @@ AT_COMMANDS: List[Command] = [
     SISOModeCommand,
     WiFiEnabledCommand,
     WiFiHardwareCommand,
+    FilesDeleteCommand,
+    FilesExportCommand,
+    FilesListCommand,
+    FilesUploadCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
@@ -164,7 +172,7 @@ class ATInterfaceFSM(metaclass=Singleton):
                     self.command_buffer = ""
             self.echo(message)
         elif self.state == "process_command":
-            self.log_debug("Rx: " + message.decode("utf-8") + " ")
+            self.log_debug("Rx: " + str(message) + " ")
             for listener in self._listeners:
                 listener(message)
         await self.input_received()

@@ -1,7 +1,7 @@
 from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
-from summit_rcm.at_interface.connection_service import ConnectionService
+from summit_rcm.at_interface.services.connection_service import ConnectionService
 import summit_rcm.at_interface.fsm as fsm
 
 
