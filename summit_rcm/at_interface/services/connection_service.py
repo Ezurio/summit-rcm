@@ -2,7 +2,7 @@ import asyncio
 from syslog import syslog
 import time
 from typing import List, Optional, Tuple
-from summit_rcm.at_interface.dialer import Dialer
+from summit_rcm.at_interface.services.dialer_service import Dialer
 
 from summit_rcm.utils import Singleton
 import summit_rcm.at_interface.fsm as fsm

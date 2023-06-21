@@ -50,29 +50,29 @@ class FilesService(metaclass=Singleton):
 
     @staticmethod
     async def handle_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes, path: str
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes, path: str, mode: str = "wb"
     ) -> str:
         """
         Handle when a client uploads a file as either a multipart form part or raw bytes.
         """
         if isinstance(incoming_data, falcon.asgi.multipart.BodyPart):
             return await FilesService.handle_file_upload_multipart_form_part(
-                incoming_data, path
+                incoming_data, path, mode
             )
 
         if isinstance(incoming_data, bytes):
-            return await FilesService.handle_file_upload_bytes(incoming_data, path)
+            return await FilesService.handle_file_upload_bytes(incoming_data, path, mode)
 
         raise Exception("Invalid data type")
 
     @staticmethod
     async def handle_file_upload_multipart_form_part(
-        part: falcon.asgi.multipart.BodyPart, path: str
+        part: falcon.asgi.multipart.BodyPart, path: str, mode: str = "wb"
     ) -> str:
         """
         Handle file upload as multipart form part
         """
-        with open(path, "wb") as dest:
+        with open(path, mode) as dest:
             while True:
                 data = await part.stream.read(FILE_READ_SIZE)
                 if not data:
@@ -81,11 +81,11 @@ class FilesService(metaclass=Singleton):
         return path
 
     @staticmethod
-    async def handle_file_upload_bytes(data: bytes, path: str) -> str:
+    async def handle_file_upload_bytes(data: bytes, path: str, mode: str = "wb") -> str:
         """
         Handle file upload as bytes
         """
-        with open(path, "wb") as dest:
+        with open(path, mode) as dest:
             dest.write(data)
         return path
 
@@ -101,36 +101,36 @@ class FilesService(metaclass=Singleton):
 
     @staticmethod
     async def handle_cert_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes, name: str
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes, name: str, mode: str = "wb"
     ):
         """
         Handle when a client uploads a certificate file
         """
         return await FilesService.handle_file_upload(
             incoming_data,
-            os.path.normpath(os.path.join(NETWORKMANAGER_DIR_FULL, "certs", name)),
+            os.path.normpath(os.path.join(NETWORKMANAGER_DIR_FULL, "certs", name)), mode
         )
 
     @staticmethod
     async def handle_connection_import_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes,
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes, mode: str = "wb"
     ):
         """
         Handle when a client uploads an archive for importing connections
         """
         return await FilesService.handle_file_upload(
-            incoming_data, os.path.normpath(CONNECTION_TMP_ARCHIVE_FILE)
+            incoming_data, os.path.normpath(CONNECTION_TMP_ARCHIVE_FILE), mode
         )
 
     @staticmethod
     async def handle_config_import_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes,
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes, mode: str = "wb"
     ):
         """
         Handle when a client uploads an archive for importing system configuration
         """
         return await FilesService.handle_file_upload(
-            incoming_data, os.path.normpath(CONFIG_TMP_ARCHIVE_FILE)
+            incoming_data, os.path.normpath(CONFIG_TMP_ARCHIVE_FILE), mode
         )
 
     @staticmethod
