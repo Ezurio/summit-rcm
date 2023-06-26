@@ -933,6 +933,11 @@ class NMDeviceType(IntEnum):
     A VRF (Virtual Routing and Forwarding) interface. Since: 1.24.
     """
 
+    NM_DEVICE_TYPE_LOOPBACK = 32
+    """
+    A loopback interface. Since: 1.42.
+    """
+
 
 @unique
 class NMActiveConnectionState(IntEnum):
