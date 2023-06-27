@@ -151,6 +151,6 @@ class WiFiResource(object):
         except Exception as exception:
             syslog(
                 LOG_ERR,
-                f"Unable to create network connection: {str(exception)}",
+                f"Unable to configure Wi-Fi settings: {str(exception)}",
             )
             resp.status = falcon.HTTP_500
