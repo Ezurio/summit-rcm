@@ -1345,6 +1345,7 @@ class NetworkService(metaclass=Singleton):
             uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
 
         activate_connection = False
+        activated_setting = None
         new_settings_connection = new_settings.get("connection", None)
         if new_settings_connection:
             activated_setting = new_settings_connection.pop("activated", None)
@@ -1352,23 +1353,22 @@ class NetworkService(metaclass=Singleton):
                 activated_setting == 1 or activated_setting == "1"
             )
 
-        if new_settings_connection and len(new_settings_connection) > 0:
-            # Retrieve the current settings for the connection profile
-            connection_obj_path = (
-                await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
-            )
-            connection_settings = await NetworkManagerService().get_connection_settings(
-                connection_obj_path=connection_obj_path
-            )
+        # Retrieve the current settings for the connection profile
+        connection_obj_path = (
+            await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
+        )
+        connection_settings = await NetworkManagerService().get_connection_settings(
+            connection_obj_path=connection_obj_path
+        )
 
-            # Update the connection profile settings with the new, incoming ones
-            connection_settings.update(
-                await NetworkManagerService().prepare_new_connection_data(new_settings)
-            )
+        # Update the connection profile settings with the new, incoming ones
+        connection_settings.update(
+            await NetworkManagerService().prepare_new_connection_data(new_settings)
+        )
 
-            await NetworkManagerService().update_connection(
-                connection_obj_path=connection_obj_path, connection=connection_settings
-            )
+        await NetworkManagerService().update_connection(
+            connection_obj_path=connection_obj_path, connection=connection_settings
+        )
 
         if activate_connection:
             # Activation requested

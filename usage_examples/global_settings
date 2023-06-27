@@ -3,33 +3,32 @@
 #                   Adjust these values for your system.
 
 # setup the Ip address of the DUT
-if [ -z "$IPADDR" ]
-then
-    IPADDR=192.168.1.233
+if [ -z "$IPADDR" ]; then
+    IPADDR=198.18.101.1
 else
-    sed -i 's/^    IPADDR=.*$/    IPADDR='"${IPADDR}"'/g' global_settings
+    sed -i 's/^    IPADDR=.*$/    IPADDR='"${IPADDR}"'/g' ../global_settings
 fi
-if [[ -z "$IPADDR" && -z "$URL" ]]
-then
+if [ -z "$IPADDR" -a -z "$URL" ]; then
     echo "IPADDR variable needs to be set."
     exit 1
 fi
 
-function smart_jq {
-    local input=$(cat)
-    if [ "${input:0:1}" == "{" ]; then
+smart_jq() {
+    input=$(cat)
+    case "${input}" in
+    '{'* | '['*)
         echo "${input}" | jq
-    else
+        ;;
+    *)
         echo "${input}"
-    fi
+        ;;
+    esac
 }
 
 # Use jq if it is installed.
 
-if [ -z "${JQ_APP+x}" ]
-then
-    if ! command -v jq &> /dev/null
-    then
+if [ -z "${JQ_APP}" ]; then
+    if ! command -v jq &>/dev/null; then
         # recommend installing the jq application
         JQ_APP=tee
     else
@@ -53,7 +52,3 @@ CA_CERT="${CA_CERT:-SystestCA.cer}"
 BT_CONTROLLER="${BT_CONTROLLER:-controller0}"
 
 CURL_APP="${CURL_APP:-curl}"
-
-
-
-
