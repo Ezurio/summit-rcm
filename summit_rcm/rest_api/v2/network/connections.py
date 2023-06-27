@@ -154,7 +154,11 @@ class NetworkConnectionResourceByUuid(object):
             post_data: dict = await req.get_media()
             connection_settings = post_data.get("connection", None)
 
-            connection_settings_uuid = connection_settings.get("uuid", None)
+            connection_settings_uuid = (
+                connection_settings.get("uuid", None)
+                if connection_settings is not None
+                else None
+            )
             if connection_settings_uuid and connection_settings_uuid != uuid:
                 resp.status = falcon.HTTP_400
                 return
