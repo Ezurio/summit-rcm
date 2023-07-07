@@ -9,8 +9,10 @@ if [ ! -e "${FIRMWARE}" ]; then
     echo \"${FIRMWARE}\": file not found
     exit
 fi
+SCRIPT=$(readlink -f "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
 
-. ../global_settings
+. ${SCRIPTPATH}/../global_settings
 
 
 echo -e "\n\n========================="
@@ -25,7 +27,7 @@ ${CURL_APP} -s -S --header "Content-Type: application/json" \
     '{"image":"main"}'  --insecure \
     ${URL}/firmware -b cookie -c cookie | ${JQ_APP}
 
-${CURL_APP} -s -S --request PUT ${URL}/firmware --header "Content-type: application/octet-stream" -b cookie -c cookie --insecure --data-binary @${FIRMWARE}
+${CURL_APP} --request PUT ${URL}/firmware --header "Content-type: application/octet-stream" -b cookie -c cookie --insecure --data-binary @${FIRMWARE}
 
 SUCCESS=false
 echo
@@ -45,7 +47,7 @@ while true; do
 done
 
 echo
-${SUCCESS} && . ./reboot_put.sh
+${SUCCESS} && . $SCRIPTPATH/reboot_put.sh
 
 
 echo ""

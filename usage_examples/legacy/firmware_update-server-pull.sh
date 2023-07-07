@@ -4,8 +4,10 @@ if [ -z "${FIRMWARE}" ]; then
     echo usage: ${0} firmware url, e.g. http://192.168.1.123:8080/som60.swu
     exit
 fi
+SCRIPT=$(readlink -f "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
 
-. ../global_settings
+. ${SCRIPTPATH}/../global_settings
 
 
 echo -e "\n\n========================="
@@ -36,7 +38,7 @@ while true; do
 done
 
 echo
-${SUCCESS} && . ./reboot_put.sh
+${SUCCESS} && . $SCRIPTPATH/reboot_put.sh
 
 
 echo ""
