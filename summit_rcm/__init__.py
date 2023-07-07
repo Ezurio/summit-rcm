@@ -608,6 +608,8 @@ async def add_system_v2():
     """
     Add the following v2 routes, if enabled:
     - /api/v2/system/power
+    - /api/v2/system/update
+    - /api/v2/system/update/updatefile
     - /api/v2/system/fips
     - /api/v2/system/factoryReset
     - /api/v2/system/datetime
@@ -618,6 +620,10 @@ async def add_system_v2():
     """
     try:
         from summit_rcm.rest_api.v2.system.power import PowerResource
+        from summit_rcm.rest_api.v2.system.update import (
+            FirmwareUpdateStatusResource,
+            FirmwareUpdateFileResource,
+        )
         from summit_rcm.rest_api.v2.system.fips import FipsResource
         from summit_rcm.rest_api.v2.system.factory_reset import FactoryResetResource
         from summit_rcm.rest_api.v2.system.date_time import DateTimeResource
@@ -633,6 +639,8 @@ async def add_system_v2():
     if PowerResource:
         try:
             add_route("/api/v2/system/power", PowerResource())
+            add_route("/api/v2/system/update", FirmwareUpdateStatusResource())
+            add_route("/api/v2/system/update/updateFile", FirmwareUpdateFileResource())
             add_route("/api/v2/system/fips", FipsResource())
             add_route("/api/v2/system/factoryReset", FactoryResetResource())
             add_route("/api/v2/system/datetime", DateTimeResource())

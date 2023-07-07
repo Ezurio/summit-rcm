@@ -13,7 +13,10 @@ fi
 # first - create the block files that you will send with split:
 split -b128k -d -a 4 --additional-suffix=.swu-block ${FIRMWARE}
 
-. ../global_settings
+SCRIPT=$(readlink -f "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+
+. ${SCRIPTPATH}/../global_settings
 
 
 echo -e "\n\n========================="
@@ -51,7 +54,7 @@ while true; do
 done
 
 echo
-${SUCCESS} && . ./reboot_put.sh
+${SUCCESS} && . $SCRIPTPATH/reboot_put.sh
 
 
 echo ""
