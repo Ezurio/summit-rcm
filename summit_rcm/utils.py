@@ -1,6 +1,13 @@
+"""Module to hold various utility functions"""
+
 from re import sub
 from typing import Any
+from pathlib import Path
 from dbus_fast import Variant
+
+
+CMDLINE_BOOTSIDE_A = "ubi.block=0,1"
+CMDLINE_BOOTSIDE_B = "ubi.block=0,4"
 
 
 class Singleton(type):
@@ -47,3 +54,18 @@ def variant_to_python(data: Any) -> Any:
     if isinstance(data, bytearray):
         return data.hex()
     return data
+
+
+def get_current_side():
+    """
+    Return the current bootside
+    """
+    cmdline = Path("/proc/cmdline").read_text()
+    if CMDLINE_BOOTSIDE_B in cmdline:
+        return "b"
+    elif CMDLINE_BOOTSIDE_A in cmdline:
+        return "a"
+    else:
+        raise ValueError(
+            "get_current_side: could not determine boot side from kernel cmdline"
+        )
