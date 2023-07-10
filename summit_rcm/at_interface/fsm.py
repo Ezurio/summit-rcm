@@ -1,3 +1,4 @@
+from syslog import syslog, LOG_ERR
 from typing import Callable, List, Optional, Tuple
 from asyncio import Transport, Protocol
 from threading import Lock
@@ -18,23 +19,40 @@ from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
 from summit_rcm.at_interface.commands.fips_command import FipsCommand
 from summit_rcm.at_interface.commands.connect_command import ActivateConnectionCommand
-from summit_rcm.at_interface.commands.configure_http_transaction import ConfigureHTTPTransaction
-from summit_rcm.at_interface.commands.execute_http_transaction import ExecuteHTTPTransaction
-from summit_rcm.at_interface.commands.add_http_header import AddHTTPHeader
-from summit_rcm.at_interface.commands.enable_http_reponse_headers import EnableHTTPResponseHeader
-from summit_rcm.at_interface.commands.clear_http_configuration import ClearHTTPConfiguration
-from summit_rcm.at_interface.commands.network_interface_statistics import (
-    NetworkInterfaceStatisticsCommand
+from summit_rcm.at_interface.commands.configure_http_transaction import (
+    ConfigureHTTPTransaction,
 )
-from summit_rcm.at_interface.commands.network_interfaces_command import NetworkInterfacesCommand
-from summit_rcm.at_interface.commands.modify_connection_command import ModifyConnectionCommand
-from summit_rcm.at_interface.commands.virtual_interface_command import VirtualInterfaceCommand
+from summit_rcm.at_interface.commands.execute_http_transaction import (
+    ExecuteHTTPTransaction,
+)
+from summit_rcm.at_interface.commands.add_http_header import AddHTTPHeader
+from summit_rcm.at_interface.commands.enable_http_reponse_headers import (
+    EnableHTTPResponseHeader,
+)
+from summit_rcm.at_interface.commands.clear_http_configuration import (
+    ClearHTTPConfiguration,
+)
+from summit_rcm.at_interface.commands.network_interface_statistics import (
+    NetworkInterfaceStatisticsCommand,
+)
+from summit_rcm.at_interface.commands.network_interfaces_command import (
+    NetworkInterfacesCommand,
+)
+from summit_rcm.at_interface.commands.modify_connection_command import (
+    ModifyConnectionCommand,
+)
+from summit_rcm.at_interface.commands.virtual_interface_command import (
+    VirtualInterfaceCommand,
+)
 from summit_rcm.at_interface.commands.wifi_list_command import WifiListCommand
 from summit_rcm.at_interface.commands.wifi_scan_command import WifiScanCommand
 from summit_rcm.at_interface.commands.datetime_command import DatetimeCommand
 from summit_rcm.at_interface.commands.timezone_set_command import TimezoneSetCommand
 from summit_rcm.at_interface.commands.timezone_get_command import TimezoneGetCommand
-from summit_rcm.at_interface.commands.certificates_get_command import CertificatesGetCommand
+from summit_rcm.at_interface.commands.certificates_get_command import (
+    CertificatesGetCommand,
+)
+
 try:
     from summit_rcm.at_interface.commands.awm_scan_command import AWMScanCommand
     from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
@@ -52,6 +70,11 @@ from summit_rcm.at_interface.commands.files_list_command import FilesListCommand
 from summit_rcm.at_interface.commands.files_upload_command import FilesUploadCommand
 from summit_rcm.at_interface.commands.ntp_get_command import NTPGetCommand
 from summit_rcm.at_interface.commands.ntp_configure_command import NTPConfigureCommand
+from summit_rcm.at_interface.commands.fwupdate_run_command import FWUpdateRunCommand
+from summit_rcm.at_interface.commands.fwupdate_send_command import FWUpdateSendCommand
+from summit_rcm.at_interface.commands.fwupdate_status_command import (
+    FWUpdateStatusCommand,
+)
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -89,6 +112,9 @@ AT_COMMANDS: List[Command] = [
     FilesUploadCommand,
     NTPGetCommand,
     NTPConfigureCommand,
+    FWUpdateRunCommand,
+    FWUpdateSendCommand,
+    FWUpdateStatusCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
@@ -167,19 +193,22 @@ class ATInterfaceFSM(metaclass=Singleton):
         if isinstance(message, str):
             message = bytes(message)
         if self.state == "idle" or self.state == "analyze_input":
-            message = message.decode("utf-8")
-            length = len(self.command_buffer)
-            self.command_buffer += message
-            while "\x7f" in self.command_buffer:
-                if length > 1:
-                    backspace_index = self.command_buffer.find("\x7f")
-                    temp_buf = self.command_buffer[: backspace_index - 1]
-                    if backspace_index != (length - 1):
-                        temp_buf += self.command_buffer[backspace_index + 1 :]
-                    self.command_buffer = temp_buf
-                else:
-                    self.command_buffer = ""
-            self.echo(message)
+            try:
+                message = message.decode("utf-8")
+                length = len(self.command_buffer)
+                self.command_buffer += message
+                while "\x7f" in self.command_buffer:
+                    if length > 1:
+                        backspace_index = self.command_buffer.find("\x7f")
+                        temp_buf = self.command_buffer[: backspace_index - 1]
+                        if backspace_index != (length - 1):
+                            temp_buf += self.command_buffer[backspace_index + 1 :]
+                        self.command_buffer = temp_buf
+                    else:
+                        self.command_buffer = ""
+                self.echo(message)
+            except UnicodeDecodeError as exception:
+                syslog(LOG_ERR, f"Invalid Character Received: {str(exception)}")
         elif self.state == "process_command":
             self.log_debug("Rx: " + str(message) + " ")
             for listener in self._listeners:

@@ -11,6 +11,7 @@ from summit_rcm.settings import ServerConfig
 
 class ATInterfaceSerialProtocol(asyncio.Protocol):
     """The AT Interface's Asyncio Protocol"""
+
     def connection_made(self, transport) -> None:
         self.transport = transport
 
@@ -23,6 +24,7 @@ class ATInterfaceSerialProtocol(asyncio.Protocol):
 
 class ATInterface:
     """Class that establishes the AT Interface"""
+
     def __init__(self) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
 
@@ -50,6 +52,7 @@ class ATInterface:
             ATInterfaceSerialProtocol,
             serial_port,
             baud_rate,
+            rtscts=True,
         )
         ATInterfaceFSM()._transport = transport
         ATInterfaceFSM()._protocol = protocol
