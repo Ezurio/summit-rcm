@@ -2,6 +2,7 @@
 Module to handle receiving files serially through the AT Interface
 """
 import time
+from syslog import LOG_ERR, syslog
 from typing import Tuple
 from summit_rcm.utils import Singleton
 import summit_rcm.at_interface.fsm as fsm
@@ -10,7 +11,7 @@ import summit_rcm.at_interface.fsm as fsm
 class ATFilesService(object, metaclass=Singleton):
     """Service to handle serial data mode for files sent through the AT Interface"""
 
-    escape_delay: float = 0.02
+    escape_delay: float = 0.2
     escape_count: int = 0
     escape: bool = False
     rx_timestamp: float = 0.0
@@ -20,7 +21,9 @@ class ATFilesService(object, metaclass=Singleton):
         self.busy = False
         self.listener_id = -1
 
-    async def write_upload_body(self, length: int) -> Tuple[bool, bytes, int]:
+    async def write_upload_body(
+        self, length: int, buffer_size: int = 0
+    ) -> Tuple[bool, bytes, int]:
         """
         Handle constructing payload of a file upload
         """
@@ -31,14 +34,20 @@ class ATFilesService(object, metaclass=Singleton):
             self.data_buffer = b""
             state_machine.deregister_listener(self.listener_id)
             return (True, "", -1)
-
         if len(self.data_buffer) >= length:
+            syslog(LOG_ERR, f"Total Length size({length} met, returning body to command)")
             self.data_buffer = self.data_buffer[:length]
             state_machine.deregister_listener(self.listener_id)
             body = self.data_buffer
             self.busy = False
             self.data_buffer = b""
             return (True, body, length)
+        if len(self.data_buffer) >= buffer_size and buffer_size:
+            syslog(LOG_ERR, f"Buffer size({buffer_size} met, returning body to command)")
+            body = self.data_buffer[:buffer_size]
+            self.data_buffer = self.data_buffer[buffer_size:]
+            syslog(LOG_ERR, f"Length of body is {len(body)}")
+            return (True, body, len(body))
 
         def data_received(data: bytes):
             self.data_buffer += data
