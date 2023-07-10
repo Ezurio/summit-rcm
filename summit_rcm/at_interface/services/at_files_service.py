@@ -20,7 +20,9 @@ class ATFilesService(object, metaclass=Singleton):
         self.busy = False
         self.listener_id = -1
 
-    async def write_upload_body(self, length: int) -> Tuple[bool, bytes, int]:
+    async def write_upload_body(
+        self, length: int, buffer_size: int = 0
+    ) -> Tuple[bool, bytes, int]:
         """
         Handle constructing payload of a file upload
         """
@@ -31,7 +33,6 @@ class ATFilesService(object, metaclass=Singleton):
             self.data_buffer = b""
             state_machine.deregister_listener(self.listener_id)
             return (True, "", -1)
-
         if len(self.data_buffer) >= length:
             self.data_buffer = self.data_buffer[:length]
             state_machine.deregister_listener(self.listener_id)
@@ -39,6 +40,10 @@ class ATFilesService(object, metaclass=Singleton):
             self.busy = False
             self.data_buffer = b""
             return (True, body, length)
+        if len(self.data_buffer) >= buffer_size and buffer_size:
+            body = self.data_buffer[:buffer_size]
+            self.data_buffer = self.data_buffer[buffer_size:]
+            return (True, body, len(body))
 
         def data_received(data: bytes):
             self.data_buffer += data
