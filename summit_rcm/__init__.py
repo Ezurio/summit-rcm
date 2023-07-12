@@ -3,16 +3,45 @@ Summit RCM main module
 """
 
 import asyncio
+import socket
 from syslog import LOG_ERR, syslog, openlog
 from typing import Any, List
-import falcon.asgi
-from summit_rcm.services.date_time_service import DateTimeService
-from summit_rcm.settings import ServerConfig
+import ssl
+
+try:
+    import falcon.asgi
+    import uvicorn.config
+    from summit_rcm.services.date_time_service import DateTimeService
+    from summit_rcm.settings import ServerConfig
+
+    app = falcon.asgi.App()
+    REST_ENABLED = True
+except ImportError:
+    REST_ENABLED = False
+
+
+# If enabled, load the AT interface
+try:
+    from summit_rcm.at_interface.at_interface import ATInterface
+
+    async def start_at_interface():
+        """Start the AT interface"""
+        syslog("Starting AT interface")
+        await ATInterface().start()
+
+except ImportError:
+    ATInterface = None
+
+PY_SSL_CERT_REQUIRED_NO_CHECK_TIME = 3
+"""Custom OpenSSL verify mode to disable time checking during certificate verification"""
+
+X509_V_FLAG_NO_CHECK_TIME = 0x200000
+"""Flags for OpenSSL 1.1.1 or newer to disable time checking during certificate verification"""
+
+SOCKET_RECEIVE_BUFFER_SIZE = 32 * 1024
+"""Server socket's receiver buffer size"""
 
 summit_rcm_plugins: List[str] = []
-
-
-app = falcon.asgi.App()
 
 
 class SecureHeadersMiddleware:
@@ -34,16 +63,6 @@ class LifespanMiddleware:
 
     async def process_startup(self, scope, event):
         """Add logic to run at the startup event"""
-
-        # If enabled, load the AT interface
-        try:
-            from summit_rcm.at_interface.at_interface import ATInterface
-        except ImportError:
-            ATInterface = None
-
-        if ATInterface:
-            syslog("Starting AT interface")
-            asyncio.create_task(ATInterface(asyncio.get_event_loop()).start())
 
         # Load the routes
         await add_routes()
@@ -704,17 +723,97 @@ def add_route(route_path: str, resource: Any, **kwargs):
     syslog(f"route loaded: {str(route_path)}")
 
 
-def start_server():
+async def start_server():
     """Start the webserver and add middleware"""
+    syslog("Starting webserver")
     parser = ServerConfig().get_parser()
     enable_sessions = parser.getboolean(
         section="/", option="tools.sessions.on", fallback=True
     )
+    ssl_private_key = (
+        parser["global"]
+        .get("server.ssl_private_key", "/etc/summit-rcm/ssl/server.key")
+        .strip('"')
+    )
+    ssl_certificate = (
+        parser["global"]
+        .get("server.ssl_certificate", "/etc/summit-rcm/ssl/server.crt")
+        .strip('"')
+    )
+    ssl_certificate_chain = (
+        parser["global"]
+        .get(
+            "server.ssl_certificate_chain",
+            "/etc/summit-rcm/ssl/ca.crt",
+        )
+        .strip('"')
+    )
+    enable_client_auth = parser.getboolean(
+        section="summit-rcm", option="enable_client_auth", fallback=False
+    )
 
+    config = uvicorn.Config(
+        app=app,
+        host="",
+        port=443,
+        ssl_certfile=ssl_certificate,
+        ssl_keyfile=ssl_private_key,
+        ssl_cert_reqs=ssl.CERT_NONE,
+        ssl_ca_certs=ssl_certificate_chain,
+        ssl_version=ssl.PROTOCOL_TLS_SERVER,
+        lifespan="on",
+        http="auto",
+        loop="asyncio",
+        log_level="error",
+    )
+    config.load()
+
+    if enable_client_auth:
+        try:
+            if ssl.OPENSSL_VERSION_NUMBER >= 0x10101000:
+                # OpenSSL 1.1.1 or newer - we can use the built-in functionality to disable time
+                # checking during certificate verification
+                config.ssl.verify_mode = ssl.CERT_REQUIRED
+                config.ssl.verify_flags |= X509_V_FLAG_NO_CHECK_TIME
+            else:
+                # OpenSSL 1.0.2 - we need to use the patched-in functionality to disable time
+                # checking during certificate verification
+                config.ssl.verify_mode = PY_SSL_CERT_REQUIRED_NO_CHECK_TIME
+            syslog("SSL client authentication enabled")
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                f"Error configuring SSL client authentication - {str(exception)}",
+            )
+
+    # Bind the socket and configure the socket's receive buffer to avoid excess memory usage
+    sock = config.bind_socket()
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCKET_RECEIVE_BUFFER_SIZE)
+
+    server = uvicorn.Server(config)
     add_middleware(enable_sessions)
 
+    await server.serve([sock])
 
-# Configure logging and start the application
-openlog("summit-rcm")
-syslog("Starting webserver")
-start_server()
+
+async def start():
+    """Configure logging and start the application"""
+    openlog("summit-rcm")
+
+    if not ATInterface and not REST_ENABLED:
+        syslog(LOG_ERR, "Invalid configuration!")
+        exit(1)
+
+    tasks = []
+
+    if ATInterface:
+        tasks.append(asyncio.create_task(start_at_interface()))
+    if REST_ENABLED:
+        tasks.append(asyncio.create_task(start_server()))
+
+    await asyncio.gather(*tasks)
+
+
+def main():
+    """Main entry point"""
+    asyncio.run(start())

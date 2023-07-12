@@ -1,0 +1,12 @@
+[Unit]
+Description=Summit Remote Control Manager (RCM)
+Requires=dbus.service
+After=dbus.service network.target
+
+[Service]
+ExecStart=/usr/bin/summit-rcm
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

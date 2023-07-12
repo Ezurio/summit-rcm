@@ -3,8 +3,8 @@ import configparser
 from syslog import LOG_ERR, syslog
 from typing import Optional
 
-from .utils import Singleton
-from . import definition
+from summit_rcm.utils import Singleton
+from summit_rcm import definition
 from threading import Lock
 
 

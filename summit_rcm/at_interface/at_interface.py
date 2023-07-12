@@ -19,8 +19,8 @@ class ATInterfaceSerialProtocol(asyncio.Protocol):
 
 
 class ATInterface:
-    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
-        self.loop: asyncio.AbstractEventLoop = loop
+    def __init__(self) -> None:
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
 
     async def start(self):
         serial_port = (
@@ -33,8 +33,13 @@ class ATInterface:
             ServerConfig().get_parser().getint("summit-rcm", "baud_rate", fallback=None)
         )
         if serial_port is None or baud_rate is None:
-            syslog(LOG_ERR, "AT Interface Failed: Invalid/Unspecified Serial Port Configuration")
-            raise ValueError("AT Interface Failed: Invalid/Unspecified Serial Port Configuration")
+            syslog(
+                LOG_ERR,
+                "AT Interface Failed: Invalid/Unspecified Serial Port Configuration",
+            )
+            raise ValueError(
+                "AT Interface Failed: Invalid/Unspecified Serial Port Configuration"
+            )
         transport, protocol = await serial_asyncio.create_serial_connection(
             self.loop,
             ATInterfaceSerialProtocol,

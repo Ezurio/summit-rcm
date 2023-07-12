@@ -2,7 +2,7 @@ from typing import Callable, List, Optional, Tuple
 from asyncio import Transport, Protocol
 from threading import Lock
 from transitions.extensions.asyncio import AsyncMachine
-from utils import Singleton
+from summit_rcm.utils import Singleton
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.commands.communication_check_command import (
     CommunicationCheckCommand,

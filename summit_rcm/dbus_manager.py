@@ -2,7 +2,7 @@ from syslog import syslog, LOG_ERR
 from typing import Optional
 from dbus_fast.constants import BusType
 from dbus_fast.aio import MessageBus
-from .utils import Singleton
+from summit_rcm.utils import Singleton
 
 
 class DBusManager(object, metaclass=Singleton):
