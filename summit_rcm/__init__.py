@@ -91,10 +91,26 @@ class SessionCheckingMiddleware:
             "datetime",
             "fips",
             "modemEnable",
+            "/api/v2/network/interfaces",
+            "/api/v2/network/connections",
+            "/api/v2/network/accessPoints",
+            "/api/v2/network/certificates",
+            "/api/v2/network/wifi",
+            "/api/v2/system/power",
+            "/api/v2/system/update",
+            "/api/v2/system/fips",
+            "/api/v2/system/factoryReset",
+            "/api/v2/system/datetime",
+            "/api/v2/system/config",
+            "/api/v2/system/logs",
+            "/api/v2/system/debug",
         ]
 
-    def session_is_valid(self, req) -> bool:
+    def session_is_valid(self, req: falcon.asgi.Request) -> bool:
         """Determinte if the current request's session is valid"""
+        # With the `get` method the session id will be saved which could result in session fixation
+        # vulnerability. Session ids will be destroyed periodically so we have to check 'USERNAME'
+        # to make sure the session is not valid after logout.
         if not hasattr(req.context, "valid_session"):
             return False
 
@@ -104,25 +120,49 @@ class SessionCheckingMiddleware:
         username = req.context.get_session("USERNAME")
         return username is not None and username != ""
 
-    async def process_request(self, req, resp):
+    def is_restricted_path(self, req: falcon.asgi.Request) -> bool:
+        """Determine if the request's path belongs to a restricted resource"""
+        url = req.url.split("/")[-1]
+
+        if not url:
+            return False
+
+        if ".html" in url:
+            return False
+
+        if ".js" in url:
+            return False
+
+        path_root = req.path.split("/")[1]
+        if path_root in self.paths or path_root in summit_rcm_plugins:
+            return True
+
+        # For v2 routes, check if the requested path starts with a restricted path string
+        for path in self.paths:
+            if req.path.startswith(path):
+                return True
+
+        return False
+
+    async def process_request(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ):
         """
         Raise HTTP 401 Unauthorized client error if a session with invalid id tries to access
-        following resources.
+        restricted resources.
         """
-        # With the `get` method the session id will be saved which could result in session fixation
-        # vulnerability. Session ids will be destroyed periodically so we have to check 'USERNAME'
-        # to make sure the session is not valid after logout.
-        if not self.session_is_valid(req):
-            url = req.url.split("/")[-1]
-            path_root = req.path.split("/")[1]
-            if (
-                url
-                and ".html" not in url
-                and ".js" not in url
-                and (path_root in self.paths or path_root in summit_rcm_plugins)
-            ):
-                resp.status = falcon.HTTP_401
-                resp.complete = True
+        if self.session_is_valid(req):
+            return
+
+        # The current session is not valid (or there is no current session), so check if the
+        # requested path is restricted
+        if not self.is_restricted_path(req):
+            return
+
+        # The session is invalid and the requested path is restricted, so return an HTTP 401
+        # Unauthorized error
+        resp.status = falcon.HTTP_401
+        resp.complete = True
 
 
 class IndexResource:
