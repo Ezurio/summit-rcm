@@ -674,6 +674,9 @@ async def add_system_v2():
     - /api/v2/system/datetime
     - /api/v2/system/config/import
     - /api/v2/system/config/export
+    - /api/v2/system/logs/data
+    - /api/v2/system/logs/config
+    - /api/v2/system/logs/forwarding
     - /api/v2/system/logs/export
     - /api/v2/system/debug/export
     """
@@ -690,7 +693,12 @@ async def add_system_v2():
             SystemConfigImportResource,
             SystemConfigExportResource,
         )
-        from summit_rcm.rest_api.v2.system.logs import LogsExportResource
+        from summit_rcm.rest_api.v2.system.logs import (
+            LogsDataResource,
+            LogsConfigResource,
+            LogForwardingResource,
+            LogsExportResource,
+        )
         from summit_rcm.rest_api.v2.system.debug import DebugExportResource
     except ImportError:
         PowerResource = None
@@ -706,6 +714,9 @@ async def add_system_v2():
             await DateTimeService().populate_time_zone_list()
             add_route("/api/v2/system/config/import", SystemConfigImportResource())
             add_route("/api/v2/system/config/export", SystemConfigExportResource())
+            add_route("/api/v2/system/logs/data", LogsDataResource())
+            add_route("/api/v2/system/logs/config", LogsConfigResource())
+            add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
             add_route("/api/v2/system/logs/export", LogsExportResource())
             add_route("/api/v2/system/debug/export", DebugExportResource())
         except Exception as exception:
