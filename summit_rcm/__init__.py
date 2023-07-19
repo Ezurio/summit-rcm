@@ -104,6 +104,7 @@ class SessionCheckingMiddleware:
             "/api/v2/system/config",
             "/api/v2/system/logs",
             "/api/v2/system/debug",
+            "/api/v2/login/users",
         ]
 
     def session_is_valid(self, req: falcon.asgi.Request) -> bool:
@@ -724,6 +725,30 @@ async def add_system_v2():
             raise exception
 
 
+async def add_login_v2():
+    """
+    Add the following v2 routes, if enabled:
+    - /api/v2/login
+    - /api/v2/login/users
+    - /api/v2/login/users/{username}
+    """
+    try:
+        from summit_rcm.rest_api.v2.login.login import LoginResource
+        from summit_rcm.rest_api.v2.login.users import UsersResource
+        from summit_rcm.rest_api.v2.login.users import UserResource
+    except ImportError:
+        LoginResource = None
+
+    if LoginResource:
+        try:
+            add_route("/api/v2/login", LoginResource())
+            add_route("/api/v2/login/users", UsersResource())
+            add_route("/api/v2/login/users/{username}", UserResource())
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load login endpoints - {str(exception)}")
+            raise exception
+
+
 def add_middleware(enable_session_checking: bool) -> None:
     """Add middleware to the ASGI application"""
     # Add ASGI lifespan middleware
@@ -746,6 +771,7 @@ async def add_routes() -> None:
         # v2 routes
         add_network_v2(),
         add_system_v2(),
+        add_login_v2(),
         # legacy routes
         add_network_legacy(),
         add_firewall_legacy(),
