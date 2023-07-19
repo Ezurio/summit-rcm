@@ -58,7 +58,7 @@ class NetworkConnectionsResource(object):
                 settings=post_data, overwrite_existing=True, is_legacy=False
             )
             resp.content_type = falcon.MEDIA_JSON
-            resp.status = falcon.HTTP_200
+            resp.status = falcon.HTTP_201
         except Exception as exception:
             syslog(
                 LOG_ERR,
@@ -122,7 +122,9 @@ class NetworkConnectionsImportResource:
 
             async for part in form:
                 if part.name == "archive":
-                    if not await FilesService.handle_connection_import_file_upload(part):
+                    if not await FilesService.handle_connection_import_file_upload(
+                        part
+                    ):
                         raise Exception("error uploading file")
                 elif part.name == "password":
                     password = str(await part.text)
@@ -162,7 +164,7 @@ class NetworkConnectionResourceByUuid(object):
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_200
         except ConnectionProfileNotFoundError:
-            resp.status = falcon.HTTP_400
+            resp.status = falcon.HTTP_404
         except Exception as exception:
             syslog(
                 LOG_ERR,
@@ -199,15 +201,16 @@ class NetworkConnectionResourceByUuid(object):
                 resp.media = await NetworkService.update_connection_profile(
                     new_settings=post_data, uuid=uuid, id=None, is_legacy=False
                 )
+                resp.status = falcon.HTTP_200
             else:
                 # The specified connection profile does not exist, so create a new one
                 resp.media = await NetworkService.create_connection_profile(
                     settings=post_data, overwrite_existing=True, is_legacy=False
                 )
+                resp.status = falcon.HTTP_201
             resp.content_type = falcon.MEDIA_JSON
-            resp.status = falcon.HTTP_200
         except ConnectionProfileNotFoundError:
-            resp.status = falcon.HTTP_400
+            resp.status = falcon.HTTP_404
         except Exception as exception:
             syslog(
                 LOG_ERR,
@@ -243,8 +246,9 @@ class NetworkConnectionResourceByUuid(object):
             )
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_200
+        except ConnectionProfileNotFoundError:
+            resp.status = falcon.HTTP_404
         except (
-            ConnectionProfileNotFoundError,
             ConnectionProfileAlreadyActiveError,
             ConnectionProfileAlreadyInactiveError,
         ):
@@ -270,7 +274,7 @@ class NetworkConnectionResourceByUuid(object):
             await NetworkService.delete_connection_profile(uuid=uuid, id=None)
             resp.status = falcon.HTTP_200
         except ConnectionProfileNotFoundError:
-            resp.status = falcon.HTTP_400
+            resp.status = falcon.HTTP_404
         except Exception as exception:
             syslog(
                 LOG_ERR,

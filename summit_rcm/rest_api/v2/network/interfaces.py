@@ -93,7 +93,7 @@ class NetworkInterfaceResource(object):
                 resp.status = falcon.HTTP_500
                 return
 
-            resp.status = falcon.HTTP_200
+            resp.status = falcon.HTTP_201
             resp.content_type = falcon.MEDIA_JSON
             resp.media = result
         except Exception as e:
@@ -115,7 +115,7 @@ class NetworkInterfaceResource(object):
 
             # Check that the virtual interface exists
             if name not in await NetworkService.get_all_interfaces():
-                resp.status = falcon.HTTP_400
+                resp.status = falcon.HTTP_404
                 return
 
             if not await NetworkService.remove_virtual_interface():

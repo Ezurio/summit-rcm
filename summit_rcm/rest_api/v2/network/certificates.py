@@ -80,7 +80,7 @@ class CertificateResource:
                     if not await FilesService.handle_cert_file_upload(part, name):
                         raise Exception("Error saving file to disk")
 
-                    resp.status = falcon.HTTP_200
+                    resp.status = falcon.HTTP_201
                     return
                 except Exception as exception:
                     syslog(f"Could not upload file - {str(exception)}")
@@ -100,7 +100,7 @@ class CertificateResource:
             FilesService.delete_cert_file(name)
             resp.status = falcon.HTTP_200
         except FileNotFoundError:
-            resp.status = falcon.HTTP_400
+            resp.status = falcon.HTTP_404
         except Exception as exception:
             syslog(f"Could not delete certificate - {str(exception)}")
             resp.status = falcon.HTTP_500
