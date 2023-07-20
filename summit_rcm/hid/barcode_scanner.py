@@ -7,7 +7,6 @@ import threading
 from syslog import syslog
 from typing import Optional, Tuple, List, Dict
 
-import dbus
 from dbus_fast.aio.proxy_object import ProxyInterface
 import pyudev
 
@@ -311,7 +310,7 @@ class HidBarcodeScanner(TcpConnection):
         self.tcp_connection_try_send((json.dumps(connected_packet) + "\n").encode())
 
     async def connect(
-        self, bus, device_uuid: str = "", device: dbus.ObjectPath = None, params=None
+        self, bus, device_uuid: str = "", device: str = "", params=None
     ):
         device_uuid = device_uuid.upper()
         if AUTO_CONNECT:

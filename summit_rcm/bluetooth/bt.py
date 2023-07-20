@@ -21,7 +21,6 @@ from summit_rcm.bluetooth.ble import (
     DBUS_PROP_IFACE,
     controller_pretty_name,
     find_device,
-    find_devices,
     DEVICE_IFACE,
     ADAPTER_IFACE,
     DBUS_OM_IFACE,
@@ -32,7 +31,7 @@ from summit_rcm.bluetooth.ble import (
     create_agent_singleton,
 )
 from summit_rcm.bluetooth.bt_controller_state import BluetoothControllerState
-from summit_rcm.utils import variant_to_python
+from summit_rcm.utils import Singleton, variant_to_python
 
 
 PAIR_TIMEOUT_SECONDS = 60
@@ -63,7 +62,9 @@ bluetooth_plugins: List[bt_plugin.BluetoothPlugin] = []
 try:
     from summit_rcm.hid.barcode_scanner import HidBarcodeScannerPlugin
 
-    bluetooth_plugins.append(HidBarcodeScannerPlugin())
+    hid_barcode_scanner_plugin = HidBarcodeScannerPlugin()
+    if hid_barcode_scanner_plugin not in bluetooth_plugins:
+        bluetooth_plugins.append(hid_barcode_scanner_plugin)
     syslog("bluetooth: HidBarcodeScannerPlugin loaded")
 except ImportError:
     syslog("bluetooth: HidBarcodeScannerPlugin NOT loaded")
@@ -71,7 +72,9 @@ except ImportError:
 try:
     from summit_rcm.vsp.vsp_connection import VspConnectionPlugin
 
-    bluetooth_plugins.append(VspConnectionPlugin())
+    vsp_connection_plugin = VspConnectionPlugin()
+    if vsp_connection_plugin not in bluetooth_plugins:
+        bluetooth_plugins.append(vsp_connection_plugin)
     syslog("bluetooth: VspConnectionPlugin loaded")
 except ImportError:
     syslog("bluetooth: VspConnectionPlugin NOT loaded")
@@ -81,7 +84,8 @@ try:
     from summit_rcm.bluetooth.bt_ble import BluetoothBlePlugin
 
     bluetooth_ble_plugin = BluetoothBlePlugin()
-    bluetooth_plugins.append(bluetooth_ble_plugin)
+    if bluetooth_ble_plugin not in bluetooth_plugins:
+        bluetooth_plugins.append(bluetooth_ble_plugin)
     syslog("bluetooth: BluetoothBlePlugin loaded")
 except ImportError:
     syslog("bluetooth: BluetoothBlePlugin NOT loaded")
@@ -113,27 +117,36 @@ def lower_camel_case(upper_camel_string: str):
     return upper_camel_string[:1].lower() + upper_camel_string[1:]
 
 
-class Bluetooth:
+class Bluetooth(metaclass=Singleton):
     def __init__(self):
         self._controller_states: Dict[str, BluetoothControllerState] = {}
-        """ Controller state tracking - indexed by friendly (REST API) name
-        """
+        """Controller state tracking - indexed by friendly (REST API) name"""
         self._controller_addresses: Dict[str, str] = {}
-        """ Controller addresses - indexed by friendly (REST API) name
-        """
+        """Controller addresses - indexed by friendly (REST API) name"""
         self._controller_callbacks_registered = False
         self._logger = logging.getLogger(__name__)
         self._devices_to_restore: Dict[str, type(None)] = {}
-        """ Map of device uuids to restore state due to associated controller reset
-        """
+        """Map of device uuids to restore state due to associated controller reset"""
+        self.setup_initiated: bool = False
 
     async def setup(self, app: falcon.asgi.App) -> None:
         """
         Run async logic required to setup Bluetooth intergration
         """
-        if bluetooth_ble_plugin:
-            bluetooth_ble_plugin.set_app(app)
-        await self.discover_controllers()
+        if not self.setup_initiated:
+            self.setup_initiated = True
+            for plugin in bluetooth_plugins:
+                if isinstance(plugin, BluetoothBlePlugin):
+                    plugin.set_app(app)
+                    break
+            await self.discover_controllers()
+
+    def add_ws_route(self, ws_route: str, is_legacy: bool = False):
+        """Add a websocket route to the list of supported routes"""
+        for plugin in bluetooth_plugins:
+            if isinstance(plugin, BluetoothBlePlugin):
+                plugin.add_ws_route(ws_route, is_legacy)
+                return
 
     @property
     def device_commands(self) -> List[str]:
@@ -150,6 +163,10 @@ class Bluetooth:
                 plugin.adapter_commands for plugin in bluetooth_plugins
             )
         )
+
+    @property
+    def controller_addresses(self) -> Dict[str, str]:
+        return self._controller_addresses
 
     @staticmethod
     def get_bluez_version() -> str:
@@ -436,259 +453,6 @@ class Bluetooth:
                 await plugin.DeviceAddedNotify(device, device_uuid, device_obj)
             except Exception as exception:
                 self.log_exception(exception)
-
-    async def handle_get(self, req, resp, controller, device) -> falcon.asgi.Response:
-        """GET handler"""
-        resp.status = falcon.HTTP_200
-        resp.content_type = falcon.MEDIA_JSON
-        result = {
-            "SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"],
-            "InfoMsg": "",
-        }
-
-        try:
-            filters: Optional[List[str]] = None
-            if "filter" in req.params:
-                filters = req.params["filter"].split(",")
-
-            controller_friendly_name: str = (
-                controller_pretty_name(controller) if controller else ""
-            )
-
-            device_uuid = uri_to_uuid(device) if device else None
-
-            # get the system bus
-            bus = await DBusManager().get_bus()
-            # get the ble controller
-            if controller_friendly_name:
-                controller = (
-                    controller_friendly_name,
-                    await self.get_remapped_controller(controller_friendly_name),
-                )
-                controllers = [controller]
-                if not controller[1]:
-                    result[
-                        "InfoMsg"
-                    ] = f"Controller {controller_friendly_name} not found."
-                    resp.media = result
-                    return
-            else:
-                controllers = {
-                    (x, await self.get_remapped_controller(x))
-                    for x in self._controller_addresses.keys()
-                }
-
-            for controller_friendly_name, controller in controllers:
-                controller_result = {}
-                try:
-                    controller_obj = bus.get_proxy_object(
-                        BLUEZ_SERVICE_NAME,
-                        controller,
-                        await bus.introspect(BLUEZ_SERVICE_NAME, controller),
-                    )
-                except Exception:
-                    result[
-                        "InfoMsg"
-                    ] = f"Controller {controller_friendly_name} not found."
-                    resp.media = result
-                    return
-
-                matched_filter = False
-                if not device_uuid:
-                    if not filters or "bluetoothDevices" in filters:
-                        controller_result["bluetoothDevices"] = await find_devices(bus)
-                        matched_filter = True
-
-                    adapter_iface = controller_obj.get_interface(ADAPTER_IFACE)
-
-                    if not filters or "transportFilter" in filters:
-                        controller_result[
-                            "transportFilter"
-                        ] = self.get_adapter_transport_filter(controller_friendly_name)
-                        matched_filter = True
-
-                    for pass_property in PASS_ADAPTER_PROPS:
-                        if not filters or lower_camel_case(pass_property) in filters:
-                            controller_result[lower_camel_case(pass_property)] = (
-                                1
-                                if await self.get_device_property(
-                                    obj_path=adapter_iface.path,
-                                    interface=ADAPTER_IFACE,
-                                    property_name=pass_property,
-                                )
-                                else 0
-                            )
-                            matched_filter = True
-
-                    result[controller_friendly_name] = controller_result
-                    if filters and not matched_filter:
-                        result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
-                        result["InfoMsg"] = f"filters {filters} not matched"
-                        resp.media = result
-                        return
-                else:
-                    result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
-                    device, device_props = await find_device(bus, device_uuid)
-                    if not device:
-                        result["InfoMsg"] = "Device not found"
-                        resp.media = result
-                        return
-                    result.update(device_props)
-                result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-        except Exception as exception:
-            self.log_exception(exception)
-            result["InfoMsg"] = f"Error: {str(exception)}"
-
-        resp.media = result
-
-    async def on_get_no_device(self, req, resp, controller):
-        """GET handler when no device is specified"""
-        await self.handle_get(req, resp, controller, None)
-
-    async def on_get(self, req, resp, controller, device):
-        """GET handler when a device is specified"""
-        await self.handle_get(req, resp, controller, device)
-
-    async def handle_put(self, req, resp, controller, device) -> falcon.asgi.Response:
-        """PUT handler"""
-        resp.status = falcon.HTTP_200
-        resp.content_type = falcon.MEDIA_JSON
-        result = {
-            "SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"],
-            "InfoMsg": "",
-        }
-
-        await self.register_controller_callbacks()
-
-        controller_friendly_name = (
-            controller_pretty_name(controller) if controller else "controller0"
-        )
-
-        controller = await self.get_remapped_controller(controller_friendly_name)
-
-        device_uuid = uri_to_uuid(device) if device else None
-
-        post_data = await req.get_media()
-        bus, adapter_obj, get_controller_result = await get_controller_obj(controller)
-
-        result.update(get_controller_result)
-
-        if not adapter_obj:
-            resp.media = result
-            return
-
-        controller_state = self.get_controller_state(controller_friendly_name)
-
-        try:
-            adapter_interface = adapter_obj.get_interface(ADAPTER_IFACE)
-
-            command = post_data["command"] if "command" in post_data else None
-            if not device_uuid:
-                # adapter-specific operation
-                if command:
-                    if command not in self.adapter_commands:
-                        result.update(
-                            self.result_parameter_not_one_of(
-                                "command", self.adapter_commands
-                            )
-                        )
-                    else:
-                        result.update(
-                            await self.execute_adapter_command(
-                                bus,
-                                command,
-                                controller_friendly_name,
-                                adapter_interface,
-                                post_data,
-                            )
-                        )
-                    resp.media = result
-                    return
-
-                for prop in CACHED_ADAPTER_PROPS:
-                    if prop in post_data:
-                        controller_state.properties[prop] = post_data.get(prop)
-                result.update(
-                    await self.set_adapter_properties(
-                        adapter_interface,
-                        controller_friendly_name,
-                        post_data,
-                    )
-                )
-            else:
-                # device-specific operation
-                if command and command not in self.device_commands:
-                    result.update(
-                        self.result_parameter_not_one_of(
-                            "command", self.device_commands
-                        )
-                    )
-                    resp.media = result
-                    return
-                device, _ = await find_device(bus, device_uuid)
-                if device is None:
-                    result["InfoMsg"] = "Device not found"
-                    if command:
-                        # Forward device-specific commands on to plugins even if device
-                        # is not found:
-                        result.update(
-                            await self.execute_device_command(
-                                bus, command, device_uuid, None, None, post_data
-                            )
-                        )
-                    resp.media = result
-                    return
-
-                device_obj = bus.get_proxy_object(
-                    BLUEZ_SERVICE_NAME,
-                    device,
-                    await bus.introspect(BLUEZ_SERVICE_NAME, device),
-                )
-                device_interface = device_obj.get_interface(DEVICE_IFACE)
-
-                if command:
-                    result.update(
-                        await self.execute_device_command(
-                            bus,
-                            command,
-                            device_uuid,
-                            device_interface,
-                            adapter_interface,
-                            post_data,
-                        )
-                    )
-                    resp.media = result
-                    return
-
-                cached_device_properties = self.get_device_properties(
-                    controller_state, device_uuid
-                )
-                for prop in CACHED_DEVICE_PROPS:
-                    if prop in post_data:
-                        cached_device_properties[prop] = post_data.get(prop)
-                result.update(
-                    await self.set_device_properties(
-                        adapter_interface,
-                        device_interface,
-                        device_uuid,
-                        post_data,
-                    )
-                )
-
-        except Exception as exception:
-            result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
-            self.log_exception(exception)
-            result["InfoMsg"] = f"Error: {str(exception)}"
-
-        resp.media = result
-
-    async def on_put_no_device(self, req, resp, controller):
-        """PUT handler when no device is specified"""
-        await self.handle_put(req, resp, controller, None)
-
-    async def on_put(self, req, resp, controller, device):
-        """PUT handler when a device is specified"""
-        await self.handle_put(req, resp, controller, device)
 
     async def get_device_property(
         self, obj_path: str, interface: str, property_name: str

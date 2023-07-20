@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any
-from falcon import Request, Response
+import falcon.asgi
 import base64
 import json
 import asyncio
@@ -47,7 +47,7 @@ class SessionsMiddleware:
             EXPIRED_SESSION_CLEANUP_INTERNVAL_S, self._cleanup_expired_sessions
         )
 
-    def _load_session_cookie(self, req: Request) -> dict:
+    def _load_session_cookie(self, req: falcon.asgi.Request) -> dict:
         session_cookie = req.get_cookie_values(self._session_cookie)
         if session_cookie:
             try:
@@ -61,7 +61,9 @@ class SessionsMiddleware:
 
         return payload
 
-    async def process_request(self, req: Request, resp: Response) -> None:
+    async def process_request(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
         req.context.valid_session = False
         session_cookie = req.get_cookie_values(self._session_cookie)
         if session_cookie:
@@ -94,8 +96,35 @@ class SessionsMiddleware:
         resp.context.set_session = set_session
         req.context.sessions = sessions
 
+    async def process_request_ws(
+        self, req: falcon.asgi.Request, _: falcon.asgi.WebSocket
+    ) -> None:
+        req.context.valid_session = False
+        session_cookie = req.get_cookie_values(self._session_cookie)
+        if session_cookie:
+            try:
+                session_id_base64 = session_cookie[0]
+                now = int(round(datetime.utcnow().timestamp()))
+                for session in self._valid_sessions:
+                    if session_id_base64 == session.id and now < session.expiry:
+                        req.context.valid_session = True
+                        break
+            except Exception:
+                req.context.valid_session = False
+
+        def get_session(key: str) -> Any:
+            if not hasattr(req.context, "_session"):
+                req.context._session = self._load_session_cookie(req)
+            return req.context._session.get(key, None)
+
+        req.context.get_session = get_session
+
     async def process_response(
-        self, req: Request, resp: Response, resource, req_succeeded: bool
+        self,
+        req: falcon.asgi.Request,
+        resp: falcon.asgi.Response,
+        resource,
+        req_succeeded: bool,
     ) -> None:
         if (
             req_succeeded
