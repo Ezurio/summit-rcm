@@ -8,7 +8,6 @@ from syslog import syslog
 from typing import Deque, Dict
 from uuid import uuid4
 import falcon.asgi
-import falcon
 from summit_rcm.bluetooth.bt_ble import ble_notification_objects
 
 SLEEP_DELAY_S = 0.1
@@ -17,9 +16,10 @@ SLEEP_DELAY_S = 0.1
 class BluetoothWebSocketResource:
     """Resource to handle BLE via WebSocket"""
 
-    def __init__(self) -> None:
+    def __init__(self, is_legacy: bool = False) -> None:
         ble_notification_objects.append(self)
         self.listeners: Dict[str, Deque[str]] = {}
+        self.is_legacy = is_legacy
 
     def __del__(self):
         if self in ble_notification_objects:
@@ -28,6 +28,8 @@ class BluetoothWebSocketResource:
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
         """Handle GET request"""
         resp.status = falcon.HTTP_200
+        if not self.is_legacy:
+            return
         resp.content_type = falcon.MEDIA_JSON
         resp.media = {"SDCERR": 0, "InfoMsg": ""}
 

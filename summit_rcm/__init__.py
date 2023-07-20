@@ -7,6 +7,7 @@ import socket
 from syslog import LOG_ERR, syslog, openlog
 from typing import Any, List
 import ssl
+from summit_rcm.utils import Singleton
 
 try:
     import falcon.asgi
@@ -68,7 +69,7 @@ class LifespanMiddleware:
         await add_routes()
 
 
-class SessionCheckingMiddleware:
+class SessionCheckingMiddleware(metaclass=Singleton):
     """Middleware that handles enforcing checking for a valid session"""
 
     def __init__(self) -> None:
@@ -165,6 +166,24 @@ class SessionCheckingMiddleware:
         resp.status = falcon.HTTP_401
         resp.complete = True
 
+    async def process_request_ws(
+        self, req: falcon.asgi.Request, ws: falcon.asgi.WebSocket
+    ):
+        """
+        Close a WebSocket connection if a session with invalid id tries to access restricted
+        resources.
+        """
+        if self.session_is_valid(req):
+            return
+
+        # The current session is not valid (or there is no current session), so check if the
+        # requested path is restricted
+        if not self.is_restricted_path(req):
+            return
+
+        # The session is invalid and the requested path is restricted, so close the WebSocket
+        await ws.close()
+
 
 class IndexResource:
     """Main index resource"""
@@ -174,6 +193,19 @@ class IndexResource:
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_TEXT
         resp.text = "Summit RCM"
+
+
+async def custom_handle_uncaught_exception(req, resp, exception, params):
+    """Custom handler for uncaught errors"""
+
+    syslog(
+        LOG_ERR,
+        f"Uncaught error - {str(exception)}, "
+        f"req: {str(req)}, "
+        f"resp: {str(resp)}, "
+        f"params: {str(params)}",
+    )
+    raise exception
 
 
 async def add_definitions_legacy():
@@ -644,21 +676,74 @@ async def add_bluetooth_legacy():
 
         from summit_rcm.bluetooth.bt import Bluetooth
         from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
+        from summit_rcm.rest_api.legacy.bluetooth import (
+            BluetoothControllerLegacyResource,
+            BluetoothDeviceLegacyResource,
+        )
 
         summit_rcm_plugins.append("bluetooth")
 
         if Bluetooth and websockets_auth_by_header_token:
-            summit_rcm_plugins.append("ws")
+            SessionCheckingMiddleware().paths.append("/bluetoothWebsocket/ws")
     except ImportError:
         Bluetooth = None
 
     if Bluetooth:
         try:
-            bluetooth = Bluetooth()
-            await bluetooth.setup(app)
+            await Bluetooth().setup(app)
 
-            add_route("/bluetooth/{controller}", bluetooth, suffix="no_device")
-            add_route("/bluetooth/{controller}/{device}", bluetooth)
+            if websockets_auth_by_header_token:
+                Bluetooth().add_ws_route(
+                    ws_route="/bluetoothWebsocket/ws", is_legacy=True
+                )
+
+            add_route("/bluetooth/{controller}", BluetoothControllerLegacyResource())
+            add_route(
+                "/bluetooth/{controller}/{device}", BluetoothDeviceLegacyResource()
+            )
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not load Bluetooth endpoints - {str(exception)}")
+            raise exception
+
+
+async def add_bluetooth_v2():
+    """
+    Add the following v2 routes, if enabled, and determine if websockets access should require a
+    valid, authenticated session:
+    - /api/v2/bluetooth/{controller}
+    - /api/v2/bluetooth/{controller}/{device}
+    """
+    try:
+        # Note: Authenticating websocket users by header token is non-standard; an alternative
+        # method may be required for Javascript browser clients.
+
+        from summit_rcm.bluetooth.bt import Bluetooth
+        from summit_rcm.rest_api.v2.bluetooth.bluetooth import (
+            BluetoothControllerV2Resource,
+            BluetoothDeviceV2Resource,
+        )
+        from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
+
+        summit_rcm_plugins.append("/api/v2/bluetooth")
+
+        if Bluetooth and websockets_auth_by_header_token:
+            SessionCheckingMiddleware().paths.append("/api/v2/bluetooth/ws")
+    except ImportError:
+        Bluetooth = None
+
+    if Bluetooth:
+        try:
+            await Bluetooth().setup(app)
+
+            if websockets_auth_by_header_token:
+                Bluetooth().add_ws_route(
+                    ws_route="/api/v2/bluetooth/ws", is_legacy=False
+                )
+
+            add_route("/api/v2/bluetooth/{controller}", BluetoothControllerV2Resource())
+            add_route(
+                "/api/v2/bluetooth/{controller}/{device}", BluetoothDeviceV2Resource()
+            )
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load Bluetooth endpoints - {str(exception)}")
             raise exception
@@ -772,6 +857,7 @@ async def add_routes() -> None:
         add_network_v2(),
         add_system_v2(),
         add_login_v2(),
+        add_bluetooth_v2(),
         # legacy routes
         add_network_legacy(),
         add_firewall_legacy(),
@@ -829,6 +915,13 @@ async def start_server():
         section="summit-rcm", option="enable_client_auth", fallback=False
     )
 
+    websockets_config = "none"
+    try:
+        import websockets
+        websockets_config = "websockets"
+    except ImportError:
+        pass
+
     config = uvicorn.Config(
         app=app,
         host="",
@@ -842,6 +935,7 @@ async def start_server():
         http="auto",
         loop="asyncio",
         log_level="error",
+        ws=websockets_config,
     )
     config.load()
 
@@ -869,6 +963,7 @@ async def start_server():
 
     server = uvicorn.Server(config)
     add_middleware(enable_sessions)
+    app.add_error_handler(Exception, custom_handle_uncaught_exception)
 
     await server.serve([sock])
 

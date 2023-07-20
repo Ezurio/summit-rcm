@@ -39,6 +39,7 @@ ble_notification_objects: list = []
 
 try:
     from summit_rcm.bluetooth.bt_ble_websocket import BluetoothWebSocketResource
+    import websockets
 
     syslog("bt_ble: Bluetooth BLE Websockets loaded")
 except ImportError:
@@ -55,6 +56,7 @@ class BluetoothBlePlugin(BluetoothPlugin):
         self.bt = None
         self.ble_logger: Optional[BleLogger] = None
         self.app: falcon.asgi.App = None
+        self.ws_routes: list[Tuple[str, bool]] = []
 
     @property
     def device_commands(self) -> List[str]:
@@ -89,9 +91,9 @@ class BluetoothBlePlugin(BluetoothPlugin):
         # Enable websocket endpoint
         if BluetoothWebSocketResource and not self._websockets_enabled and self.app:
             try:
-                self.app.add_route(
-                    "/bluetoothWebsocket/ws", BluetoothWebSocketResource()
-                )
+                for route, is_legacy in self.ws_routes:
+                    self.app.add_route(route, BluetoothWebSocketResource(is_legacy))
+                    syslog(f"route loaded: {str(route)}")
                 self._websockets_enabled = True
             except Exception as exception:
                 self._websockets_enabled = False
@@ -105,6 +107,14 @@ class BluetoothBlePlugin(BluetoothPlugin):
 
     def set_app(self, app: falcon.asgi.App):
         self.app = app
+
+    def add_ws_route(self, ws_route: str, is_legacy: bool = False):
+        """Add a route where WebSockets support should be enabled"""
+        for route, _ in self.ws_routes:
+            if ws_route == route:
+                return
+
+        self.ws_routes.append((ws_route, is_legacy))
 
     async def ProcessDeviceCommand(
         self,
