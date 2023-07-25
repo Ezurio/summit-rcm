@@ -40,7 +40,10 @@ try:
     from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
 except ImportError:
     AWMScanCommand = None
-from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
+try:
+    from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
+except ImportError:
+    SISOModeCommand = None
 from summit_rcm.at_interface.commands.wifi_enabled_command import WiFiEnabledCommand
 from summit_rcm.at_interface.commands.wifi_hardware_command import WiFiHardwareCommand
 from summit_rcm.at_interface.commands.files_delete_command import FilesDeleteCommand
@@ -76,7 +79,6 @@ AT_COMMANDS: List[Command] = [
     TimezoneSetCommand,
     TimezoneGetCommand,
     CertificatesGetCommand,
-    SISOModeCommand,
     WiFiEnabledCommand,
     WiFiHardwareCommand,
     FilesDeleteCommand,
@@ -87,6 +89,9 @@ AT_COMMANDS: List[Command] = [
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
     AT_COMMANDS.append(AWMModeCommand)
+
+if SISOModeCommand:
+    AT_COMMANDS.append(SISOModeCommand)
 
 
 class ATInterfaceFSM(metaclass=Singleton):
