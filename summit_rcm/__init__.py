@@ -648,16 +648,19 @@ async def add_ntp_legacy():
     - /ntp/{command}
     """
     try:
-        from summit_rcm.chrony.ntp import NTP
+        from summit_rcm.chrony.ntp_service import ChronyNTPService
+        from summit_rcm.rest_api.legacy.ntp import NTPResourceLegacy
 
         summit_rcm_plugins.append("ntp")
     except ImportError:
-        NTP = None
+        ChronyNTPService = None
+        NTPResourceLegacy = None
 
-    if NTP:
+    if ChronyNTPService and NTPResourceLegacy:
         try:
-            add_route("/ntp", NTP())
-            add_route("/ntp/{command}", NTP())
+            ntp_resource_legacy = NTPResourceLegacy()
+            add_route("/ntp", ntp_resource_legacy)
+            add_route("/ntp/{command}", ntp_resource_legacy)
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load NTP endpoints - {str(exception)}")
             raise exception
@@ -758,6 +761,8 @@ async def add_system_v2():
     - /api/v2/system/fips
     - /api/v2/system/factoryReset
     - /api/v2/system/datetime
+    - /api/v2/system/datetime/ntp
+    - /api/v2/system/datetime/ntp/{address}
     - /api/v2/system/config/import
     - /api/v2/system/config/export
     - /api/v2/system/logs/data
@@ -786,6 +791,16 @@ async def add_system_v2():
             LogsExportResource,
         )
         from summit_rcm.rest_api.v2.system.debug import DebugExportResource
+
+        try:
+            from summit_rcm.chrony.ntp_service import ChronyNTPService
+            from summit_rcm.rest_api.v2.system.ntp import (
+                NTPSourcesResource,
+                NTPSourceResource,
+            )
+        except ImportError:
+            ChronyNTPService = None
+            NTPSourcesResource = None
     except ImportError:
         PowerResource = None
 
@@ -805,6 +820,9 @@ async def add_system_v2():
             add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
             add_route("/api/v2/system/logs/export", LogsExportResource())
             add_route("/api/v2/system/debug/export", DebugExportResource())
+            if ChronyNTPService and NTPSourcesResource:
+                add_route("/api/v2/system/datetime/ntp", NTPSourcesResource())
+                add_route("/api/v2/system/datetime/ntp/{address}", NTPSourceResource())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load system endpoints - {str(exception)}")
             raise exception
@@ -918,6 +936,7 @@ async def start_server():
     websockets_config = "none"
     try:
         import websockets
+
         websockets_config = "websockets"
     except ImportError:
         pass
