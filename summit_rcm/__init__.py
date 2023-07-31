@@ -96,6 +96,7 @@ class SessionCheckingMiddleware(metaclass=Singleton):
             "/api/v2/network/connections",
             "/api/v2/network/accessPoints",
             "/api/v2/network/certificates",
+            "/api/v2/network/firewall",
             "/api/v2/network/wifi",
             "/api/v2/system/power",
             "/api/v2/system/update",
@@ -226,16 +227,19 @@ async def add_firewall_legacy():
     - /firewall/{command}
     """
     try:
-        from summit_rcm.iptables.firewall import Firewall
+        from summit_rcm.iptables.firewall_service import FirewallService
+        from summit_rcm.rest_api.legacy.firewall import FirewallResourceLegacy
 
         summit_rcm_plugins.append("firewall")
     except ImportError:
-        Firewall = None
+        FirewallService = None
+        FirewallResourceLegacy = None
 
-    if Firewall:
+    if FirewallService and FirewallResourceLegacy:
         try:
-            add_route("/firewall", Firewall())
-            add_route("/firewall/{command}", Firewall())
+            firewall_resource_legacy = FirewallResourceLegacy()
+            add_route("/firewall", firewall_resource_legacy)
+            add_route("/firewall/{command}", firewall_resource_legacy)
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load firewall endpoints - {str(exception)}")
             raise exception
@@ -279,6 +283,7 @@ async def add_network_v2():
     - /api/v2/network/certificates
     - /api/v2/network/certificates/{name}
     - /api/v2/network/wifi
+    - /api/v2/network/firewall/forwardedPorts
     """
     try:
         from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
@@ -300,6 +305,15 @@ async def add_network_v2():
         from summit_rcm.rest_api.v2.network.certificates import CertificatesResource
         from summit_rcm.rest_api.v2.network.certificates import CertificateResource
         from summit_rcm.rest_api.v2.network.wifi import WiFiResource
+
+        try:
+            from summit_rcm.iptables.firewall_service import FirewallService
+            from summit_rcm.rest_api.v2.network.firewall import (
+                FirewallForwardedPortsResource,
+            )
+        except ImportError:
+            FirewallService = None
+            FirewallForwardedPortsResource = None
     except ImportError:
         NetworkStatusResource = None
 
@@ -328,6 +342,11 @@ async def add_network_v2():
             add_route("/api/v2/network/certificates", CertificatesResource())
             add_route("/api/v2/network/certificates/{name}", CertificateResource())
             add_route("/api/v2/network/wifi", WiFiResource())
+            if FirewallService and FirewallForwardedPortsResource:
+                add_route(
+                    "/api/v2/network/firewall/forwardedPorts",
+                    FirewallForwardedPortsResource(),
+                )
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
             raise exception
