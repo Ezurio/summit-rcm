@@ -3,14 +3,18 @@ Module to handle interfacing with log forwarding
 """
 
 import os
-from summit_rcm.systemd_unit import SystemdUnit
+from summit_rcm.systemd_unit import (
+    ActivationFailedError,
+    AlreadyActiveError,
+    AlreadyInactiveError,
+    DeactivationFailedError,
+    SystemdUnit,
+)
 from summit_rcm.utils import Singleton
 from summit_rcm.definition import (
     LOG_FORWARDING_ENABLED_FLAG_FILE,
     SYSTEMD_JOURNAL_GATEWAYD_SOCKET_FILE,
 )
-
-VALID_STATES = ["active", "inactive"]
 
 
 class LogForwardingService(SystemdUnit, metaclass=Singleton):
@@ -54,31 +58,3 @@ class LogForwardingService(SystemdUnit, metaclass=Singleton):
             # Deactivate service
             if not await LogForwardingService().deactivate():
                 raise DeactivationFailedError()
-
-
-class AlreadyActiveError(Exception):
-    """
-    Custom error class for when a user requests to activate the log forwarding service, but it's
-    already active.
-    """
-
-
-class AlreadyInactiveError(Exception):
-    """
-    Custom error class for when a user requests to deactivate the log forwarding service, but it's
-    already inactive.
-    """
-
-
-class ActivationFailedError(Exception):
-    """
-    Custom error class for when a user requests to activate the log forwarding service, but the
-    activation fails
-    """
-
-
-class DeactivationFailedError(Exception):
-    """
-    Custom error class for when a user requests to deactivate the log forwarding service, but the
-    deactivation fails
-    """

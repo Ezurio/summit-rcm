@@ -1,7 +1,10 @@
+"""
+Module to handle log configuration for legacy routes
+"""
+
 from syslog import LOG_ERR, syslog
 import falcon
 from summit_rcm.services.log_forwarding_service import (
-    VALID_STATES,
     ActivationFailedError,
     AlreadyActiveError,
     AlreadyInactiveError,
@@ -14,10 +17,16 @@ from summit_rcm.services.logs_service import (
     LogsService,
 )
 from summit_rcm.definition import SUMMIT_RCM_ERRORS
+from summit_rcm.systemd_unit import SYSTEMD_UNIT_VALID_CONFIG_STATES
 
 
 class LogData:
+    """Resource to handle queries and requests for log data"""
+
     async def on_get(self, req, resp):
+        """
+        GET handler for the /logData endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 0, "InfoMsg": ""}
@@ -62,7 +71,12 @@ class LogData:
 
 
 class LogForwarding:
+    """Resource to handle queries and requests for log forwarding"""
+
     async def on_get(self, _, resp):
+        """
+        GET handler for the /logForwarding endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -84,6 +98,9 @@ class LogForwarding:
         resp.media = result
 
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /logForwarding endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -95,13 +112,16 @@ class LogForwarding:
             post_data = await req.get_media()
             requested_state = post_data.get("state", None)
             if not requested_state:
-                result["InfoMsg"] = f"Invalid state; valid states: {VALID_STATES}"
-                resp.media = result
-                return
-            if requested_state not in VALID_STATES:
                 result[
                     "InfoMsg"
-                ] = f"Invalid state: {requested_state}; valid states: {VALID_STATES}"
+                ] = f"Invalid state; valid states: {SYSTEMD_UNIT_VALID_CONFIG_STATES}"
+                resp.media = result
+                return
+            if requested_state not in SYSTEMD_UNIT_VALID_CONFIG_STATES:
+                result["InfoMsg"] = (
+                    f"Invalid state: {requested_state}; "
+                    f"valid states: {SYSTEMD_UNIT_VALID_CONFIG_STATES}"
+                )
                 resp.media = result
                 return
 
@@ -129,7 +149,12 @@ class LogForwarding:
 
 
 class LogSetting:
+    """Resource to handle queries and requests for log level configuration"""
+
     async def on_post(self, req, resp):
+        """
+        POST handler for the /logSetting endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": ""}
@@ -186,6 +211,9 @@ class LogSetting:
         resp.media = result
 
     async def on_get(self, _, resp):
+        """
+        GET handler for the /logSetting endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 0, "InfoMsg": ""}

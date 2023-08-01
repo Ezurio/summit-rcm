@@ -1,3 +1,7 @@
+"""
+Module to support advanced configuration for legacy routes
+"""
+
 import falcon
 import os
 from syslog import syslog, LOG_ERR
@@ -10,7 +14,12 @@ from summit_rcm.services.fips_service import FipsService
 
 
 class PowerOff:
+    """Resource to handler power off requests"""
+
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /poweroff endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -35,7 +44,12 @@ class PowerOff:
 
 
 class Suspend:
+    """Resource to handler suspend requests"""
+
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /suspend endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -61,7 +75,12 @@ class Suspend:
 
 
 class Reboot:
+    """Resource to handler reboot requests"""
+
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /reboot endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -86,7 +105,12 @@ class Reboot:
 
 
 class FactoryReset:
+    """Resource to handler factory reset requests"""
+
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /factoryReset endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -116,7 +140,12 @@ class FactoryReset:
 
 
 class Fips:
+    """Resource to handler factory reset requests"""
+
     async def on_put(self, req, resp):
+        """
+        PUT handler for the /fips endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -124,12 +153,12 @@ class Fips:
             "InfoMsg": "Reboot required",
         }
 
-        setOptions = ["unset", "fips", "fips_wifi"]
+        set_options = ["unset", "fips", "fips_wifi"]
 
         post_data = await req.get_media()
         fips = post_data.get("fips", None)
-        if fips not in setOptions:
-            result["InfoMsg"] = f"Invalid option: {fips}; valid options: {setOptions}"
+        if fips not in set_options:
+            result["InfoMsg"] = f"Invalid option: {fips}; valid options: {set_options}"
             resp.media = result
             return
 
@@ -138,23 +167,12 @@ class Fips:
         else:
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
 
-        try:
-            from summit_rcm.stunnel.stunnel import Stunnel
-
-            if fips == "fips" or fips == "fips_wifi":
-                Stunnel.configure_fips(enabled=True)
-            elif fips == "unset":
-                Stunnel.configure_fips(enabled=False)
-        except ImportError:
-            # stunnel module not loaded
-            pass
-        except Exception as e:
-            syslog("FIPS stunnel set exception: %s" % e)
-            result["InfoMsg"] = "FIPS stunnel SET exception: {}".format(e)
-
         resp.media = result
 
     async def on_get(self, req, resp):
+        """
+        GET handler for the /fips endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
