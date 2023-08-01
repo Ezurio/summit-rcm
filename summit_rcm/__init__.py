@@ -97,6 +97,7 @@ class SessionCheckingMiddleware(metaclass=Singleton):
             "/api/v2/network/accessPoints",
             "/api/v2/network/certificates",
             "/api/v2/network/firewall",
+            "/api/v2/network/stunnel",
             "/api/v2/network/wifi",
             "/api/v2/system/power",
             "/api/v2/system/update",
@@ -284,6 +285,7 @@ async def add_network_v2():
     - /api/v2/network/certificates/{name}
     - /api/v2/network/wifi
     - /api/v2/network/firewall/forwardedPorts
+    - /api/v2/network/stunnel
     """
     try:
         from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
@@ -314,6 +316,13 @@ async def add_network_v2():
         except ImportError:
             FirewallService = None
             FirewallForwardedPortsResource = None
+
+        try:
+            from summit_rcm.stunnel.stunnel_service import StunnelService
+            from summit_rcm.rest_api.v2.network.stunnel import StunnelResource
+        except ImportError:
+            StunnelService = None
+            StunnelResource = None
     except ImportError:
         NetworkStatusResource = None
 
@@ -346,6 +355,11 @@ async def add_network_v2():
                 add_route(
                     "/api/v2/network/firewall/forwardedPorts",
                     FirewallForwardedPortsResource(),
+                )
+            if StunnelService and StunnelResource:
+                add_route(
+                    "/api/v2/network/stunnel",
+                    StunnelResource(),
                 )
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
@@ -586,15 +600,17 @@ async def add_awm_legacy():
 async def add_stunnel_legacy():
     """Add the /stunnel legacy route, if enabled"""
     try:
-        from summit_rcm.stunnel.stunnel import Stunnel
+        from summit_rcm.stunnel.stunnel_service import StunnelService
+        from summit_rcm.rest_api.legacy.stunnel import StunnelResourceLegacy
 
         summit_rcm_plugins.append("stunnel")
     except ImportError:
-        Stunnel = None
+        StunnelService = None
+        StunnelResourceLegacy = None
 
-    if Stunnel:
+    if StunnelService and StunnelResourceLegacy:
         try:
-            add_route("/stunnel", Stunnel())
+            add_route("/stunnel", StunnelResourceLegacy())
         except Exception as exception:
             syslog(LOG_ERR, f"Could not load stunnel endpoint - {str(exception)}")
             raise exception

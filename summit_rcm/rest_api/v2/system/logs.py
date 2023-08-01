@@ -7,7 +7,6 @@ from syslog import syslog
 import falcon.asgi
 from summit_rcm.services.files_service import FilesService
 from summit_rcm.services.log_forwarding_service import (
-    VALID_STATES,
     AlreadyActiveError,
     AlreadyInactiveError,
     LogForwardingService,
@@ -18,6 +17,7 @@ from summit_rcm.services.logs_service import (
     JournalctlError,
     LogsService,
 )
+from summit_rcm.systemd_unit import SYSTEMD_UNIT_VALID_CONFIG_STATES
 
 
 class LogsExportResource:
@@ -178,7 +178,10 @@ class LogForwardingResource:
 
             # Read in and validate the input data
             requested_state = put_data.get("state", None)
-            if not requested_state or requested_state not in VALID_STATES:
+            if (
+                not requested_state
+                or requested_state not in SYSTEMD_UNIT_VALID_CONFIG_STATES
+            ):
                 raise ValueError()
 
             # Configure new value

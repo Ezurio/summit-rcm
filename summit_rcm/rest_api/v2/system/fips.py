@@ -1,3 +1,7 @@
+"""
+Module to support FIPS configuration for v2 routes
+"""
+
 import falcon
 from summit_rcm.services.fips_service import FipsService, VALID_FIPS_STATES
 
@@ -8,6 +12,9 @@ class FipsResource(object):
     """
 
     async def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """
+        GET handler for the /system/fips endpoint
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         fips_state = await FipsService().get_fips_state()
@@ -19,6 +26,9 @@ class FipsResource(object):
         resp.media = {"state": fips_state}
 
     async def on_put(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """
+        PUT handler for the /system/fips endpoint
+        """
         post_data = await req.get_media()
         desired_state = str(post_data.get("state", ""))
 
@@ -30,7 +40,7 @@ class FipsResource(object):
             resp.status = falcon.HTTP_400
             return
 
-        success: bool = await FipsService().set_power_state(desired_state)
+        success: bool = await FipsService().set_fips_state(desired_state)
 
         new_fips_state = await FipsService().get_fips_state()
 

@@ -1,4 +1,8 @@
-from subprocess import CalledProcessError, run
+"""
+Module to handle FIPS configuration
+"""
+
+import asyncio
 from syslog import LOG_ERR, syslog
 from summit_rcm.utils import Singleton
 
@@ -7,6 +11,10 @@ FIPS_SCRIPT = "/usr/bin/fips-set"
 
 
 class FipsService(metaclass=Singleton):
+    """
+    Service to handle FIPS configuration
+    """
+
     async def set_fips_state(self, value: str) -> bool:
         """
         Configure the desired FIPS state for the module (reboot required) and return a boolean
@@ -15,23 +23,39 @@ class FipsService(metaclass=Singleton):
         - fips_wifi
         - unset
         """
-        success = False
         try:
             if value not in ["fips", "fips_wifi", "unset"]:
                 raise f"invalid input parameter {str(value)}"
 
-            run(
-                [FIPS_SCRIPT, value],
-                check=True,
+            proc = await asyncio.create_subprocess_exec(
+                *[FIPS_SCRIPT, value],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            success = True
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise Exception(stderr.decode("utf-8").strip())
         except FileNotFoundError:
+            return False
+        except Exception as exception:
+            syslog(LOG_ERR, f"set_fips_state exception: {str(exception)}")
+            return False
+
+        try:
+            from summit_rcm.stunnel.stunnel_service import StunnelService
+
+            if value in ["fips", "fips_wifi"]:
+                await StunnelService.configure_fips(enabled=True)
+            elif value == "unset":
+                await StunnelService.configure_fips(enabled=False)
+        except ImportError:
+            # stunnel module not loaded
             pass
-        except CalledProcessError as e:
-            syslog(LOG_ERR, f"set_fips_state error: {str(e.returncode)}")
-        except Exception as e:
-            syslog(LOG_ERR, f"set_fips_state exception: {str(e)}")
-        return success
+        except Exception as exception:
+            syslog(f"FIPS stunnel set exception: {str(exception)}")
+            return False
+
+        return True
 
     async def get_fips_state(self) -> str:
         """
@@ -43,18 +67,18 @@ class FipsService(metaclass=Singleton):
         - unknown
         """
         try:
-            p = run(
-                [FIPS_SCRIPT, "status"],
-                capture_output=True,
-                check=True,
+            proc = await asyncio.create_subprocess_exec(
+                *[FIPS_SCRIPT, "status"],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            status = p.stdout.decode("utf-8").strip()
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise Exception(stderr.decode("utf-8").strip())
+            status = stdout.decode("utf-8").strip()
             return status if status in VALID_FIPS_STATES else "unknown"
         except FileNotFoundError:
             return "unsupported"
-        except CalledProcessError as e:
-            syslog(LOG_ERR, f"get_fips_state error: {str(e.returncode)}")
-            return "unknown"
-        except Exception as e:
-            syslog(LOG_ERR, f"get_fips_state exception: {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"get_fips_state exception: {str(exception)}")
             return "unknown"

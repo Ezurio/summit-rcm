@@ -1,3 +1,7 @@
+"""
+Module to support interface with systemd units (services, sockets, etc.)
+"""
+
 from syslog import LOG_ERR, syslog
 from dbus_fast import Message, MessageType, Variant
 from .dbus_manager import DBusManager
@@ -10,8 +14,14 @@ from .definition import (
     DBUS_PROP_IFACE,
 )
 
+SYSTEMD_UNIT_VALID_CONFIG_STATES = ["active", "inactive"]
+
 
 class SystemdUnit(object):
+    """
+    Base helper class that facilitates interface with systemd units (services, sockets, etc.)
+    """
+
     def __init__(self, unit_file: str) -> None:
         self.unit_file = unit_file
 
@@ -67,10 +77,10 @@ class SystemdUnit(object):
                 if isinstance(reply.body[0], Variant)
                 else str(reply.body[0])
             )
-        except Exception as e:
+        except Exception as exception:
             syslog(
                 LOG_ERR,
-                f"Could not read 'ActiveState' of {self.unit_file}: {str(e)}",
+                f"Could not read 'ActiveState' of {self.unit_file}: {str(exception)}",
             )
             return "unknown"
 
@@ -96,10 +106,10 @@ class SystemdUnit(object):
                 raise Exception(reply.body[0])
 
             return True
-        except Exception as e:
+        except Exception as exception:
             syslog(
                 LOG_ERR,
-                f"Could not activate unit {str(self.unit_file)}: {str(e)}",
+                f"Could not activate unit {str(self.unit_file)}: {str(exception)}",
             )
             return False
 
@@ -125,9 +135,37 @@ class SystemdUnit(object):
                 raise Exception(reply.body[0])
 
             return True
-        except Exception as e:
+        except Exception as exception:
             syslog(
                 LOG_ERR,
-                f"Could not deactivate the unit {str(self.unit_file)}: {str(e)}",
+                f"Could not deactivate the unit {str(self.unit_file)}: {str(exception)}",
             )
             return False
+
+
+class AlreadyActiveError(Exception):
+    """
+    Custom error class for when a user requests to activate a systemd service, but it's already
+    active.
+    """
+
+
+class AlreadyInactiveError(Exception):
+    """
+    Custom error class for when a user requests to deactivate a systemd service, but it's already
+    inactive.
+    """
+
+
+class ActivationFailedError(Exception):
+    """
+    Custom error class for when a user requests to activate a systemd service, but the activation
+    fails.
+    """
+
+
+class DeactivationFailedError(Exception):
+    """
+    Custom error class for when a user requests to deactivate a systemd service, but the
+    deactivation fails.
+    """
