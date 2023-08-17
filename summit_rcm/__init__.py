@@ -277,6 +277,7 @@ async def add_network_v2():
     - /api/v2/network/interfaces/{name}/stats
     - /api/v2/network/connections
     - /api/v2/network/connections/uuid/{uuid}
+    - /api/v2/network/connections/id/{id}
     - /api/v2/network/connections/import
     - /api/v2/network/connections/export
     - /api/v2/network/accessPoints
@@ -297,6 +298,7 @@ async def add_network_v2():
         from summit_rcm.rest_api.v2.network.connections import (
             NetworkConnectionsResource,
             NetworkConnectionResourceByUuid,
+            NetworkConnectionResourceById,
             NetworkConnectionsImportResource,
             NetworkConnectionsExportResource,
         )
@@ -339,6 +341,9 @@ async def add_network_v2():
             add_route(
                 "/api/v2/network/connections/uuid/{uuid}",
                 NetworkConnectionResourceByUuid(),
+            )
+            add_route(
+                "/api/v2/network/connections/id/{id}", NetworkConnectionResourceById()
             )
             add_route(
                 "/api/v2/network/connections/import", NetworkConnectionsImportResource()

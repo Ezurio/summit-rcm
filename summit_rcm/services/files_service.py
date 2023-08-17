@@ -2,15 +2,20 @@
 Module to interact with files.
 """
 
-import os
+import configparser
 from shutil import copy2, rmtree
 from subprocess import run
 from syslog import LOG_ERR, syslog
 from typing import Any, List, Tuple
+from pathlib import Path
 import aiofiles
 import falcon.asgi
 import falcon.media.multipart
 from summit_rcm import definition
+from summit_rcm.services.network_service import (
+    ConnectionProfileReservedError,
+    NetworkService,
+)
 from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.utils import Singleton
 from summit_rcm.services.network_manager_service import NetworkManagerService
@@ -50,7 +55,9 @@ class FilesService(metaclass=Singleton):
 
     @staticmethod
     async def handle_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes, path: str, mode: str = "wb"
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes,
+        path: str,
+        mode: str = "wb",
     ) -> str:
         """
         Handle when a client uploads a file as either a multipart form part or raw bytes.
@@ -61,7 +68,9 @@ class FilesService(metaclass=Singleton):
             )
 
         if isinstance(incoming_data, bytes):
-            return await FilesService.handle_file_upload_bytes(incoming_data, path, mode)
+            return await FilesService.handle_file_upload_bytes(
+                incoming_data, path, mode
+            )
 
         raise Exception("Invalid data type")
 
@@ -94,21 +103,22 @@ class FilesService(metaclass=Singleton):
         """
         Handle when a client downloads a file
         """
-        if not os.path.isfile(path):
+        if not Path(path).exists():
             raise Exception("File not found")
 
         return await aiofiles.open(path, "rb")
 
     @staticmethod
     async def handle_cert_file_upload(
-        incoming_data: falcon.asgi.multipart.BodyPart | bytes, name: str, mode: str = "wb"
+        incoming_data: falcon.asgi.multipart.BodyPart | bytes,
+        name: str,
+        mode: str = "wb",
     ):
         """
         Handle when a client uploads a certificate file
         """
         return await FilesService.handle_file_upload(
-            incoming_data,
-            os.path.normpath(os.path.join(NETWORKMANAGER_DIR_FULL, "certs", name)), mode
+            incoming_data, str(Path(NETWORKMANAGER_DIR_FULL, "certs", name)), mode
         )
 
     @staticmethod
@@ -119,7 +129,7 @@ class FilesService(metaclass=Singleton):
         Handle when a client uploads an archive for importing connections
         """
         return await FilesService.handle_file_upload(
-            incoming_data, os.path.normpath(CONNECTION_TMP_ARCHIVE_FILE), mode
+            incoming_data, CONNECTION_TMP_ARCHIVE_FILE, mode
         )
 
     @staticmethod
@@ -130,7 +140,7 @@ class FilesService(metaclass=Singleton):
         Handle when a client uploads an archive for importing system configuration
         """
         return await FilesService.handle_file_upload(
-            incoming_data, os.path.normpath(CONFIG_TMP_ARCHIVE_FILE), mode
+            incoming_data, CONFIG_TMP_ARCHIVE_FILE, mode
         )
 
     @staticmethod
@@ -139,18 +149,19 @@ class FilesService(metaclass=Singleton):
         Determines whether or not the Summit Encrypted Storage Toolkit is enabled on the running
         image.
         """
-        return os.path.exists(FACTORY_RESET_SCRIPT)
+        return Path(FACTORY_RESET_SCRIPT).exists()
 
     @staticmethod
-    async def import_connections(password: str) -> Tuple[bool, str]:
+    async def import_connections(
+        password: str, overwrite_existing: bool
+    ) -> Tuple[bool, str]:
         """
         Handle importing NetworkManager connections and certificates from a properly structured and
-        encrypted zip archive
+        encrypted zip archive overwriting existing connections, if specified
 
         Return value is a tuple in the form of: (success, message)
         """
-        archive_upload_path = os.path.normpath(CONNECTION_TMP_ARCHIVE_FILE)
-        if not os.path.isfile(archive_upload_path):
+        if not Path(CONNECTION_TMP_ARCHIVE_FILE).exists():
             return (False, "Invalid archive")
 
         result = (False, "Unknown error")
@@ -165,7 +176,7 @@ class FilesService(metaclass=Singleton):
                     "-P",
                     password,
                     "-n",
-                    archive_upload_path,
+                    CONNECTION_TMP_ARCHIVE_FILE,
                     "-d",
                     TMP_ARCHIVE_DIRECTORY,
                 ],
@@ -175,47 +186,45 @@ class FilesService(metaclass=Singleton):
                 raise Exception(proc.stderr.decode("utf-8"))
 
             # Verify expected sub directories ('system-connections' and 'certs') are present
-            if not os.path.exists(
-                os.path.join(
-                    TMP_ARCHIVE_DIRECTORY,
-                    NETWORKMANAGER_DIR,
-                    "system-connections",
-                )
-            ) or not os.path.exists(
-                os.path.join(
-                    TMP_ARCHIVE_DIRECTORY,
-                    NETWORKMANAGER_DIR,
-                    "certs",
-                )
+            if (
+                not Path(
+                    TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, "system-connections"
+                ).exists()
+                or not Path(TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, "certs").exists()
             ):
                 raise Exception("Expected files missing")
 
             # Copy connections and certs
             for subdir in ["system-connections", "certs"]:
-                for file in os.listdir(
-                    os.path.join(
-                        TMP_ARCHIVE_DIRECTORY,
-                        NETWORKMANAGER_DIR,
-                        subdir,
-                    )
-                ):
+                for file in Path(
+                    TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, subdir
+                ).iterdir():
                     try:
-                        source = os.path.join(
-                            TMP_ARCHIVE_DIRECTORY,
-                            NETWORKMANAGER_DIR,
-                            subdir,
-                            file,
-                        )
-                        dest = os.path.join("/", NETWORKMANAGER_DIR, subdir, file)
-                        if os.path.islink(dest):
-                            continue
+                        # Check for reserved connections
+                        if FilesService.imported_connection_is_reserved(file):
+                            raise ConnectionProfileReservedError("Reserved")
+
+                        # Check for existing connections
+                        if (
+                            not overwrite_existing
+                            and await FilesService.imported_connection_exists(file)
+                        ):
+                            raise Exception("Connection exists")
+
+                        dest = Path("/", NETWORKMANAGER_DIR, subdir, file.name)
+                        if dest.is_symlink():
+                            raise Exception("Symlink")
+
                         copy2(
-                            source,
+                            file,
                             dest,
                             follow_symlinks=False,
                         )
-                    except Exception:
-                        pass
+                    except Exception as exception:
+                        syslog(
+                            LOG_ERR,
+                            f"Could not import connection file {str(file)} - {str(exception)}",
+                        )
 
             # Requst NetworkManager to reload connections
             if not await NetworkManagerService().reload_connections():
@@ -226,17 +235,14 @@ class FilesService(metaclass=Singleton):
             result = (False, str(exception))
         finally:
             # Delete the temp file if present
-            try:
-                os.remove(archive_upload_path)
-            except OSError:
-                pass
+            Path(CONNECTION_TMP_ARCHIVE_FILE).unlink(missing_ok=True)
 
             # Delete the temp dir if present
             try:
                 rmtree(TMP_ARCHIVE_DIRECTORY, ignore_errors=True)
             except Exception as exception:
                 msg = f"Error cleaning up connection imports: {str(exception)}"
-                return (False, msg)
+                result = (False, msg)
 
         return result
 
@@ -248,7 +254,6 @@ class FilesService(metaclass=Singleton):
 
         Return value is a tuple in the form of: (success, message, archive_path)
         """
-        archive_download_path = os.path.normpath(CONNECTION_TMP_ARCHIVE_FILE)
         result = (False, "Unknown error", None)
         try:
             # Generate the archive using 'zip' (the built-in Python zipfile implementation is
@@ -262,19 +267,19 @@ class FilesService(metaclass=Singleton):
                     password,
                     "-9",
                     "-r",
-                    archive_download_path,
-                    os.path.join("/", NETWORKMANAGER_DIR, "system-connections"),
-                    os.path.join("/", NETWORKMANAGER_DIR, "certs"),
+                    CONNECTION_TMP_ARCHIVE_FILE,
+                    str(Path("/", NETWORKMANAGER_DIR, "system-connections")),
+                    str(Path("/", NETWORKMANAGER_DIR, "certs")),
                 ],
                 capture_output=True,
             )
             if proc.returncode != 0:
                 raise Exception(proc.stderr.decode("utf-8"))
 
-            if not os.path.isfile(archive_download_path):
+            if not Path(CONNECTION_TMP_ARCHIVE_FILE).exists():
                 raise Exception("archive generation failed")
 
-            return (True, "", archive_download_path)
+            return (True, "", CONNECTION_TMP_ARCHIVE_FILE)
         except Exception as exception:
             msg = f"Unable to export connections - {str(exception)}"
             syslog(LOG_ERR, msg)
@@ -288,11 +293,11 @@ class FilesService(metaclass=Singleton):
             return []
 
         files = []
-        for entry in os.scandir(definition.FILEDIR_DICT.get(file_type)):
-            if entry.is_file():
-                strs = entry.name.split(".")
-                if len(strs) == 2 and strs[1] in definition.FILEFMT_DICT.get(file_type):
-                    files.append(entry.name)
+        for entry in Path(definition.FILEDIR_DICT.get(file_type)).iterdir():
+            if entry.exists() and entry.suffix in definition.FILEFMT_DICT.get(
+                file_type
+            ):
+                files.append(entry.name)
         files.sort()
         return files
 
@@ -316,11 +321,11 @@ class FilesService(metaclass=Singleton):
     @staticmethod
     def delete_cert_file(name: str):
         """Delete the specified file if present"""
-        path = os.path.normpath(os.path.join(NETWORKMANAGER_DIR_FULL, "certs", name))
-        if not os.path.isfile(path):
+        path = Path(NETWORKMANAGER_DIR_FULL, "certs", name)
+        if not path.exists():
             raise FileNotFoundError()
 
-        os.remove(path)
+        path.unlink()
 
     @staticmethod
     def export_system_config(password: str) -> Tuple[bool, str, Any]:
@@ -330,7 +335,6 @@ class FilesService(metaclass=Singleton):
 
         Return value is a tuple in the form of: (success, message, archive_path)
         """
-        archive_download_path = os.path.normpath(CONFIG_TMP_ARCHIVE_FILE)
         result = (False, "Unknown error", None)
         try:
             # Generate the archive using 'zip' (the built-in Python zipfile implementation is
@@ -345,7 +349,7 @@ class FilesService(metaclass=Singleton):
                     password,
                     "-9",
                     "-r",
-                    archive_download_path,
+                    CONFIG_TMP_ARCHIVE_FILE,
                     ".",
                 ],
                 cwd=definition.FILEDIR_DICT.get("config"),
@@ -354,10 +358,10 @@ class FilesService(metaclass=Singleton):
             if proc.returncode != 0:
                 raise Exception(proc.stderr.decode("utf-8"))
 
-            if not os.path.isfile(archive_download_path):
+            if not Path(CONFIG_TMP_ARCHIVE_FILE).exists():
                 raise Exception("archive generation failed")
 
-            return (True, "", archive_download_path)
+            return (True, "", CONFIG_TMP_ARCHIVE_FILE)
         except Exception as exception:
             msg = f"Unable to export system config - {str(exception)}"
             result = (False, msg, None)
@@ -371,8 +375,7 @@ class FilesService(metaclass=Singleton):
 
         Return value is a tuple in the form of: (success, message)
         """
-        archive_upload_path = os.path.normpath(CONFIG_TMP_ARCHIVE_FILE)
-        if not os.path.isfile(archive_upload_path):
+        if not Path(CONFIG_TMP_ARCHIVE_FILE).exists():
             return (False, "Invalid archive")
 
         result = (False, "Unknown error")
@@ -384,7 +387,7 @@ class FilesService(metaclass=Singleton):
                     "-P",
                     "1234",
                     "-t",
-                    archive_upload_path,
+                    CONFIG_TMP_ARCHIVE_FILE,
                 ],
                 capture_output=True,
                 cwd=definition.FILEDIR_DICT.get("config"),
@@ -399,7 +402,7 @@ class FilesService(metaclass=Singleton):
                     "-P",
                     password,
                     "-t",
-                    archive_upload_path,
+                    CONFIG_TMP_ARCHIVE_FILE,
                 ],
                 capture_output=True,
                 cwd=definition.FILEDIR_DICT.get("config"),
@@ -421,7 +424,7 @@ class FilesService(metaclass=Singleton):
                     "-P",
                     password,
                     "-o",
-                    archive_upload_path,
+                    CONFIG_TMP_ARCHIVE_FILE,
                 ],
                 capture_output=True,
                 cwd=definition.FILEDIR_DICT.get("config"),
@@ -438,10 +441,7 @@ class FilesService(metaclass=Singleton):
             result = (False, str(exception))
         finally:
             # Delete the temp file if present
-            try:
-                os.remove(archive_upload_path)
-            except OSError:
-                pass
+            Path(CONFIG_TMP_ARCHIVE_FILE).unlink(missing_ok=True)
 
         return result
 
@@ -452,7 +452,6 @@ class FilesService(metaclass=Singleton):
 
         Return value is a tuple in the form of: (success, message, archive_path)
         """
-        archive_download_path = os.path.normpath(LOG_TMP_ARCHIVE_FILE)
         result = (False, "Unknown error", None)
 
         try:
@@ -468,7 +467,7 @@ class FilesService(metaclass=Singleton):
                     password,
                     "-9",
                     "-r",
-                    archive_download_path,
+                    LOG_TMP_ARCHIVE_FILE,
                     ".",
                 ],
                 cwd=FilesService.get_log_path(),
@@ -477,10 +476,10 @@ class FilesService(metaclass=Singleton):
             if proc.returncode != 0:
                 raise Exception(proc.stdout.decode("utf-8"))
 
-            if not os.path.isfile(archive_download_path):
+            if not Path(LOG_TMP_ARCHIVE_FILE).exists():
                 raise Exception("archive generation failed")
 
-            return (True, "", archive_download_path)
+            return (True, "", LOG_TMP_ARCHIVE_FILE)
         except Exception as exception:
             msg = f"Unable to export logs - {str(exception)}"
             result = (False, msg, None)
@@ -494,8 +493,6 @@ class FilesService(metaclass=Singleton):
 
         Return value is a tuple in the form of: (success, message, archive_path)
         """
-        archive_tmp_path = os.path.normpath(TMP_TMP_ARCHIVE_FILE)
-        archive_download_path = os.path.normpath(DEBUG_TMP_ARCHIVE_FILE)
         result = (False, "Unknown error", None)
 
         try:
@@ -514,7 +511,7 @@ class FilesService(metaclass=Singleton):
                     ZIP,
                     "-9",
                     "-r",
-                    archive_tmp_path,
+                    TMP_TMP_ARCHIVE_FILE,
                 ]
                 + debug_paths,
                 capture_output=True,
@@ -522,7 +519,7 @@ class FilesService(metaclass=Singleton):
             if proc.returncode != 0:
                 raise Exception(proc.stderr.decode("utf-8"))
 
-            if not os.path.isfile(archive_tmp_path):
+            if not Path(TMP_TMP_ARCHIVE_FILE).exists():
                 raise Exception("tmp archive generation failed")
 
             proc = run(
@@ -532,25 +529,64 @@ class FilesService(metaclass=Singleton):
                     "-encrypt",
                     "-aes256",
                     "-in",
-                    archive_tmp_path,
+                    TMP_TMP_ARCHIVE_FILE,
                     "-binary",
                     "-outform",
                     "DER",
                     "-out",
-                    archive_download_path,
+                    DEBUG_TMP_ARCHIVE_FILE,
                     SystemSettingsManage.get_cert_for_file_encryption(),
                 ],
                 capture_output=True,
             )
-            os.unlink(TMP_TMP_ARCHIVE_FILE)
+            Path(TMP_TMP_ARCHIVE_FILE).unlink()
             if proc.returncode != 0:
                 raise Exception(proc.stderr.decode("utf-8"))
 
-            if not os.path.isfile(archive_download_path):
+            if not Path(DEBUG_TMP_ARCHIVE_FILE).exists():
                 raise Exception("encrypted archive generation failed")
 
-            return (True, "", archive_download_path)
+            return (True, "", DEBUG_TMP_ARCHIVE_FILE)
         except Exception as exception:
             msg = f"Unable to export debug info - {str(exception)}"
             result = (False, msg, None)
         return result
+
+    @staticmethod
+    async def imported_connection_exists(connection_file_path: Path) -> bool:
+        """
+        Determine whether or not the given imported network connection file matches an already
+        existing network connection
+        """
+        if await NetworkService.connection_profile_exists_by_id(
+            connection_file_path.stem
+        ):
+            return True
+
+        parser = configparser.ConfigParser()
+        parser.read(str(connection_file_path))
+        if await NetworkService.connection_profile_exists_by_id(
+            str(parser.get("connection", "id", fallback=""))
+        ):
+            return True
+
+        return False
+
+    @staticmethod
+    def imported_connection_is_reserved(
+        imported_connection_file_path: Path,
+    ) -> bool:
+        """
+        Determine whether or not the given imported network connection file matches a reserved
+        network connection (from /usr/lib/NetworkManager/system-connections)
+        """
+        imported_file_parser = configparser.ConfigParser()
+        imported_file_parser.read(str(imported_connection_file_path))
+
+        imported_file_id = str(
+            imported_file_parser.get("connection", "id", fallback="")
+        )
+        if not imported_file_id:
+            return False
+
+        return NetworkService.connection_profile_is_reserved_by_id(imported_file_id)
