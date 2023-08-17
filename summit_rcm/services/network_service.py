@@ -3,7 +3,9 @@ Module to provide an interface to perform networking tasks (interfaces, connecti
 """
 
 import asyncio
+import configparser
 import os
+from pathlib import Path
 import re
 from struct import pack
 from subprocess import TimeoutExpired, run
@@ -36,6 +38,7 @@ from summit_rcm.settings import ServerConfig, SystemSettingsManage
 from summit_rcm.utils import Singleton, to_camel_case
 
 IW_PATH = "/usr/sbin/iw"
+RESERVED_NM_CONNECTIONS_DIR = "/usr/lib/NetworkManager/system-connections"
 
 
 class NetworkService(metaclass=Singleton):
@@ -1177,7 +1180,7 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def connection_profile_exists_by_uuid(uuid: str) -> bool:
-        """Check if a connection profile with the provided UUID"""
+        """Check if a connection profile with the provided UUID exists"""
 
         settings_props = await NetworkManagerService().get_obj_properties(
             NetworkManagerService().NM_SETTINGS_OBJ_PATH,
@@ -1202,7 +1205,7 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def connection_profile_exists_by_id(id: str) -> bool:
-        """Check if a connection profile with the provided id"""
+        """Check if a connection profile with the provided id exists"""
 
         settings_props = await NetworkManagerService().get_obj_properties(
             NetworkManagerService().NM_SETTINGS_OBJ_PATH,
@@ -1226,6 +1229,50 @@ class NetworkService(metaclass=Singleton):
         return False
 
     @staticmethod
+    def connection_profile_is_reserved_by_uuid(uuid: str) -> bool:
+        """Check if a connection profile with the provided UUID is reserved"""
+        if not uuid:
+            return False
+
+        for reserved_connection_file in Path(RESERVED_NM_CONNECTIONS_DIR).iterdir():
+            if reserved_connection_file.suffix != ".nmconnection":
+                # Ignore any files in the directory that aren't NetworkManager connection files
+                continue
+
+            reserved_file_parser = configparser.ConfigParser()
+            reserved_file_parser.read(str(reserved_connection_file))
+
+            if str(reserved_file_parser.get("connection", "uuid", fallback="")) == uuid:
+                # UUIDs match, we found a reserved connection
+                return True
+
+        return False
+
+    @staticmethod
+    def connection_profile_is_reserved_by_id(id: str) -> bool:
+        """Check if a connection profile with the provided id is reserved"""
+        if not id:
+            return False
+
+        for reserved_connection_file in Path(RESERVED_NM_CONNECTIONS_DIR).iterdir():
+            if reserved_connection_file.suffix != ".nmconnection":
+                # Ignore any files in the directory that aren't NetworkManager connection files
+                continue
+
+            if reserved_connection_file.stem == id:
+                # File name 'stem' matches id, we found a reserved connection
+                return True
+
+            reserved_file_parser = configparser.ConfigParser()
+            reserved_file_parser.read(str(reserved_connection_file))
+
+            if str(reserved_file_parser.get("connection", "id", fallback="")) == id:
+                # ids match, we found a reserved connection
+                return True
+
+        return False
+
+    @staticmethod
     async def create_connection_profile(
         settings: dict,
         overwrite_existing: bool = True,
@@ -1242,6 +1289,9 @@ class NetworkService(metaclass=Singleton):
         id = settings["connection"].get("id", None)
         if not id:
             raise Exception("Missing 'id'")
+
+        if NetworkService.connection_profile_is_reserved_by_id(id=id):
+            raise ConnectionProfileReservedError("Reserved")
 
         if await NetworkService.connection_profile_exists_by_id(id=id):
             if not overwrite_existing:
@@ -1345,6 +1395,18 @@ class NetworkService(metaclass=Singleton):
                 activated_setting == 1 or activated_setting == "1"
             )
 
+        if (
+            activated_setting is None
+            and NetworkService.connection_profile_is_reserved_by_id(
+                id
+                if id
+                else await NetworkService.get_connection_profile_id_from_uuid(uuid=uuid)
+            )
+        ):
+            # If the request is not to activate/deactivate the connection (i.e., update it) and the
+            # target connection is reserved, raise an error
+            raise ConnectionProfileReservedError("Reserved")
+
         # Retrieve the current settings for the connection profile
         connection_obj_path = (
             await NetworkManagerService().get_connection_obj_path_by_uuid(uuid=uuid)
@@ -1400,6 +1462,13 @@ class NetworkService(metaclass=Singleton):
 
             # No UUID provided, look up the connection profile by id (name)
             uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
+
+        if NetworkService.connection_profile_is_reserved_by_id(
+            id
+            if id
+            else await NetworkService.get_connection_profile_id_from_uuid(uuid=uuid)
+        ):
+            raise ConnectionProfileReservedError("Reserved")
 
         if not await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
             raise ConnectionProfileNotFoundError("Not found")
@@ -2441,6 +2510,10 @@ class NetworkService(metaclass=Singleton):
             raise Exception("Unable to read NM properties")
 
         return result
+
+
+class ConnectionProfileReservedError(Exception):
+    """Custom error class for when the requested connection profile is reserved."""
 
 
 class ConnectionProfileNotFoundError(Exception):
