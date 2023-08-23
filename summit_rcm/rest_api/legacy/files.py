@@ -4,7 +4,9 @@ Module to handle legacy files endpoint
 import os
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
-from summit_rcm.services.files_service import FilesService
+from summit_rcm.rest_api.services.rest_files_service import (
+    RESTFilesService as FilesService,
+)
 from summit_rcm import definition
 
 
@@ -74,7 +76,9 @@ class FileManage:
 
                 async for part in form:
                     if part.name == "file":
-                        await FilesService.handle_config_import_file_upload(part)
+                        await FilesService.handle_config_import_file_upload_multipart_form(
+                            part
+                        )
 
                         success, msg = await FilesService.import_system_config(password)
                         if not success:
@@ -100,7 +104,7 @@ class FileManage:
         async for part in form:
             if part.name == "file":
                 try:
-                    fp = await FilesService.handle_cert_file_upload(
+                    fp = await FilesService.handle_cert_file_upload_multipart_form(
                         part, part.secure_filename
                     )
                     if not fp:
@@ -299,7 +303,7 @@ class FilesManage:
             os.unlink(archive)
             return
         else:
-            files = FilesService().get_files_by_type(type)
+            files = FilesService.get_files_by_type(type)
             result["files"] = files
             result["count"] = len(files)
             result["InfoMsg"] = f"{type} files"
@@ -322,7 +326,9 @@ class FilesManage:
         async for part in await req.get_media():
             if part.name == "archive":
                 try:
-                    fp = await FilesService.handle_connection_import_file_upload(part)
+                    fp = await FilesService.handle_connection_import_file_upload_multipart_form(
+                        part
+                    )
                 except Exception as exception:
                     syslog(f"Could not upload file - {str(exception)}")
                     fp = None
@@ -339,7 +345,7 @@ class FilesManage:
             resp.media = result
             return
 
-        success, msg = await FilesService.import_connections(password)
+        success, msg = await FilesService.import_connections(password, False)
         if success:
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
         else:

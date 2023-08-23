@@ -8,13 +8,11 @@ import logging
 from subprocess import Popen
 from syslog import syslog, LOG_ERR
 from typing import Tuple, Optional
-import falcon.asgi
 import swclient
 from summit_rcm.utils import Singleton, get_current_side
 
+
 FW_UPDATE_SCRIPT = "fw_update"
-FILE_STREAMING_BUFFER_SIZE = 128 * 1024
-MEDIA_OCTET_STREAM = "application/octet-stream"
 
 
 @unique
@@ -155,19 +153,6 @@ class FirmwareUpdateService(metaclass=Singleton):
         # external REST query, just assume update started unless/until a failure or completion
         # occurs.
         self.status = SummitRCMUpdateStatus.UPDATING
-
-    async def handle_update_file_upload_stream(self, stream: falcon.asgi.BoundedStream):
-        """Handle an incoming update file stream in chunk sizes of FILE_STREAMING_BUFFER_SIZE"""
-
-        if self.swclient_fd < 0:
-            raise NoUpdateInProgressError("no update in progress")
-
-        while True:
-            data_chunk = await stream.read(FILE_STREAMING_BUFFER_SIZE)
-            if not data_chunk:
-                return
-
-            self.handle_update_file_chunk(data_chunk)
 
     def handle_update_file_chunk(self, data_chunk: bytes):
         """Handle an incoming update file chunk and pass it to swupdate"""

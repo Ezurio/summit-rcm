@@ -5,7 +5,9 @@ Module to interact with system config files
 import os
 from syslog import syslog
 import falcon.asgi
-from summit_rcm.services.files_service import FilesService
+from summit_rcm.rest_api.services.rest_files_service import (
+    RESTFilesService as FilesService,
+)
 
 
 class SystemConfigExportResource:
@@ -71,7 +73,9 @@ class SystemConfigImportResource:
 
             async for part in form:
                 if part.name == "archive":
-                    if not await FilesService.handle_config_import_file_upload(part):
+                    if not await FilesService.handle_config_import_file_upload_multipart_form(
+                        part
+                    ):
                         raise Exception("error uploading file")
                 elif part.name == "password":
                     password = str(await part.text)
