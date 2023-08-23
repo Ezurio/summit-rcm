@@ -5,11 +5,13 @@ Module to facilitate firmware updates
 from syslog import syslog
 import falcon.asgi
 from summit_rcm.services.firmware_update_service import (
-    MEDIA_OCTET_STREAM,
-    FirmwareUpdateService,
     NoUpdateInProgressError,
     SummitRCMUpdateStatus,
     UpdateError,
+)
+from summit_rcm.rest_api.services.rest_firmware_update_service import (
+    RESTFirmwareUpdateService as FirmwareUpdateService,
+    MEDIA_OCTET_STREAM,
 )
 
 
@@ -50,7 +52,9 @@ class FirmwareUpdateStatusResource:
         """
         try:
             put_data = await req.get_media()
-            desired_status = int(put_data.get("status", SummitRCMUpdateStatus.NOT_UPDATING))
+            desired_status = int(
+                put_data.get("status", SummitRCMUpdateStatus.NOT_UPDATING)
+            )
 
             if (
                 desired_status == SummitRCMUpdateStatus.UPDATED

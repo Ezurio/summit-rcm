@@ -5,10 +5,12 @@ Module to handle legacy firmware updates via swupdate
 from syslog import syslog, LOG_ERR
 import falcon.asgi
 from summit_rcm.services.firmware_update_service import (
-    MEDIA_OCTET_STREAM,
-    FirmwareUpdateService,
     NoUpdateInProgressError,
     UpdateError,
+)
+from summit_rcm.rest_api.services.rest_firmware_update_service import (
+    RESTFirmwareUpdateService as FirmwareUpdateService,
+    MEDIA_OCTET_STREAM,
 )
 
 
