@@ -5,7 +5,9 @@ Module to interact with network connection profiles
 import os
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
-from summit_rcm.services.files_service import FilesService
+from summit_rcm.rest_api.services.rest_files_service import (
+    RESTFilesService as FilesService,
+)
 from summit_rcm.services.network_service import (
     ConnectionProfileAlreadyActiveError,
     ConnectionProfileAlreadyInactiveError,
@@ -135,7 +137,7 @@ class NetworkConnectionsImportResource:
 
             async for part in form:
                 if part.name == "archive":
-                    if not await FilesService.handle_connection_import_file_upload(
+                    if not await FilesService.handle_connection_import_file_upload_multipart_form(
                         part
                     ):
                         raise Exception("error uploading file")

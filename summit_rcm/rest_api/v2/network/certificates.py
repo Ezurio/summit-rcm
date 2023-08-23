@@ -4,7 +4,9 @@ Module to interact with certificates
 
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
-from summit_rcm.services.files_service import FilesService
+from summit_rcm.rest_api.services.rest_files_service import (
+    RESTFilesService as FilesService,
+)
 from summit_rcm.services.certificates_service import CertificatesService
 
 
@@ -77,7 +79,9 @@ class CertificateResource:
         async for part in form:
             if part.name == "file":
                 try:
-                    if not await FilesService.handle_cert_file_upload(part, name):
+                    if not await FilesService.handle_cert_file_upload_multipart_form(
+                        part, name
+                    ):
                         raise Exception("Error saving file to disk")
 
                     resp.status = falcon.HTTP_201

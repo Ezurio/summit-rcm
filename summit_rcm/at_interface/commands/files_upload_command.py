@@ -56,23 +56,24 @@ class FilesUploadCommand(Command):
                 )
             file_type = params_dict["type"]
             if file_type == Types.FILE_TYPE_CERT:
-                await FilesService().handle_cert_file_upload(
+                await FilesService.handle_cert_file_upload_bytes(
                     body, params_dict["name"], MODES_DICT[params_dict["mode"]]
                 )
             elif file_type == Types.FILE_TYPE_CONNECTION:
-                await FilesService().handle_connection_import_file_upload(
+                await FilesService.handle_connection_import_file_upload_bytes(
                     body, MODES_DICT[params_dict["mode"]]
                 )
-                success, message = await FilesService().import_connections(
-                    params_dict["password"]
+                success, message = await FilesService.import_connections(
+                    params_dict["password"],
+                    False
                 )
                 if not success:
                     raise Exception(message)
             else:
-                await FilesService().handle_config_import_file_upload(
+                await FilesService.handle_config_import_file_upload_bytes(
                     body, MODES_DICT[params_dict["mode"]]
                 )
-                success, message = await FilesService().import_system_config(
+                success, message = await FilesService.import_system_config(
                     params_dict["password"]
                 )
                 if not success:
