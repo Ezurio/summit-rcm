@@ -1709,6 +1709,12 @@ class NetworkManagerService(object, metaclass=Singleton):
                     "ay", bytearray(ssid, "utf-8")
                 )
 
+            # if 'mode' is not provided, assume 'infrastructure'
+            if not connection["802-11-wireless"].get("mode", None):
+                new_connection["802-11-wireless"]["mode"] = Variant(
+                    "s", "infrastructure"
+                )
+
         if connection.get("802-11-wireless-security"):
             new_connection["802-11-wireless-security"] = {}
 
