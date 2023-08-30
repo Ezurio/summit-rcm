@@ -52,16 +52,6 @@ from summit_rcm.at_interface.commands.timezone_get_command import TimezoneGetCom
 from summit_rcm.at_interface.commands.certificates_get_command import (
     CertificatesGetCommand,
 )
-
-try:
-    from summit_rcm.at_interface.commands.awm_scan_command import AWMScanCommand
-    from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
-except ImportError:
-    AWMScanCommand = None
-try:
-    from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
-except ImportError:
-    SISOModeCommand = None
 from summit_rcm.at_interface.commands.wifi_enabled_command import WiFiEnabledCommand
 from summit_rcm.at_interface.commands.wifi_hardware_command import WiFiHardwareCommand
 from summit_rcm.at_interface.commands.files_delete_command import FilesDeleteCommand
@@ -75,6 +65,25 @@ from summit_rcm.at_interface.commands.fwupdate_send_command import FWUpdateSendC
 from summit_rcm.at_interface.commands.fwupdate_status_command import (
     FWUpdateStatusCommand,
 )
+from summit_rcm.at_interface.commands.log_get_command import LogGetCommand
+from summit_rcm.at_interface.commands.log_debug_level_command import (
+    LogDebugLevelCommand,
+)
+try:
+    from summit_rcm.log_forwarding.at_interface.commands.log_forwarding_command import (
+        LogForwardingCommand,
+    )
+except ImportError:
+    LogForwardingCommand = None
+try:
+    from summit_rcm.at_interface.commands.awm_scan_command import AWMScanCommand
+    from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
+except ImportError:
+    AWMScanCommand = None
+try:
+    from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
+except ImportError:
+    SISOModeCommand = None
 
 AT_COMMANDS: List[Command] = [
     CIPSTARTCommand,
@@ -115,6 +124,8 @@ AT_COMMANDS: List[Command] = [
     FWUpdateRunCommand,
     FWUpdateSendCommand,
     FWUpdateStatusCommand,
+    LogGetCommand,
+    LogDebugLevelCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
@@ -122,6 +133,9 @@ if AWMScanCommand:
 
 if SISOModeCommand:
     AT_COMMANDS.append(SISOModeCommand)
+
+if LogForwardingCommand:
+    AT_COMMANDS.append(LogForwardingCommand)
 
 
 class ATInterfaceFSM(metaclass=Singleton):
