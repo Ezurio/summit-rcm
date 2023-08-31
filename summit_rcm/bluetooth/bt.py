@@ -168,39 +168,6 @@ class Bluetooth(metaclass=Singleton):
     def controller_addresses(self) -> Dict[str, str]:
         return self._controller_addresses
 
-    @staticmethod
-    def get_bluez_version() -> str:
-        """
-        Retrieve the current version of BlueZ as a string by running 'bluetoothctl --version'
-        """
-        BLUEZ_VERSION_RE = r"bluetoothctl: (?P<VERSION>.*)"
-        BLUETOOTHCTL_PATH = "/usr/bin/bluetoothctl"
-
-        if not os.path.exists(BLUETOOTHCTL_PATH):
-            return "Unknown"
-
-        try:
-            proc = run(
-                [BLUETOOTHCTL_PATH, "--version"],
-                capture_output=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-
-            if not proc.returncode:
-                for line in proc.stdout.decode("utf-8").splitlines():
-                    line = line.strip()
-                    match = re.match(BLUEZ_VERSION_RE, line)
-                    if match:
-                        return str(match.group("VERSION"))
-        except TimeoutExpired:
-            syslog(LOG_ERR, "Call to 'bluetoothctl --version' timeout")
-        except Exception as exception:
-            syslog(
-                LOG_ERR, f"Call to 'bluetoothctl --version' failed: {str(exception)}"
-            )
-
-        return "Unknown"
-
     async def get_remapped_controller(self, controller_friendly_name: str):
         """Scan present controllers and find the controller with address associated with
         controller_friendly_name, in _controller_addresses dictionary.
