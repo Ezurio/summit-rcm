@@ -90,6 +90,7 @@ try:
                 "/api/v2/system/config",
                 "/api/v2/system/logs",
                 "/api/v2/system/debug",
+                "/api/v2/system/version",
                 "/api/v2/login/users",
             ]
 
@@ -796,6 +797,7 @@ try:
         - /api/v2/system/logs/forwarding
         - /api/v2/system/logs/export
         - /api/v2/system/debug/export
+        - /api/v2/system/version
         """
         try:
             from summit_rcm.rest_api.v2.system.power import PowerResource
@@ -817,6 +819,7 @@ try:
                 LogsExportResource,
             )
             from summit_rcm.rest_api.v2.system.debug import DebugExportResource
+            from summit_rcm.rest_api.v2.system.version import VersionResource
 
             try:
                 from summit_rcm.chrony.ntp_service import ChronyNTPService
@@ -848,6 +851,7 @@ try:
                 add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
                 add_route("/api/v2/system/logs/export", LogsExportResource())
                 add_route("/api/v2/system/debug/export", DebugExportResource())
+                add_route("/api/v2/system/version", VersionResource())
                 if ChronyNTPService and NTPSourcesResource:
                     add_route("/api/v2/system/datetime/ntp", NTPSourcesResource())
                     add_route(
