@@ -2367,6 +2367,106 @@ class NetworkService(metaclass=Singleton):
         return settings
 
     @staticmethod
+    def get_access_point_security_description(
+        flags: int, wpa_flags: int, rsn_flags: int
+    ) -> Tuple[str, str]:
+        """Analyze the provided AP flags and return the security and key management supported"""
+
+        security_string = ""
+        keymgmt = ""
+        if (
+            flags & NM80211ApFlags.NM_802_11_AP_FLAGS_PRIVACY
+            and wpa_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+            and rsn_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+        ):
+            # WEP
+            security_string += "WEP "
+            keymgmt = "static"
+        else:
+            if wpa_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
+                # WPA1
+                security_string += "WPA1 "
+
+            if (
+                (rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK)
+                or (rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_CCKM)
+                or (
+                    rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_SUITE_B
+                )
+                or (rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X)
+            ):
+                # WPA2
+                security_string += "WPA2 "
+
+            if rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_SAE:
+                # WPA3
+                security_string += "WPA3 "
+                keymgmt += "sae "
+
+            if (wpa_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE) and (
+                rsn_flags
+                == (
+                    NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192
+                    | NM80211ApSecurityFlags.NM_802_11_AP_SEC_PAIR_GCMP_256
+                    | NM80211ApSecurityFlags.NM_802_11_AP_SEC_GROUP_GCMP_256
+                    | NM80211ApSecurityFlags.NM_802_11_AP_SEC_MGMT_GROUP_GMAC_256
+                )
+            ):
+                # WPA3
+                security_string += "WPA3 "
+                keymgmt = "wpa-eap-suite-b-192"
+
+            if rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_OWE != 0:
+                # OWE
+                security_string += "OWE "
+                keymgmt = "owe"
+            elif (
+                rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_OWE_TM != 0
+            ):
+                # OWE-TM
+                security_string += "OWE-TM "
+                keymgmt = "owe"
+
+            if (
+                (wpa_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X)
+                or (rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_CCKM)
+                or (
+                    rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_SUITE_B
+                )
+                or (rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X)
+            ):
+                # 802.1X
+                security_string += "802.1X "
+                if rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_SUITE_B:
+                    keymgmt += "wpa-eap-suite-b "
+                else:
+                    keymgmt += "wpa-eap "
+
+            if (
+                wpa_flags
+                & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192
+            ) or (
+                rsn_flags
+                & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192
+            ):
+                # WPA-EAP-SUITE-B-192
+                security_string += "WPA-EAP-SUITE-B-192 "
+                keymgmt += "wpa-eap-suite-b-192 "
+
+            if (wpa_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK) or (
+                rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
+            ):
+                # PSK
+                security_string += "PSK "
+                keymgmt += "wpa-psk "
+
+        if not keymgmt:
+            # Open
+            keymgmt = "none"
+
+        return security_string.rstrip(" "), keymgmt.rstrip(" ")
+
+    @staticmethod
     async def get_access_points(is_legacy: bool = False) -> list:
         """
         Retrieve a list of info on the cached APs know to NetworkManager
@@ -2390,8 +2490,6 @@ class NetworkService(metaclass=Singleton):
                         ap_obj_path,
                         NetworkManagerService().NM_ACCESS_POINT_IFACE,
                     )
-                    security_string = ""
-                    keymgmt = "none"
                     flags = ap.get("Flags", NM80211ApFlags.NM_802_11_AP_FLAGS_NONE)
                     wpa_flags = ap.get(
                         "WpaFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
@@ -2399,37 +2497,12 @@ class NetworkService(metaclass=Singleton):
                     rsn_flags = ap.get(
                         "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
                     )
-                    if (
-                        flags & NM80211ApFlags.NM_802_11_AP_FLAGS_PRIVACY
-                        and wpa_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                        and rsn_flags == NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
-                    ):
-                        security_string = security_string + "WEP "
-                        keymgmt = "static"
-
-                    if wpa_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
-                        security_string = security_string + "WPA1 "
-
-                    if rsn_flags != NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE:
-                        security_string = security_string + "WPA2 "
-
-                    if (
-                        wpa_flags
-                        & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X
-                        or rsn_flags
-                        & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_802_1X
-                    ):
-                        security_string = security_string + "802.1X "
-                        keymgmt = "wpa-eap"
-
-                    if (
-                        wpa_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
-                    ) or (
-                        rsn_flags & NM80211ApSecurityFlags.NM_802_11_AP_SEC_KEY_MGMT_PSK
-                    ):
-                        security_string = security_string + "PSK"
-                        keymgmt = "wpa-psk"
-
+                    (
+                        security_string,
+                        keymgmt,
+                    ) = NetworkService.get_access_point_security_description(
+                        flags=flags, wpa_flags=wpa_flags, rsn_flags=rsn_flags
+                    )
                     ssid = ap.get("Ssid", None)
                     ap_data = {}
                     ap_data["SSID" if is_legacy else "ssid"] = (
