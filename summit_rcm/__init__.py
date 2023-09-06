@@ -485,11 +485,18 @@ try:
         - /logForwarding
         """
         try:
-            from summit_rcm.rest_api.legacy.log import (
-                LogData,
-                LogSetting,
-                LogForwarding,
-            )
+            from summit_rcm.rest_api.legacy.log import LogData, LogSetting
+
+            try:
+                from summit_rcm.log_forwarding.services.log_forwarding_service import (
+                    LogForwardingService,
+                )
+                from summit_rcm.log_forwarding.rest_api.legacy.log_forwarding import (
+                    LogForwarding,
+                )
+            except ImportError:
+                LogForwardingService = None
+                LogForwarding = None
         except ImportError:
             LogData = None
 
@@ -497,7 +504,8 @@ try:
             try:
                 add_route("/logData", LogData())
                 add_route("/logSetting", LogSetting())
-                add_route("/logForwarding", LogForwarding())
+                if LogForwardingService and LogForwarding:
+                    add_route("/logForwarding", LogForwarding())
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load logging endpoints - {str(exception)}")
                 raise exception
@@ -815,7 +823,6 @@ try:
             from summit_rcm.rest_api.v2.system.logs import (
                 LogsDataResource,
                 LogsConfigResource,
-                LogForwardingResource,
                 LogsExportResource,
             )
             from summit_rcm.rest_api.v2.system.debug import DebugExportResource
@@ -830,6 +837,17 @@ try:
             except ImportError:
                 ChronyNTPService = None
                 NTPSourcesResource = None
+
+            try:
+                from summit_rcm.log_forwarding.services.log_forwarding_service import (
+                    LogForwardingService,
+                )
+                from summit_rcm.log_forwarding.rest_api.v2.system.log_forwarding import (
+                    LogForwardingResource,
+                )
+            except ImportError:
+                LogForwardingService = None
+                LogForwardingResource = None
         except ImportError:
             PowerResource = None
 
@@ -848,7 +866,6 @@ try:
                 add_route("/api/v2/system/config/export", SystemConfigExportResource())
                 add_route("/api/v2/system/logs/data", LogsDataResource())
                 add_route("/api/v2/system/logs/config", LogsConfigResource())
-                add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
                 add_route("/api/v2/system/logs/export", LogsExportResource())
                 add_route("/api/v2/system/debug/export", DebugExportResource())
                 add_route("/api/v2/system/version", VersionResource())
@@ -857,6 +874,8 @@ try:
                     add_route(
                         "/api/v2/system/datetime/ntp/{address}", NTPSourceResource()
                     )
+                if LogForwardingService and LogForwardingResource:
+                    add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load system endpoints - {str(exception)}")
                 raise exception
