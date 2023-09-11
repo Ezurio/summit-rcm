@@ -1,8 +1,16 @@
+"""
+File that consists of the CommunicationCheckCommand Command Functionality
+"""
+from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 
 
 class CommunicationCheckCommand(Command):
+    """
+    AT Command to perform a communication check
+    """
+
     NAME: str = "Communication Check"
     SIGNATURE: str = "at"
     VALID_NUM_PARAMS: List[int] = [1]
@@ -11,10 +19,8 @@ class CommunicationCheckCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = CommunicationCheckCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {CommunicationCheckCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         return (True, "\r\nOK\r\n")
 
     @staticmethod

@@ -21,10 +21,8 @@ class AWMModeCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = AWMModeCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {AWMModeCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             awm_lite_str = str(int(AWMConfigService().get_lite_mode_enabled()))
             return (True, f"\r\n+AWMMODE: {awm_lite_str}\r\nOK\r\n")

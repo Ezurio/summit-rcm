@@ -27,10 +27,8 @@ class FilesListCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FilesListCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FilesListCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             files_str = ""
             if params_dict["type"] == Types.FILE_TYPE_CERT_AND_PAC:
@@ -52,6 +50,8 @@ class FilesListCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in FilesListCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         try:
             params_dict["type"] = (
                 Types(int(params_list[0])) if params_list[0] else Types(0)
@@ -62,7 +62,7 @@ class FilesListCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FILESLIST=<type>\r\n"
+        return "\r\nAT+FILESLIST[=<type>]\r\n"
 
     @staticmethod
     def signature() -> str:

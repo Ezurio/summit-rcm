@@ -21,10 +21,8 @@ class WifiScanCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = WifiScanCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {WifiScanCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             await NetworkService().request_ap_scan()
             return (True, "\r\nOK\r\n")

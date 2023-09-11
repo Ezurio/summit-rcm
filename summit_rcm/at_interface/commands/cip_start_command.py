@@ -1,23 +1,34 @@
+"""
+File that consists of the CIPStart Command Functionality
+"""
+from syslog import LOG_ERR, syslog
 from typing import List, Tuple
+from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.services.connection_service import ConnectionService
 
 
-class CIPSTARTCommand(Command):
+class Types(IntEnum):
+    tcp = 0
+    udp = 1
+    ssl = 2
+
+
+class CIPStartCommand(Command):
+    """
+    AT Command to start an IP connection
+    """
+
     NAME: str = "Start IP connection"
     SIGNATURE: str = "at+cipstart"
     VALID_NUM_PARAMS: List[int] = [4, 5]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = CIPSTARTCommand.parse_params(params)
+        (valid, params_dict) = CIPStartCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {CIPSTARTCommand.SIGNATURE}?\r\n",
-            )
-        if not ConnectionService.validate_connection_type(params_dict["type"]):
-            return (True, "\r\nCONNECTION TYPE ERROR\r\n")
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
 
         if ConnectionService().start_connection(
             id=params_dict["connection_id"],
@@ -28,7 +39,7 @@ class CIPSTARTCommand(Command):
         ):
             return (True, "\r\nOK\r\n")
         else:
-            return (True, "\r\nCONNECTION START ERROR\r\n")
+            return (True, "\r\nERROR\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -36,20 +47,21 @@ class CIPSTARTCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         given_num_param = len(params_list)
-        valid &= given_num_param in CIPSTARTCommand.VALID_NUM_PARAMS
+        valid &= given_num_param in CIPStartCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
-        if valid:
-            try:
-                params_dict["connection_id"] = int(params_list[0])
-                params_dict["type"] = params_list[1].lower()
-                params_dict["remote_ip"] = params_list[2]
-                params_dict["remote_port"] = params_list[3]
-                params_dict["keepalive"] = (
-                    int(params_list[4]) if given_num_param == 5 else 0
-                )
-            except Exception:
-                valid = False
+        if not valid:
+            return (False, {})
+        try:
+            params_dict["connection_id"] = int(params_list[0])
+            params_dict["type"] = Types(int(params_list[1])).name
+            params_dict["remote_ip"] = params_list[2]
+            params_dict["remote_port"] = params_list[3]
+            params_dict["keepalive"] = (
+                int(params_list[4]) if given_num_param == 5 else 0
+            )
+        except ValueError:
+            valid = False
         return (valid, params_dict)
 
     @staticmethod
@@ -61,8 +73,8 @@ class CIPSTARTCommand(Command):
 
     @staticmethod
     def signature() -> str:
-        return CIPSTARTCommand.SIGNATURE
+        return CIPStartCommand.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return CIPSTARTCommand.NAME
+        return CIPStartCommand.NAME

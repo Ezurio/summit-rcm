@@ -1,3 +1,6 @@
+"""
+File that consists of the CIPSend Command Functionality
+"""
 from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
@@ -5,31 +8,27 @@ from summit_rcm.at_interface.services.connection_service import ConnectionServic
 import summit_rcm.at_interface.fsm as fsm
 
 
-class CIPSENDCommand(Command):
+class CIPSendCommand(Command):
+    """
+    AT Command to send data to an IP connection
+    """
+
     NAME: str = "Send IP data command"
     SIGNATURE: str = "at+cipsend"
     VALID_NUM_PARAMS: List[int] = [2]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = CIPSENDCommand.parse_params(params)
+        (valid, params_dict) = CIPSendCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {CIPSENDCommand.SIGNATURE}?\r\n",
-            )
-
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             connection_status = ConnectionService().is_connection_busy(
                 id=params_dict["connection_id"]
             )
             if connection_status is None:
-                return (
-                    True,
-                    "\r\nError, Connection ID: "
-                    + str(params_dict["connection_id"])
-                    + " is invalid\r\n",
-                )
+                return (True, "\r\nERROR\r\n")
             elif not connection_status:
                 fsm.ATInterfaceFSM().dte_output("\r\n> ")
 
@@ -43,14 +42,12 @@ class CIPSENDCommand(Command):
             if params_dict["length"] == sent:
                 return (True, "\r\nOK\r\n")
             elif sent == -1:
-                return (
-                    True,
-                    "\r\nEscape Sequence '+++' detected: Exiting Data Mode\r\n",
-                )
+                syslog(LOG_ERR, "Escaping Data Mode")
+                return (True, "\r\n")
             else:
-                "\r\n Length ERROR\r\n"
-        except Exception as e:
-            syslog(LOG_ERR, f"CIPSEND error: {str(e)}")
+                return (True, "\r\nERROR\r\n")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Error sending CIP data: {str(exception)}")
             return (True, "\r\nERROR\r\n")
 
     @staticmethod
@@ -58,15 +55,16 @@ class CIPSENDCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in CIPSENDCommand.VALID_NUM_PARAMS
+        valid &= len(params_list) in CIPSendCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
-        if valid:
-            try:
-                params_dict["connection_id"] = int(params_list[0])
-                params_dict["length"] = int(params_list[1])
-            except Exception:
-                valid = False
+        if not valid:
+            return (False, {})
+        try:
+            params_dict["connection_id"] = int(params_list[0])
+            params_dict["length"] = int(params_list[1])
+        except ValueError:
+            valid = False
         return (valid, params_dict)
 
     @staticmethod
@@ -75,8 +73,8 @@ class CIPSENDCommand(Command):
 
     @staticmethod
     def signature() -> str:
-        return CIPSENDCommand.SIGNATURE
+        return CIPSendCommand.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return CIPSENDCommand.NAME
+        return CIPSendCommand.NAME

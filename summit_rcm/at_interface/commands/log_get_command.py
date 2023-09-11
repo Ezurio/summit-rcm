@@ -16,6 +16,17 @@ class Types(IntEnum):
     All = 4
 
 
+class Priorities(IntEnum):
+    LOG_EMERG = 0
+    LOG_ALERT = 1
+    LOG_CRIT = 2
+    LOG_ERR = 3
+    LOG_WARNING = 4
+    LOG_NOTICE = 5
+    LOG_INFO = 6
+    LOG_DEBUG = 7
+
+
 class LogGetCommand(Command):
     """
     AT Command to retrieve journal log data
@@ -30,10 +41,8 @@ class LogGetCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = LogGetCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {LogGetCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             logs_list = LogsService.get_journal_log_data(
                 params_dict["type"], params_dict["priority"], params_dict["days"]
@@ -54,11 +63,11 @@ class LogGetCommand(Command):
         valid &= len(params_list) in LogGetCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
             params_dict["type"] = Types(int(params_list[0])).name
-            params_dict["priority"] = int(params_list[1])
-            if params_dict["priority"] not in range(0, 8):
-                raise ValueError
+            params_dict["priority"] = Priorities(int(params_list[1])).value
             params_dict["days"] = int(params_list[2])
         except ValueError:
             return (False, params_dict)

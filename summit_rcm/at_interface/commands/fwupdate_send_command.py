@@ -30,10 +30,8 @@ class FWUpdateSendCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FWUpdateSendCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FWUpdateSendCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             status, _ = FirmwareUpdateService().get_update_status()
             if status != SummitRCMUpdateStatus.UPDATING:
@@ -49,20 +47,17 @@ class FWUpdateSendCommand(Command):
             if not done:
                 return (False, "")
             if length == -1:
-                return (
-                    True,
-                    "\r\nEscape Sequence '+++' detected: Exiting Data Mode\r\n",
-                )
+                syslog(LOG_ERR, "Escaping Data Mode")
+                return (True, "\r\n")
             FirmwareUpdateService().handle_update_file_chunk(body)
             if length_remaining - length > 0:
                 FWUpdateSendCommand.ITERATIONS += 1
                 return (False, "")
             FWUpdateSendCommand.ITERATIONS = 0
+            FirmwareUpdateService().cancel_update()
             return (True, f"\r\n+FWSEND: {params_dict['length']}\r\nOK\r\n")
         except Exception as exception:
-            syslog(
-                LOG_ERR, f"Error sending the firmware update: {str(exception)}"
-            )
+            syslog(LOG_ERR, f"Error sending the firmware update: {str(exception)}")
             return (True, "\r\nERROR\r\n")
 
     @staticmethod
@@ -73,6 +68,8 @@ class FWUpdateSendCommand(Command):
         valid &= len(params_list) in FWUpdateSendCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
             params_dict["length"] = int(params_list[0])
         except ValueError:

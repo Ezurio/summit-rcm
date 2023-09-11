@@ -13,6 +13,12 @@ class Modes(IntEnum):
     FWUPDATE_START = 1
 
 
+class Image(IntEnum):
+    full = 0
+    complete = 1
+    main = 2
+
+
 class FWUpdateRunCommand(Command):
     """
     AT Command to start/stop a firmware update
@@ -27,10 +33,8 @@ class FWUpdateRunCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FWUpdateRunCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FWUpdateRunCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             if params_dict["mode"] == Modes.FWUPDATE_STOP:
                 FirmwareUpdateService().cancel_update()
@@ -53,11 +57,15 @@ class FWUpdateRunCommand(Command):
         valid &= len(params_list) in FWUpdateRunCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
             params_dict["mode"] = Modes(int(params_list[0]))
+            params_dict["image"] = (
+                Image(int(params_list[1])).name if len(params_list) > 1 else ""
+            )
         except ValueError:
             return (False, params_dict)
-        params_dict["image"] = params_list[1] if len(params_list) > 1 else ""
         params_dict["url"] = params_list[2] if len(params_list) > 2 else ""
         return (valid, params_dict)
 

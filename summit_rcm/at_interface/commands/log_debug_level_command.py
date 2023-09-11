@@ -8,7 +8,7 @@ from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.services.logs_service import LogsService
 
 
-class Levels(IntEnum):
+class Supp_Levels(IntEnum):
     none = 0
     error = 1
     warning = 2
@@ -16,6 +16,11 @@ class Levels(IntEnum):
     debug = 4
     msgdump = 5
     excessive = 6
+
+
+class Driver_Levels(IntEnum):
+    disabled = 0
+    enabled = 1
 
 
 class Types(IntEnum):
@@ -37,10 +42,8 @@ class LogDebugLevelCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = LogDebugLevelCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {LogDebugLevelCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             log_debug_str = ""
             if params_dict["log_level"] != "":
@@ -52,12 +55,12 @@ class LogDebugLevelCommand(Command):
                     params_dict["log_level"]
                 )
             else:
-                log_debug_str = (
-                    str(Levels[await LogsService.get_supplicant_debug_level()].value)
+                log_debug_str = "+LOGDEBUG: " + (
+                    str(Supp_Levels[await LogsService.get_supplicant_debug_level()].value)
                     if params_dict["type"] == Types.supplicant
                     else str(LogsService.get_wifi_driver_debug_level())
                 ) + "\r\n"
-            return (True, f"\r\n+LOGDEBUG: {log_debug_str}OK\r\n")
+            return (True, f"\r\n{log_debug_str}OK\r\n")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting/setting log debug level: {str(exception)}")
             return (True, "\r\nERROR\r\n")
@@ -70,15 +73,15 @@ class LogDebugLevelCommand(Command):
         valid &= len(params_list) in LogDebugLevelCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
             params_dict["type"] = Types(int(params_list[0]))
             if len(params_list) > 1:
                 if params_dict["type"] == Types.supplicant:
-                    params_dict["log_level"] = Levels(int(params_list[1])).name
+                    params_dict["log_level"] = Supp_Levels(int(params_list[1])).name
                 else:
-                    params_dict["log_level"] = int(params_list[1])
-                    if params_dict["log_level"] not in (0, 1):
-                        raise ValueError
+                    params_dict["log_level"] = Driver_Levels(int(params_list[1])).value
             else:
                 params_dict["log_level"] = ""
         except ValueError:

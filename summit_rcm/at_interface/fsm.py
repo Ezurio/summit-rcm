@@ -1,3 +1,6 @@
+"""
+AT interface's finite state machine module
+"""
 from syslog import syslog, LOG_ERR
 from typing import Callable, List, Optional, Tuple
 from asyncio import Transport, Protocol
@@ -10,27 +13,27 @@ from summit_rcm.at_interface.commands.communication_check_command import (
 )
 from summit_rcm.at_interface.commands.empty_command import EmptyCommand
 from summit_rcm.at_interface.commands.version_command import VersionCommand
-from summit_rcm.at_interface.commands.cipstart_command import CIPSTARTCommand
-from summit_rcm.at_interface.commands.cipsend_command import CIPSENDCommand
-from summit_rcm.at_interface.commands.cipclose_command import CIPCLOSECommand
+from summit_rcm.at_interface.commands.cip_start_command import CIPStartCommand
+from summit_rcm.at_interface.commands.cip_send_command import CIPSendCommand
+from summit_rcm.at_interface.commands.cip_close_command import CIPCloseCommand
 from summit_rcm.at_interface.commands.ping_command import PingCommand
-from summit_rcm.at_interface.commands.connections_command import ConnectionsCommand
+from summit_rcm.at_interface.commands.connection_list_command import ConnectionListCommand
 from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
 from summit_rcm.at_interface.commands.fips_command import FipsCommand
-from summit_rcm.at_interface.commands.connect_command import ActivateConnectionCommand
-from summit_rcm.at_interface.commands.configure_http_transaction import (
-    ConfigureHTTPTransaction,
+from summit_rcm.at_interface.commands.connection_activate_command import ConnectionActivateCommand
+from summit_rcm.at_interface.commands.http_configure_transaction import (
+    HTTPConfigureTransaction,
 )
-from summit_rcm.at_interface.commands.execute_http_transaction import (
-    ExecuteHTTPTransaction,
+from summit_rcm.at_interface.commands.http_execute_transaction import (
+    HTTPExecuteTransaction,
 )
-from summit_rcm.at_interface.commands.add_http_header import AddHTTPHeader
-from summit_rcm.at_interface.commands.enable_http_reponse_headers import (
-    EnableHTTPResponseHeader,
+from summit_rcm.at_interface.commands.http_add_header import HTTPAddHeader
+from summit_rcm.at_interface.commands.http_enable_reponse_headers import (
+    HTTPEnableResponseHeader,
 )
-from summit_rcm.at_interface.commands.clear_http_configuration import (
-    ClearHTTPConfiguration,
+from summit_rcm.at_interface.commands.http_clear_configuration import (
+    HTTPClearConfiguration,
 )
 from summit_rcm.at_interface.commands.network_interface_statistics import (
     NetworkInterfaceStatisticsCommand,
@@ -38,11 +41,11 @@ from summit_rcm.at_interface.commands.network_interface_statistics import (
 from summit_rcm.at_interface.commands.network_interfaces_command import (
     NetworkInterfacesCommand,
 )
-from summit_rcm.at_interface.commands.modify_connection_command import (
-    ModifyConnectionCommand,
+from summit_rcm.at_interface.commands.connection_modify_command import (
+    ConnectionModifyCommand,
 )
-from summit_rcm.at_interface.commands.virtual_interface_command import (
-    VirtualInterfaceCommand,
+from summit_rcm.at_interface.commands.network_virtual_interface_command import (
+    NetworkVirtualInterfaceCommand,
 )
 from summit_rcm.at_interface.commands.wifi_list_command import WifiListCommand
 from summit_rcm.at_interface.commands.wifi_scan_command import WifiScanCommand
@@ -69,6 +72,8 @@ from summit_rcm.at_interface.commands.log_get_command import LogGetCommand
 from summit_rcm.at_interface.commands.log_debug_level_command import (
     LogDebugLevelCommand,
 )
+from summit_rcm.at_interface.commands.at_echo_disable_command import ATEchoDisableCommand
+from summit_rcm.at_interface.commands.at_echo_enable_command import ATEchoEnableCommand
 try:
     from summit_rcm.log_forwarding.at_interface.commands.log_forwarding_command import (
         LogForwardingCommand,
@@ -86,27 +91,27 @@ except ImportError:
     SISOModeCommand = None
 
 AT_COMMANDS: List[Command] = [
-    CIPSTARTCommand,
-    CIPCLOSECommand,
-    CIPSENDCommand,
+    CIPStartCommand,
+    CIPCloseCommand,
+    CIPSendCommand,
     CommunicationCheckCommand,
     EmptyCommand,
     VersionCommand,
     PingCommand,
-    ConnectionsCommand,
+    ConnectionListCommand,
     PowerCommand,
     FactoryResetCommand,
     FipsCommand,
-    ActivateConnectionCommand,
-    ConfigureHTTPTransaction,
-    ExecuteHTTPTransaction,
-    AddHTTPHeader,
-    EnableHTTPResponseHeader,
-    ClearHTTPConfiguration,
+    ConnectionActivateCommand,
+    HTTPConfigureTransaction,
+    HTTPExecuteTransaction,
+    HTTPAddHeader,
+    HTTPEnableResponseHeader,
+    HTTPClearConfiguration,
     NetworkInterfaceStatisticsCommand,
     NetworkInterfacesCommand,
-    ModifyConnectionCommand,
-    VirtualInterfaceCommand,
+    ConnectionModifyCommand,
+    NetworkVirtualInterfaceCommand,
     WifiListCommand,
     WifiScanCommand,
     DatetimeCommand,
@@ -126,6 +131,8 @@ AT_COMMANDS: List[Command] = [
     FWUpdateStatusCommand,
     LogGetCommand,
     LogDebugLevelCommand,
+    ATEchoDisableCommand,
+    ATEchoEnableCommand,
 ]
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
@@ -155,7 +162,7 @@ class ATInterfaceFSM(metaclass=Singleton):
     _current_command_print_usage: bool = False
 
     debug = False
-    echo = True
+    echo_enabled: bool = False
 
     _listeners: Callable[[str], None] = []
 
@@ -340,8 +347,11 @@ class ATInterfaceFSM(metaclass=Singleton):
             self.dte_output(f"DBG: {str(msg)}")
 
     def echo(self, msg):
-        if self.echo:
+        if self.echo_enabled:
             self.dte_output(str(msg))
+
+    def enable_echo(self, enabled: bool):
+        self.echo_enabled = enabled
 
     def register_listener(self, listener: Callable[[str], None]) -> int:
         self._listeners.append(listener)

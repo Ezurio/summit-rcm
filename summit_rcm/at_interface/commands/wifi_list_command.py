@@ -21,10 +21,8 @@ class WifiListCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = WifiListCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {WifiListCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             ap_str = ""
             ap_list = await NetworkService().get_access_points()
@@ -43,9 +41,7 @@ class WifiListCommand(Command):
                 ap_str += f"{ap_dict['keymgmt']}\r\n"
             return (True, f"\r\n{ap_str}OK\r\n")
         except Exception as exception:
-            syslog(
-                LOG_ERR, f"Error listing wifi access points: {str(exception)}"
-            )
+            syslog(LOG_ERR, f"Error listing wifi access points: {str(exception)}")
             return (True, "\r\nERROR\r\n")
 
     @staticmethod

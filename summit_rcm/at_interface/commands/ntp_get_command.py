@@ -28,10 +28,8 @@ class NTPGetCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = NTPGetCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {NTPGetCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             sources_str = ""
             if params_dict["scope"] == Types.ALL_CHRONY_SOURCES:
@@ -57,6 +55,8 @@ class NTPGetCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in NTPGetCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         try:
             params_dict["scope"] = (
                 Types(int(params_list[0])) if params_list[0] else Types(-1)
