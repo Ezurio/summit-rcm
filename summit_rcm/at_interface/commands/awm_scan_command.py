@@ -21,10 +21,8 @@ class AWMScanCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = AWMScanCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {AWMScanCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             enabled = params_dict["enabled"]
             if enabled == "":
@@ -39,7 +37,8 @@ class AWMScanCommand(Command):
             return (True, "\r\nERROR\r\n")
         except Exception as exception:
             syslog(
-                LOG_ERR, f"Error getting/setting AWM geolocation scanning: {str(exception)}"
+                LOG_ERR,
+                f"Error getting/setting AWM geolocation scanning: {str(exception)}",
             )
             return (True, "\r\nERROR\r\n")
 
@@ -49,15 +48,14 @@ class AWMScanCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in AWMScanCommand.VALID_NUM_PARAMS
-        if params_list[0] == "":
-            params_dict["enabled"] = ""
-        else:
-            try:
-                params_dict["enabled"] = int(params_list[0])
-                if params_dict["enabled"] not in (0, 1):
-                    raise ValueError
-            except ValueError:
-                valid = False
+        if not valid:
+            return (False, {})
+        try:
+            params_dict["enabled"] = int(params_list[0]) if params_list[0] != "" else ""
+            if params_dict["enabled"] not in (0, 1, ""):
+                raise ValueError
+        except ValueError:
+            valid = False
         return (valid, params_dict)
 
     @staticmethod

@@ -1,19 +1,29 @@
 """
-File that consists of the ConfigureHTTPTransaction Command Functionality
+File that consists of the HTTPConfigureTransaction Command Functionality
 """
-
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
+from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.services.http_service import HTTPService
 
-DEFAULT_TIMEOUT = "10"
+DEFAULT_TIMEOUT = 10
 
 
-class ConfigureHTTPTransaction(Command):
+class Types(IntEnum):
+    HEAD = 0
+    GET = 1
+    PUT = 2
+    POST = 3
+    DELETE = 4
+    PATCH = 5
+
+
+class HTTPConfigureTransaction(Command):
     """
     AT Command to handle the base configuration of an HTTP Transaction
     """
+
     NAME: str = "Configure HTTP Transaction"
     SIGNATURE: str = "at+httpconf"
     VALID_NUM_PARAMS: List[int] = [4, 5]
@@ -21,12 +31,10 @@ class ConfigureHTTPTransaction(Command):
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = ConfigureHTTPTransaction.parse_params(params)
+        (valid, params_dict) = HTTPConfigureTransaction.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {ConfigureHTTPTransaction.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             HTTPService().configure_http_transaction(
                 params_dict["host"],
@@ -36,8 +44,8 @@ class ConfigureHTTPTransaction(Command):
                 params_dict["timeout"],
             )
             return (True, "\r\nOK\r\n")
-        except Exception as e:
-            syslog(LOG_ERR, f"error configuring http transaction {str(e)}")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Error configuring http transaction: {str(exception)}")
             return (True, "\r\nERROR\r\n")
 
     @staticmethod
@@ -45,23 +53,21 @@ class ConfigureHTTPTransaction(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in ConfigureHTTPTransaction.VALID_NUM_PARAMS
+        valid &= len(params_list) in HTTPConfigureTransaction.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
-        if valid:
-            params_dict["host"] = params_list[0]
-            try:
-                params_dict["port"] = int(params_list[1])
-                params_dict["timeout"] = (
-                    int(params_list[4]) if len(params_list) > 4 else DEFAULT_TIMEOUT
-                )
-            except ValueError:
-                valid = False
-            if params_list[2].upper() in ConfigureHTTPTransaction.VALID_METHODS:
-                params_dict["method"] = params_list[2].upper()
-            else:
-                valid = False
-            params_dict["route"] = params_list[3]
+        if not valid:
+            return (False, {})
+        params_dict["host"] = params_list[0]
+        try:
+            params_dict["port"] = int(params_list[1])
+            params_dict["timeout"] = (
+                int(params_list[4]) if len(params_list) > 4 else DEFAULT_TIMEOUT
+            )
+            params_dict["method"] = Types(int(params_list[2])).name
+        except ValueError:
+            return (False, params_dict)
+        params_dict["route"] = params_list[3]
         return (valid, params_dict)
 
     @staticmethod
@@ -70,8 +76,8 @@ class ConfigureHTTPTransaction(Command):
 
     @staticmethod
     def signature() -> str:
-        return ConfigureHTTPTransaction.SIGNATURE
+        return HTTPConfigureTransaction.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return ConfigureHTTPTransaction.NAME
+        return HTTPConfigureTransaction.NAME

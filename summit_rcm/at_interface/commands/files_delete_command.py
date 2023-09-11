@@ -20,10 +20,8 @@ class FilesDeleteCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FilesDeleteCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FilesDeleteCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             FilesService().delete_cert_file(params_dict["name"])
             return (True, "\r\nOK\r\n")
@@ -39,6 +37,8 @@ class FilesDeleteCommand(Command):
         valid &= len(params_list) in FilesDeleteCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         params_dict["name"] = params_list[0]
         return (valid, params_dict)
 

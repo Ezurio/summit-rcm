@@ -37,10 +37,8 @@ class FilesUploadCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FilesUploadCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FilesUploadCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             if not ATFilesService().transfer_in_process():
                 fsm.ATInterfaceFSM().dte_output("\r\n> ")
@@ -50,10 +48,8 @@ class FilesUploadCommand(Command):
             if not done:
                 return (False, "")
             if length == -1:
-                return (
-                    True,
-                    "\r\nEscape Sequence '+++' detected: Exiting Data Mode\r\n",
-                )
+                syslog(LOG_ERR, "Escaping Data Mode")
+                return (True, "\r\n")
             file_type = params_dict["type"]
             if file_type == Types.FILE_TYPE_CERT:
                 await FilesService.handle_cert_file_upload_bytes(
@@ -64,8 +60,7 @@ class FilesUploadCommand(Command):
                     body, MODES_DICT[params_dict["mode"]]
                 )
                 success, message = await FilesService.import_connections(
-                    params_dict["password"],
-                    False
+                    params_dict["password"], False
                 )
                 if not success:
                     raise Exception(message)
@@ -89,6 +84,8 @@ class FilesUploadCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in FilesUploadCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         try:
             params_dict["type"] = Types(int(params_list[0]))
             params_dict["length"] = int(params_list[1]) if len(params_list) > 1 else ""

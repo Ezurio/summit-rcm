@@ -46,10 +46,8 @@ class FilesExportCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FilesExportCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FilesExportCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             if params_dict["mode"]:
                 file = await FilesService().handle_file_download(params_dict["path"])
@@ -96,20 +94,21 @@ class FilesExportCommand(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in FilesExportCommand.VALID_NUM_PARAMS
+        length = len(params_list)
+        valid &= length in FilesExportCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         try:
-            params_dict["mode"] = int(params_list[0])
-            if params_dict["mode"] not in (0, 1) or (
-                params_dict["mode"] == 1 and len(params_list) != 4
-            ):
+            params_dict["mode"] = bool(int(params_list[0]))
+            if params_dict["mode"] and length != 4:
                 raise ValueError
             params_dict["chunk size"] = (
-                int(params_list[2]) if (params_dict["mode"] == 1) else 0
+                int(params_list[2]) if (params_dict["mode"] and length > 2) else 0
             )
             if params_dict["chunk size"] > MAX_FILE_CHUNK_SIZE:
                 raise ValueError
             params_dict["offset"] = (
-                int(params_list[3]) if (params_dict["mode"] == 1) else 0
+                int(params_list[3]) if (params_dict["mode"] and length > 3) else 0
             )
             params_dict["type"] = Types(int(params_list[1]))
         except ValueError:
@@ -119,8 +118,8 @@ class FilesExportCommand(Command):
             ""
             if (
                 params_dict["type"] == Types.FILE_TYPE_DEBUG
-                or len(params_list) < 3
-                or params_dict["mode"] == 1
+                or length < 3
+                or params_dict["mode"]
             )
             else params_list[2]
         )

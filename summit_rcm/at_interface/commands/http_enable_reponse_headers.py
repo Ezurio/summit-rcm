@@ -1,34 +1,35 @@
 """
-File that consists of the EnableHTTPResponseHeader Command Functionality
+File that consists of the HTTPEnableResponseHeader Command Functionality
 """
-
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.services.http_service import HTTPService
 
 
-class EnableHTTPResponseHeader(Command):
+class HTTPEnableResponseHeader(Command):
     """
     AT Command to handle the enabling/disabling of HTTP response headers
     """
+
     NAME: str = "Enable HTTP Response Headers"
     SIGNATURE: str = "at+httprshdr"
     VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = EnableHTTPResponseHeader.parse_params(params)
+        (valid, params_dict) = HTTPEnableResponseHeader.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {EnableHTTPResponseHeader.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             return_str = HTTPService().enable_response_headers(params_dict["enabled"])
-            return (True, f"\r\n+HTTPRSHDR:{return_str}\r\nOK\r\n")
-        except Exception as e:
-            syslog(LOG_ERR, f"error enabling http response headers {str(e)}")
+            return (True, f"\r\n+HTTPRSHDR: {int(return_str)}\r\nOK\r\n")
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                f"Error enabling/disabling http response headers: {str(exception)}",
+            )
             return (True, "\r\nERROR\r\n")
 
     @staticmethod
@@ -36,13 +37,14 @@ class EnableHTTPResponseHeader(Command):
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in EnableHTTPResponseHeader.VALID_NUM_PARAMS
+        valid &= len(params_list) in HTTPEnableResponseHeader.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
-        enabled = params_list[0]
-        if valid and enabled in ["0", "1"]:
-            params_dict["enabled"] = enabled == "1"
-        else:
+        if not valid:
+            return (False, {})
+        try:
+            params_dict["enabled"] = bool(int(params_list[0]))
+        except ValueError:
             valid = False
         return (valid, params_dict)
 
@@ -52,8 +54,8 @@ class EnableHTTPResponseHeader(Command):
 
     @staticmethod
     def signature() -> str:
-        return EnableHTTPResponseHeader.SIGNATURE
+        return HTTPEnableResponseHeader.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return EnableHTTPResponseHeader.NAME
+        return HTTPEnableResponseHeader.NAME

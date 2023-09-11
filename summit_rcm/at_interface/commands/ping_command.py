@@ -1,3 +1,7 @@
+"""
+File that consists of the Ping Command Functionality
+"""
+from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
 import subprocess
@@ -9,6 +13,10 @@ PING_COUNT = 1
 
 
 class PingCommand(Command):
+    """
+    AT Command to ping an address
+    """
+
     NAME: str = "Ping"
     SIGNATURE: str = "at+ping"
     VALID_NUM_PARAMS: List[int] = [1, 2, 3]
@@ -17,10 +25,8 @@ class PingCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = PingCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {PingCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         command = [
             "ping",
             "-c",
@@ -38,10 +44,11 @@ class PingCommand(Command):
             match = re.search(r"\d+\.\d+/(\d+\.\d+)/\d+\.\d+", ping_str)
             if match:
                 ping_str = match.group(1)
-                return (True, f"\r\n+PING:{ping_str}\r\nOK\r\n")
+                return (True, f"\r\n+PING: {ping_str}\r\nOK\r\n")
             else:
-                return (True, "\r\nTIMEOUT ERROR\r\n")
-        except Exception:
+                return (True, "\r\nERROR\r\n")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Error pinging target address: {str(exception)}")
             return (True, "\r\nERROR\r\n")
 
     @staticmethod
@@ -53,17 +60,18 @@ class PingCommand(Command):
         valid &= given_num_param in PingCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
-        if valid:
-            try:
-                params_dict["target"] = params_list[0]
-                params_dict["timeout"] = (
-                    params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
-                )
-                params_dict["protocol"] = (
-                    params_list[2] if given_num_param == 3 else DEFAULT_PROTOCOL
-                )
-            except Exception:
-                valid = False
+        if not valid:
+            return (False, {})
+        try:
+            params_dict["target"] = params_list[0]
+            params_dict["timeout"] = (
+                params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
+            )
+            params_dict["protocol"] = (
+                params_list[2] if given_num_param > 2 else DEFAULT_PROTOCOL
+            )
+        except Exception:
+            valid = False
         return (valid, params_dict)
 
     @staticmethod

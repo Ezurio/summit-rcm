@@ -21,10 +21,8 @@ class TimezoneSetCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = TimezoneSetCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {TimezoneSetCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             await DateTimeService().set_time_zone(params_dict["timezone"])
             return (True, "\r\nOK\r\n")
@@ -40,6 +38,8 @@ class TimezoneSetCommand(Command):
         valid &= len(params_list) in TimezoneSetCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         params_dict["timezone"] = params_list[0]
         return (valid, params_dict)
 

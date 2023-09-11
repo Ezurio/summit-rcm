@@ -21,16 +21,15 @@ class WiFiHardwareCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = WiFiHardwareCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {WiFiHardwareCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             wifi_enabled = await NetworkService().get_wireless_hardware_enabled()
             return (True, f"\r\n+WHARD: {1 if wifi_enabled else 0}\r\nOK\r\n")
         except Exception as exception:
             syslog(
-                LOG_ERR, f"Error getting Wi-Fi hardware enabled status: {str(exception)}"
+                LOG_ERR,
+                f"Error getting Wi-Fi hardware enabled status: {str(exception)}",
             )
             return (True, "\r\nERROR\r\n")
 

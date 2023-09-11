@@ -1,13 +1,19 @@
 """
-File that consists of the VirtualInterface Command Functionality
+File that consists of the NetworkVirtualInterface Command Functionality
 """
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
+from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.services.network_service import NetworkService
 
 
-class VirtualInterfaceCommand(Command):
+class Modes(IntEnum):
+    REMOVE = 0
+    ADD = 1
+
+
+class NetworkVirtualInterfaceCommand(Command):
     """
     AT Command to add or remove a virtual interface
     """
@@ -19,14 +25,12 @@ class VirtualInterfaceCommand(Command):
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = VirtualInterfaceCommand.parse_params(params)
+        (valid, params_dict) = NetworkVirtualInterfaceCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {VirtualInterfaceCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
-            if params_dict["add"]:
+            if params_dict["add"] == Modes.ADD:
                 await NetworkService().add_virtual_interface()
             else:
                 await NetworkService().remove_virtual_interface()
@@ -35,20 +39,20 @@ class VirtualInterfaceCommand(Command):
             syslog(
                 LOG_ERR, f"Error adding/removing virtual interface: {str(exception)}"
             )
-            return (True, "\r\nError\r\n")
+            return (True, "\r\nERROR\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in VirtualInterfaceCommand.VALID_NUM_PARAMS
+        valid &= len(params_list) in NetworkVirtualInterfaceCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
-            params_dict["add"] = int(params_list[0])
-            if params_dict["add"] not in (0, 1):
-                raise ValueError
+            params_dict["add"] = Modes(int(params_list[0]))
         except ValueError:
             valid = False
         return (valid, params_dict)
@@ -59,8 +63,8 @@ class VirtualInterfaceCommand(Command):
 
     @staticmethod
     def signature() -> str:
-        return VirtualInterfaceCommand.SIGNATURE
+        return NetworkVirtualInterfaceCommand.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return VirtualInterfaceCommand.NAME
+        return NetworkVirtualInterfaceCommand.NAME

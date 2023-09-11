@@ -22,16 +22,14 @@ class CertificatesGetCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = CertificatesGetCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {CertificatesGetCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             certificates_dict, return_msg = CertificatesService.get_cert_info(
                 params_dict["name"], params_dict["password"]
             )
             if return_msg == "":
-                certificates_str = dumps(certificates_dict, separators=(',', ':'))
+                certificates_str = dumps(certificates_dict, separators=(",", ":"))
                 return (True, f"\r\n+CERTGET: {certificates_str}\r\nOK\r\n")
             raise Exception(return_msg)
         except Exception as exception:
@@ -44,6 +42,8 @@ class CertificatesGetCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in CertificatesGetCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         params_dict["name"] = params_list[0]
         if params_dict["name"] == "":
             return (False, params_dict)
