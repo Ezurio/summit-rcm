@@ -8,7 +8,7 @@ from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.chrony.ntp_service import ChronyNTPService
 
 
-class Types(IntEnum):
+class Commands(IntEnum):
     addSource = 0
     removeSource = 1
     overrideSources = 2
@@ -27,10 +27,8 @@ class NTPConfigureCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = NTPConfigureCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {NTPConfigureCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             await ChronyNTPService.chrony_configure_sources(
                 params_dict["command"], params_dict["sources"]
@@ -48,12 +46,14 @@ class NTPConfigureCommand(Command):
         valid &= len(params_list) > 1
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
-            params_dict["command"] = Types(int(params_list[0])).name
+            params_dict["command"] = Commands(int(params_list[0])).name
             del params_list[0]
             sources_list = []
             for param in params_list:
-                param = param.strip('[]')
+                param = param.strip("[]")
                 param = param.strip("'")
                 param = param.strip('"')
                 if param != "":

@@ -1,47 +1,48 @@
 """
-File that consists of the Version Command Functionality
+File that consists of the ATEchoDisable Command Functionality
 """
 from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
-from summit_rcm.definition import SUMMIT_RCM_VERSION
+import summit_rcm.at_interface.fsm as fsm
 
 
-class VersionCommand(Command):
+class ATEchoDisableCommand(Command):
     """
-    AT Command to get the Summit-RCM version
+    AT Command to disable the AT Interface's serial echo
     """
 
-    NAME: str = "Version"
-    SIGNATURE: str = "at+ver"
+    NAME: str = "Disable AT Serial Echo"
+    SIGNATURE: str = "ate0"
     VALID_NUM_PARAMS: List[int] = [1]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        (valid, params_dict) = VersionCommand.parse_params(params)
+        (valid, params_dict) = ATEchoDisableCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "\r\nERROR\r\n")
-        return (True, f"\r\n+VER: {SUMMIT_RCM_VERSION}\r\nOK\r\n")
+        fsm.ATInterfaceFSM().enable_echo(False)
+        return (True, "\r\nOK\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
         valid = True
         params_dict = {}
         params_list = params.split(",")
-        valid &= len(params_list) in VersionCommand.VALID_NUM_PARAMS
+        valid &= len(params_list) in ATEchoDisableCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param == ""
         return (valid, params_dict)
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+VER\r\n"
+        return "\r\nATE0\r\n"
 
     @staticmethod
     def signature() -> str:
-        return VersionCommand.SIGNATURE
+        return ATEchoDisableCommand.SIGNATURE
 
     @staticmethod
     def name() -> str:
-        return VersionCommand.NAME
+        return ATEchoDisableCommand.NAME

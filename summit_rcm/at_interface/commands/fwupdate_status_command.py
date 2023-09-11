@@ -21,10 +21,8 @@ class FWUpdateStatusCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = FWUpdateStatusCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {FWUpdateStatusCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             status, info = FirmwareUpdateService().get_update_status()
             return (True, f"\r\n+FWSTATUS: {status.value}\r\nOK\r\n")

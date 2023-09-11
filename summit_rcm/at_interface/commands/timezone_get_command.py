@@ -3,8 +3,14 @@ File that consists of the TimezoneGet Command Functionality
 """
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
+from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.services.date_time_service import DateTimeService
+
+
+class Scopes(IntEnum):
+    LOCAL = 0
+    GLOBAL = 1
 
 
 class TimezoneGetCommand(Command):
@@ -21,12 +27,10 @@ class TimezoneGetCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = TimezoneGetCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {TimezoneGetCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
-            if params_dict["scope"]:
+            if params_dict["scope"] == Scopes.GLOBAL:
                 timezone_str = ""
                 timezone_list = DateTimeService().zones
                 for timezone in timezone_list:
@@ -44,10 +48,12 @@ class TimezoneGetCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in TimezoneGetCommand.VALID_NUM_PARAMS
+        if not valid:
+            return (False, {})
         try:
-            params_dict["scope"] = int(params_list[0]) if params_list[0] else 0
-            if params_dict["scope"] not in (0, 1):
-                raise ValueError
+            params_dict["scope"] = (
+                Scopes(int(params_list[0])) if params_list[0] else Scopes.LOCAL
+            )
         except ValueError:
             valid = False
         return (valid, params_dict)

@@ -3,7 +3,8 @@ Service file to handle all HTTP configurations and executions
 """
 
 import http.client
-from typing import Dict
+import time
+from typing import Dict, Tuple
 from summit_rcm.utils import Singleton
 from summit_rcm.utils import InProgressException
 import summit_rcm.at_interface.fsm as fsm
@@ -11,8 +12,13 @@ import summit_rcm.at_interface.fsm as fsm
 
 class HTTPService(object, metaclass=Singleton):
     """
-    Handles HTTP Configuration and Executions
+    Service to handle HTTP configuration and executions
     """
+
+    escape_delay: float = 0.02
+    escape_count: int = 0
+    escape: bool = False
+    rx_timestamp: float = 0.0
 
     def __init__(
         self,
@@ -75,21 +81,27 @@ class HTTPService(object, metaclass=Singleton):
         """
         self.headers[key] = value
 
-    def enable_response_headers(self, enabled: bool) -> str:
+    def enable_response_headers(self, enabled: bool) -> bool:
         """
         Enables or disables the inclusion of headers in an HTTP response
         and returns a boolean indicating whether response headers are enabled
         """
         self.rspheader = enabled
-        return str(self.rspheader)
+        return self.rspheader
 
-    def execute_http_transaction(self, length: int) -> str:
+    def execute_http_transaction(self, length: int) -> Tuple[str, int]:
         """
         Establishes an HTTP connection and sends the configures request
         to the HTTP server and returns the HTTP response. If a length is
         given, the AT interface will enter serial data mode.
         """
         statemachine = fsm.ATInterfaceFSM()
+        if self.escape:
+            self.escape = False
+            self.body = ""
+            statemachine.deregister_listener(self.listener)
+            self.listener = -1
+            return ("", -1)
         transaction = http.client.HTTPConnection(
             self.host, port=self.port, timeout=self.timeout
         )
@@ -107,10 +119,27 @@ class HTTPService(object, metaclass=Singleton):
                     response_str = f"{header[0]}:{header[1]},"
                 response_str += response_str[:-1] + "\r\n"
             response_str += response.read().decode("utf-8")
-            return response_str
+            return (response_str, length)
 
         def write_http_body(data: bytes):
             self.body += data.decode("utf-8")
+            body_check = self.body[-3:]
+            body_check_length = len(body_check)
+            less_than_delay = (
+                True
+                if (time.time() - self.rx_timestamp) <= self.escape_delay
+                else False
+            )
+            if not (body_check_length > 0 and body_check[-1] == "+"):
+                self.escape_count = 0
+            elif less_than_delay and self.escape_count != 0:
+                self.escape_count += 1
+                if self.escape_count == 3:
+                    self.escape_count = 0
+                    self.escape = True
+            elif not less_than_delay:
+                self.escape_count = 1
+            self.rx_timestamp = time.time()
 
         if self.listener == -1:
             fsm.ATInterfaceFSM().dte_output("\r\n> ")

@@ -1,3 +1,6 @@
+"""
+Module to handle IP Connections
+"""
 import asyncio
 from syslog import syslog
 import time
@@ -9,6 +12,9 @@ import summit_rcm.at_interface.fsm as fsm
 
 
 class Connection:
+    """
+    Defines an IP Connection
+    """
     id: int
     type: str
     addr: str
@@ -64,6 +70,9 @@ class Connection:
 
 
 class ConnectionService(object, metaclass=Singleton):
+    """
+    Service class to handle IP Connections
+    """
     MAX_CONNECTIONS: int = 6
     escape_delay: float = 0.02
     escape_count: int = 0
@@ -99,17 +108,6 @@ class ConnectionService(object, metaclass=Singleton):
                 current_connection.on_connection_lost
             )
             self.connections.append(current_connection)
-
-    @staticmethod
-    def validate_connection_type(input: str) -> bool:
-        """
-        Analyzes the input string and returns the True if the connection type value is valid.
-        Otherwise, return False.
-        """
-        if input == "tcp" or input == "udp" or input == "ssl":
-            return True
-        else:
-            return False
 
     def start_connection(
         self,

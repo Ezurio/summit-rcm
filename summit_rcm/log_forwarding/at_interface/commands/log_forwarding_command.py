@@ -29,10 +29,8 @@ class LogForwardingCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = LogForwardingCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {LogForwardingCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             await LogForwardingService().set_state(params_dict["state"])
             return (True, "\r\nOK\r\n")
@@ -49,6 +47,8 @@ class LogForwardingCommand(Command):
         valid &= len(params_list) in LogForwardingCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         try:
             params_dict["state"] = Types(int(params_list[0])).name
         except ValueError:

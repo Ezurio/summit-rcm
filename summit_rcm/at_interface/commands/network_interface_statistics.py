@@ -20,10 +20,8 @@ class NetworkInterfaceStatisticsCommand(Command):
     async def execute(params: str) -> Tuple[bool, str]:
         (valid, params_dict) = NetworkInterfaceStatisticsCommand.parse_params(params)
         if not valid:
-            return (
-                True,
-                f"\r\nInvalid Parameters: See Usage - {NetworkInterfaceStatisticsCommand.SIGNATURE}?\r\n",
-            )
+            syslog(LOG_ERR, "Invalid Parameters")
+            return (True, "\r\nERROR\r\n")
         try:
             (success, statistics_dict) = await NetworkService.get_interface_statistics(
                 params_dict["interface name"], is_legacy=False
@@ -37,10 +35,12 @@ class NetworkInterfaceStatisticsCommand(Command):
             statistics_str += f"{statistics_dict['txPackets']},"
             statistics_str += f"{statistics_dict['txErrors']},"
             statistics_str += f"{statistics_dict['txDropped']}"
-            return (True, f"\r\n+NETIFSTAT:{statistics_str}\r\nOK\r\n")
-        except Exception as e:
-            syslog(LOG_ERR, f"Error getting network interface statistics {str(e)}")
-            return (True, "\r\nError\r\n")
+            return (True, f"\r\n+NETIFSTAT: {statistics_str}\r\nOK\r\n")
+        except Exception as exception:
+            syslog(
+                LOG_ERR, f"Error getting network interface statistics: {str(exception)}"
+            )
+            return (True, "\r\nERROR\r\n")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -50,6 +50,8 @@ class NetworkInterfaceStatisticsCommand(Command):
         valid &= len(params_list) in NetworkInterfaceStatisticsCommand.VALID_NUM_PARAMS
         for param in params_list:
             valid &= param != ""
+        if not valid:
+            return (False, {})
         params_dict["interface name"] = params_list[0]
         return (valid, params_dict)
 

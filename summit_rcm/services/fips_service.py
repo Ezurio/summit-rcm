@@ -82,3 +82,7 @@ class FipsService(metaclass=Singleton):
         except Exception as exception:
             syslog(LOG_ERR, f"get_fips_state exception: {str(exception)}")
             return "unknown"
+
+
+class FipsUnsupportedError(Exception):
+    """Custom error class for when Fips is not supported"""
