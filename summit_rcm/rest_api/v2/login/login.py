@@ -66,15 +66,6 @@ class LoginResource:
                     resp.status = falcon.HTTP_200
                     return
 
-            # Session is created, but default password was not changed.
-            if username == LoginService().default_username:
-                if UserService.verify(
-                    LoginService().default_username, LoginService().default_password
-                ):
-                    syslog(f"User {username} logged in")
-                    resp.status = falcon.HTTP_200
-                    return
-
             # If session already exists, return success (if multiple user sessions not allowed);
             # otherwise verify login username and password.
             if (
