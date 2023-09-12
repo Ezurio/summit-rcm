@@ -223,7 +223,10 @@ class LoginManage:
                 return
 
         # Session is created, but default password was not changed.
-        if username == LoginService().default_username:
+        if (
+            username_from_cookie
+            and username_from_cookie == LoginService().default_username
+        ):
             if UserService.verify(
                 LoginService().default_username, LoginService().default_password
             ):
