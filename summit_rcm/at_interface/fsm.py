@@ -95,12 +95,12 @@ try:
 except ImportError:
     LogForwardingCommand = None
 try:
-    from summit_rcm.at_interface.commands.awm_scan_command import AWMScanCommand
-    from summit_rcm.at_interface.commands.awm_mode_command import AWMModeCommand
+    from summit_rcm.awm.at_interface.commands.awm_scan_command import AWMScanCommand
+    from summit_rcm.awm.at_interface.commands.awm_mode_command import AWMModeCommand
 except ImportError:
     AWMScanCommand = None
 try:
-    from summit_rcm.at_interface.commands.siso_mode_command import SISOModeCommand
+    from summit_rcm.radio_siso_mode.at_interface.commands.siso_mode_command import SISOModeCommand
 except ImportError:
     SISOModeCommand = None
 
