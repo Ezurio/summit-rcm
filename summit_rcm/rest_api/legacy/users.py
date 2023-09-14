@@ -2,12 +2,14 @@
 Module to handle legacy user management and login requests
 """
 
+import base64
+import json
 from syslog import syslog
 from datetime import datetime
 import falcon
 from summit_rcm.definition import SUMMIT_RCM_ERRORS, USER_PERMISSION_TYPES
 from summit_rcm.services.user_service import UserService
-from summit_rcm.services.login_service import LoginService
+from summit_rcm.services.login_service import MAX_SESSION_AGE_S, LoginService, Session
 from summit_rcm.settings import ServerConfig, SystemSettingsManage
 
 
@@ -176,107 +178,138 @@ class LoginManage:
         password = post_data.get("password", "")
         syslog(f"Attempt to login user {username}")
 
-        # Return if username is blocked
-        username_from_cookie = req.context.get_session("USERNAME")
-        if not username_from_cookie:
+        try:
+            if (
+                hasattr(req.context, "_session")
+                and req.context._session
+                and req.context.valid_session
+                and req.context.session_id
+            ):
+                # Session cookie exists
+                session_id = req.context.session_id
+                if not session_id:
+                    raise Exception("Malformed cookie")
+
+                if not UserService.verify(username=username, password=password):
+                    # Provided username and password are incorrect
+                    LoginService().login_failed(username)
+                    result["InfoMsg"] = "unable to verify user/password"
+
+                    LoginService().remove_invalid_session(session_id)
+                    resp.context.valid_session = False
+                    resp.media = result
+                    return
+
+                # Provided username and password are correct
+                LoginService().login_reset(username)
+                result["InfoMsg"] = "User logged in"
+
+                if (
+                    username == LoginService().default_username
+                    and password == LoginService().default_password
+                    and UserService.verify(
+                        LoginService().default_username,
+                        LoginService().default_password,
+                    )
+                ):
+                    # Password needs changed
+                    result["REDIRECT"] = 1
+                    result["InfoMsg"] = "Password change required"
+
+                LoginService().keepalive_session(session_id)
+                resp.context.valid_session = True
+                result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
+                syslog(f"User {username} logged in")
+                resp.media = result
+                return
+
+            # No session cookie present or it's invalid
             if LoginService().is_user_blocked(username):
+                resp.context.valid_session = False
                 result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_USER_BLOCKED")
                 result["InfoMsg"] = "User blocked"
                 resp.media = result
                 return
 
-        # If default password is not changed, redirect to passwd update page.
-        if (username == LoginService().default_username) and (
-            password == LoginService().default_password
-        ):
-            cnt = UserService.get_number_of_users()
-            if not cnt:
-                UserService.add_user(
-                    username,
-                    password,
-                    " ".join(USER_PERMISSION_TYPES["UserPermissionTypes"]),
-                )
-
-            if not cnt or UserService.verify(
-                LoginService().default_username, LoginService().default_password
+            default_login: bool = False
+            if (username == LoginService().default_username) and (
+                password == LoginService().default_password
             ):
-                LoginService().login_reset(username)
-                if (
-                    LoginService().is_user_logged_in(username)
-                    and not LoginService().allow_multiple_user_sessions
-                ):
-                    result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_USER_LOGGED")
-                    result["InfoMsg"] = "User already logged in"
-                    resp.media = result
-                    return
+                # Default login
+                default_login = True
+                if not UserService.get_number_of_users():
+                    UserService.add_user(
+                        username,
+                        password,
+                        " ".join(USER_PERMISSION_TYPES["UserPermissionTypes"]),
+                    )
 
-                resp.context.set_session("USERNAME", username)
-                resp.context.set_session(
-                    "iat", int(round(datetime.utcnow().timestamp()))
-                )
-                resp.context.valid_session = True
-                result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
-                result["REDIRECT"] = 1
-                result["InfoMsg"] = "Password change required"
-                syslog(f"User {username} logged in")
-                resp.media = result
-                return
-
-        # Session is created, but default password was not changed.
-        if (
-            username_from_cookie
-            and username_from_cookie == LoginService().default_username
-        ):
-            if UserService.verify(
-                LoginService().default_username, LoginService().default_password
+            if (
+                not LoginService().allow_multiple_user_sessions
+                and LoginService().is_user_logged_in(username)
             ):
-                result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
-                result["REDIRECT"] = 1
-                result["InfoMsg"] = "Password change required"
-                syslog(f"User {username} logged in")
-                resp.media = result
-                return
-
-        # If session already exists, return success (if multiple user sessions not allowed);
-        # otherwise verify login username and password.
-        if (
-            not req.context.get_session("USERNAME")
-            or LoginService().allow_multiple_user_sessions
-        ):
-            if not UserService.verify(username, password):
-                LoginService().login_failed(username)
-                result["InfoMsg"] = "unable to verify user/password"
-
-                # Expire the current session if user has already logged in
+                result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_USER_LOGGED")
+                result["InfoMsg"] = "User already logged in"
                 resp.context.valid_session = False
                 resp.media = result
                 return
 
+            if not (
+                default_login
+                or UserService.verify(username=username, password=password)
+            ):
+                # Provided username and password are incorrect
+                LoginService().login_failed(username)
+                result["InfoMsg"] = "unable to verify user/password"
+                resp.context.valid_session = False
+                resp.media = result
+                return
+
+            # Provided username and password are correct
             LoginService().login_reset(username)
+            result["InfoMsg"] = "User logged in"
+            resp.context.set_session("USERNAME", username)
+            resp.context.set_session("iat", int(round(datetime.utcnow().timestamp())))
+            session_base64 = base64.urlsafe_b64encode(
+                json.dumps(resp.context._session).encode()
+            ).decode()
+            LoginService().add_new_valid_session(
+                Session(
+                    id=session_base64,
+                    expiry=int(resp.context._session.get("iat", 0)) + MAX_SESSION_AGE_S,
+                    username=resp.context._session.get("USERNAME", ""),
+                )
+            )
+            resp.context.valid_session = True
 
-        if (
-            LoginService().is_user_logged_in(username)
-            and not LoginService().allow_multiple_user_sessions
-        ):
-            result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_USER_LOGGED")
-            result["InfoMsg"] = "User already logged in"
-            resp.media = result
-            return
+            result["PERMISSION"] = UserService.get_permission(username)
+            # Don't display "system_user" page for single user mode
+            if SystemSettingsManage.get_max_web_clients() == 1 and result["PERMISSION"]:
+                result["PERMISSION"] = result["PERMISSION"].replace("system_user", "")
 
-        resp.context.set_session("USERNAME", username)
-        resp.context.set_session("iat", int(round(datetime.utcnow().timestamp())))
-        resp.context.valid_session = True
+            if (
+                username == LoginService().default_username
+                and password == LoginService().default_password
+                and UserService.verify(
+                    LoginService().default_username,
+                    LoginService().default_password,
+                )
+            ):
+                # Password needs changed
+                result["REDIRECT"] = 1
+                result["InfoMsg"] = "Password change required"
+            result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
+            syslog(f"User {username} logged in")
 
-        result["PERMISSION"] = UserService.get_permission(username)
-        # Don't display "system_user" page for single user mode
-        if SystemSettingsManage.get_max_web_clients() == 1 and result["PERMISSION"]:
-            result["PERMISSION"] = result["PERMISSION"].replace("system_user", "")
-
-        result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
-        result["InfoMsg"] = "User logged in"
-        syslog(f"user {username} logged in")
+        except Exception as exception:
+            syslog(f"Error while processing login request - {str(exception)}")
+            result = {
+                "SDCERR": SUMMIT_RCM_ERRORS.get("SDCERR_FAIL", 1),
+                "REDIRECT": 0,
+                "PERMISSION": "",
+                "InfoMsg": "Error while processing login request",
+            }
         resp.media = result
-        return
 
     async def on_delete(self, req, resp):
         resp.status = falcon.HTTP_200
@@ -287,13 +320,14 @@ class LoginManage:
         }
         username = req.context.get_session("USERNAME")
         if username:
-            LoginService().delete(username)
             result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
             result["InfoMsg"] = f"user {username} logged out"
-            resp.context.valid_session = False
+            if not req.context.session_id:
+                raise Exception("Malformed cookie")
+            LoginService().remove_invalid_session(req.context.session_id)
             syslog(f"logout user {username}")
         else:
             result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_FAIL")
             result["InfoMsg"] = "user not found"
+        resp.context.valid_session = False
         resp.media = result
-        return
