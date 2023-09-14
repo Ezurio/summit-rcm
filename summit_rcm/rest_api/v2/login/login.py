@@ -1,10 +1,12 @@
 """Module to handle login session management"""
 
+import base64
+import json
 from syslog import LOG_ERR, syslog
 from datetime import datetime
 import falcon.asgi
 from summit_rcm.definition import USER_PERMISSION_TYPES
-from summit_rcm.services.login_service import LoginService
+from summit_rcm.services.login_service import LoginService, MAX_SESSION_AGE_S, Session
 from summit_rcm.services.user_service import UserService
 
 
@@ -27,73 +29,87 @@ class LoginResource:
             username = post_data.get("username", "")
             password = post_data.get("password", "")
 
-            # Return if username is blocked
-            username_from_cookie = req.context.get_session("USERNAME")
-            if not username_from_cookie and LoginService().is_user_blocked(username):
+            if (
+                hasattr(req.context, "_session")
+                and req.context._session
+                and req.context.valid_session
+                and req.context.session_id
+            ):
+                # Session cookie exists
+                session_id = req.context.session_id
+                if not session_id:
+                    raise Exception("Malformed cookie")
+
+                if not UserService.verify(username=username, password=password):
+                    # Provided username and password are incorrect
+                    LoginService().login_failed(username)
+                    LoginService().remove_invalid_session(session_id)
+                    resp.context.valid_session = False
+                    resp.status = falcon.HTTP_403
+                    return
+
+                # Provided username and password are correct
+                LoginService().login_reset(username)
+                LoginService().keepalive_session(session_id)
+                resp.context.valid_session = True
+                syslog(f"User {username} logged in")
+                resp.status = falcon.HTTP_200
+                return
+
+            # No session cookie present or it's invalid
+            if LoginService().is_user_blocked(username):
+                resp.context.valid_session = False
                 resp.status = falcon.HTTP_403
                 return
 
-            # If default password is not changed, redirect to password update page.
+            default_login: bool = False
             if (username == LoginService().default_username) and (
                 password == LoginService().default_password
             ):
-                count = UserService.get_number_of_users()
-                if not count:
+                # Default login
+                default_login = True
+                if not UserService.get_number_of_users():
                     UserService.add_user(
                         username,
                         password,
                         " ".join(USER_PERMISSION_TYPES["UserPermissionTypes"]),
                     )
 
-                if not count or UserService.verify(
-                    LoginService().default_username, LoginService().default_password
-                ):
-                    LoginService().login_reset(username)
-                    if (
-                        LoginService().is_user_logged_in(username)
-                        and not LoginService().allow_multiple_user_sessions
-                    ):
-                        # User already logged in
-                        resp.status = falcon.HTTP_200
-                        return
-
-                    resp.context.set_session("USERNAME", username)
-                    resp.context.set_session(
-                        "iat", int(round(datetime.utcnow().timestamp()))
-                    )
-                    resp.context.valid_session = True
-                    syslog(f"User {username} logged in")
-                    resp.status = falcon.HTTP_200
-                    return
-
-            # If session already exists, return success (if multiple user sessions not allowed);
-            # otherwise verify login username and password.
             if (
-                not req.context.get_session("USERNAME")
-                or LoginService().allow_multiple_user_sessions
+                not LoginService().allow_multiple_user_sessions
+                and LoginService().is_user_logged_in(username)
             ):
-                if not UserService.verify(username, password):
-                    LoginService().login_failed(username)
-                    # Expire the current session if user has already logged in
-                    resp.context.valid_session = False
-                    resp.status = falcon.HTTP_403
-                    return
-
-                LoginService().login_reset(username)
-
-            if (
-                LoginService().is_user_logged_in(username)
-                and not LoginService().allow_multiple_user_sessions
-            ):
-                # User already logged in
-                resp.status = falcon.HTTP_400
+                resp.context.valid_session = False
+                resp.status = falcon.HTTP_403
                 return
 
+            if not (
+                default_login
+                or UserService.verify(username=username, password=password)
+            ):
+                # Provided username and password are incorrect
+                LoginService().login_failed(username)
+                resp.context.valid_session = False
+                resp.status = falcon.HTTP_403
+                return
+
+            # Provided username and password are correct
+            LoginService().login_reset(username)
             resp.context.set_session("USERNAME", username)
             resp.context.set_session("iat", int(round(datetime.utcnow().timestamp())))
+            session_base64 = base64.urlsafe_b64encode(
+                json.dumps(resp.context._session).encode()
+            ).decode()
+            LoginService().add_new_valid_session(
+                Session(
+                    id=session_base64,
+                    expiry=int(resp.context._session.get("iat", 0)) + MAX_SESSION_AGE_S,
+                    username=resp.context._session.get("USERNAME", ""),
+                )
+            )
             resp.context.valid_session = True
             resp.status = falcon.HTTP_200
-            syslog(f"user {username} logged in")
+            syslog(f"User {username} logged in")
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to login: {str(exception)}")
             resp.status = falcon.HTTP_500
@@ -110,8 +126,10 @@ class LoginResource:
                 resp.status = falcon.HTTP_400
                 return
 
-            LoginService().delete(username)
-            resp.context.valid_session = False
+            if not req.context.session_id:
+                raise Exception("Malformed cookie")
+
+            LoginService().remove_invalid_session(req.context.session_id)
             resp.status = falcon.HTTP_200
             syslog(f"logout user {username}")
         except Exception as exception:

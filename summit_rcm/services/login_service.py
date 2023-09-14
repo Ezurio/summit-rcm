@@ -3,13 +3,31 @@ Module to handle session login management
 """
 
 from datetime import datetime
-import secrets
 from threading import Lock
+from typing import List
 from summit_rcm.settings import (
     ServerConfig,
     SystemSettingsManage,
 )
 from summit_rcm.utils import Singleton
+
+MAX_SESSION_AGE_S = 60 * 10
+"""
+Maximum session age in seconds (10 minutes)
+"""
+
+
+class Session:
+    """Data class to hold info about a session"""
+
+    id: str
+    expiry: int
+    username: str
+
+    def __init__(self, id: str, expiry: int, username: str) -> None:
+        self.id = id
+        self.expiry = expiry
+        self.username = username
 
 
 class LoginService(metaclass=Singleton):
@@ -18,8 +36,7 @@ class LoginService(metaclass=Singleton):
     _lock = Lock()
     # Record logins with wrong credentials to protect against tamper
     _failed_logins = {}
-    # Record successful logins and delete inactive sessions
-    _sessions = {}
+    _valid_sessions: list[Session] = []
 
     def __init__(self) -> None:
         self._sessions_enabled = (
@@ -65,14 +82,18 @@ class LoginService(metaclass=Singleton):
         """Whether or not multiple sessions per user are enabled"""
         return self._allow_multiple_user_sessions
 
-    @classmethod
-    def is_user_blocked(cls, username: str) -> bool:
+    @property
+    def valid_sessions(self) -> List[Session]:
+        """List of valid sessions"""
+        return self._valid_sessions
+
+    def is_user_blocked(self, username: str) -> bool:
         """Retrieve whether or not the user with the specified username is blocked"""
 
         user = {}
-        with cls._lock:
+        with self._lock:
             now = datetime.now()
-            user = cls._failed_logins.get(username)
+            user = self._failed_logins.get(username)
             # Block username for 'login_block_timeout' seconds if failed consecutively for
             # 'login_retry_times' times
             if (
@@ -82,16 +103,15 @@ class LoginService(metaclass=Singleton):
                 dt = abs((now - user["time"][-1]).total_seconds())
                 if dt < SystemSettingsManage.get_tamper_protection_timeout():
                     return True
-                cls._failed_logins.pop(username, None)
+                self._failed_logins.pop(username, None)
         return False
 
-    @classmethod
-    def login_failed(cls, username: str):
+    def login_failed(self, username: str):
         """Handle the event when a login attempt failed"""
 
-        with cls._lock:
+        with self._lock:
             now = datetime.now()
-            user = cls._failed_logins.get(username, {})
+            user = self._failed_logins.get(username, {})
             if user:
                 user["time"] = [
                     dt
@@ -105,28 +125,56 @@ class LoginService(metaclass=Singleton):
                 user["time"] = []
 
             user["time"].append(now)
-            cls._failed_logins[username] = user
+            self._failed_logins[username] = user
 
-    @classmethod
-    def login_reset(cls, username: str):
+    def login_reset(self, username: str):
         """Handle the event when a user's login session is reset"""
 
-        with cls._lock:
-            cls._failed_logins.pop(username, None)
+        with self._lock:
+            self._failed_logins.pop(username, None)
 
-    @classmethod
-    def is_user_logged_in(cls, username: str) -> bool:
+    def is_user_logged_in(self, username: str) -> bool:
         """Retrieve whether or not the user with the specified username is currently logged in"""
 
-        with cls._lock:
-            if cls._sessions.get(username, None):
+        for session in self.valid_sessions:
+            if session.username == username:
                 return True
-
-            cls._sessions[username] = secrets.token_bytes(10)
         return False
 
-    @classmethod
-    def delete(cls, username):
-        """Remove the active session for the user with the specified username"""
+    def add_new_valid_session(self, new_session: Session):
+        """Add a new valid session to the list"""
+        self._valid_sessions.append(new_session)
 
-        cls._sessions.pop(username, None)
+    def remove_invalid_session(self, invalid_session_id: int) -> None:
+        """Remove an invalid session from the list"""
+        self._valid_sessions[:] = [
+            x for x in self._valid_sessions if x.id != invalid_session_id
+        ]
+
+    def cleanup_expired_sessions(self) -> None:
+        """
+        Clean up and remove any expired sessions. If multiple sessions per user is not enabled, also
+        log out the corresponding user.
+        """
+        now = int(round(datetime.utcnow().timestamp()))
+        self._valid_sessions[:] = [x for x in self._valid_sessions if now < x.expiry]
+
+    def keepalive_session(self, session_id: str) -> None:
+        """Update the expiry for the session with the given ID"""
+        now = int(round(datetime.utcnow().timestamp()))
+        for session in self._valid_sessions:
+            if session.id == session_id:
+                session.expiry = now + MAX_SESSION_AGE_S
+                return
+
+    def session_is_valid(self, session_id: str) -> bool:
+        """
+        Determine whether or not the session with the given ID is valid.
+        """
+        now = int(round(datetime.utcnow().timestamp()))
+        for session in self.valid_sessions:
+            if session_id == session.id and now < session.expiry:
+                # Target session is not expired
+                return True
+
+        return False
