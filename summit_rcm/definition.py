@@ -6,7 +6,7 @@ from summit_rcm.services.network_manager_service import (
     NMDeviceType,
 )
 
-SUMMIT_RCM_VERSION = "11.0.0.108"
+SUMMIT_RCM_VERSION = "11.0.0.109"
 
 # TODO - deal with directories for file retrieval (see FIELDIR_DICT and files.py)
 SYSTEM_CONF_DIR = "/data/"
