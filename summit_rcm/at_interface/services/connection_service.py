@@ -53,24 +53,24 @@ class Connection:
 
     def on_connection_made(self):
         fsm.ATInterfaceFSM().at_output(
-            f"+IP:{self.id},Connected", print_leading_line_break=False
+            f"+IP: {self.id},Connected", print_leading_line_break=False
         )
 
     def on_data_received(self, data: bytes):
         fsm.ATInterfaceFSM().at_output(
-            f"+IPD:{self.id},{len(data)},{str(data.decode('utf-8'))}",
+            f"+IPD: {self.id},{len(data)},".encode("utf-8") + data,
             print_leading_line_break=False,
         )
 
     def on_datagram_received(self, data: bytes, addr: Tuple[str, int]):
         fsm.ATInterfaceFSM().at_output(
-            f"+IPD:{self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}",
+            f"+IPD: {self.id},{len(data)},'{addr[0]}',{addr[1]},".encode("utf-8") + data,
             print_leading_line_break=False,
         )
 
     def on_connection_lost(self):
         fsm.ATInterfaceFSM().at_output(
-            f"+IP:{self.id},Disconnected", print_leading_line_break=False
+            f"+IP: {self.id},Disconnected", print_leading_line_break=False
         )
         if ConnectionService().connections[self.id].connected:
             ConnectionService().close_connection(self.id)

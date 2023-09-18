@@ -116,7 +116,7 @@ class HTTPService(object, metaclass=Singleton):
             self.body = ""
             if self.rspheader:
                 for header in response.getheaders():
-                    response_str = f"{header[0]}:{header[1]},"
+                    response_str += f"{header[0]}:{header[1]},"
                 response_str += response_str[:-1] + "\r\n"
             response_str += response.read().decode("utf-8")
             return (response_str, length)
