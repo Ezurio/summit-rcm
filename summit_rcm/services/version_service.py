@@ -7,6 +7,7 @@ import re
 from syslog import LOG_ERR, syslog
 from subprocess import run, TimeoutExpired, check_output
 import aiofiles
+from asyncio import create_subprocess_exec, subprocess
 from summit_rcm.services.network_manager_service import (
     NMDeviceType,
     NetworkManagerService,
@@ -65,10 +66,12 @@ class VersionService(metaclass=Singleton):
                 self._version["bluez"] = (
                     self.get_bluez_version() if Bluetooth is not None else "n/a"
                 )
+                self._version["uBoot"] = await self.get_uboot_version()
 
             if is_legacy:
                 # Adjust property names for legacy support
                 version_legacy = self._version.copy()
+                version_legacy["u-boot"] = version_legacy.pop("uBoot")
                 version_legacy["nm_version"] = version_legacy.pop("nmVersion")
                 version_legacy["summit_rcm"] = version_legacy.pop("summitRcm")
                 version_legacy["radio_stack"] = version_legacy.pop("radioStack")
@@ -126,3 +129,20 @@ class VersionService(metaclass=Singleton):
                     return str(match.group("VERSION"))
 
         return "Unknown"
+
+    @staticmethod
+    async def get_uboot_version() -> str:
+        """Retrieve the current u-boot version"""
+        try:
+            proc = await create_subprocess_exec(
+                *["fw_printenv", "-n", "version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise Exception(stderr.decode("utf-8").strip())
+            return stdout.decode("utf-8").strip()
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read uboot version: {str(exception)}")
+            return ""
