@@ -189,10 +189,9 @@ class NetworkService(metaclass=Singleton):
                 else []
             )
             for nameserver in props_nameserver_data:
-                nameserver["address"] = nameserver["address"].value
                 ipconfig_properties[
                     "NameserverData" if is_legacy else "nameserverData"
-                ].append(nameserver)
+                ].append(nameserver["address"].value)
             ipconfig_properties[
                 "WinsServerData" if is_legacy else "winsServerData"
             ] = []
