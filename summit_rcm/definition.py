@@ -37,8 +37,8 @@ FILEDIR_DICT = {
 }
 
 FILEFMT_DICT = {
-    "cert": ("crt", "key", "pem", "bin", "der", "p12", "pfx", "cer"),
-    "pac": ("pac"),
+    "cert": (".crt", ".key", ".pem", ".bin", ".der", ".p12", ".pfx", ".cer"),
+    "pac": (".pac"),
 }
 
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
