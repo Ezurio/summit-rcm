@@ -29,13 +29,13 @@ class PowerCommand(Command):
         (valid, params_dict) = PowerCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             await SystemService().set_power_state(params_dict["state"])
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error while setting the power state: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -56,7 +56,7 @@ class PowerCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+POWER=<state>\r\n"
+        return "AT+POWER=<state>"
 
     @staticmethod
     def signature() -> str:

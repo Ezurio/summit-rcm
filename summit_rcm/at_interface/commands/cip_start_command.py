@@ -28,7 +28,7 @@ class CIPStartCommand(Command):
         (valid, params_dict) = CIPStartCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
         if ConnectionService().start_connection(
             id=params_dict["connection_id"],
@@ -37,9 +37,9 @@ class CIPStartCommand(Command):
             port=params_dict["remote_port"],
             keepalive=params_dict["keepalive"],
         ):
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         else:
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -67,8 +67,8 @@ class CIPStartCommand(Command):
     @staticmethod
     def usage() -> str:
         return (
-            "\r\nAT+CIPSTART=<connection id>,<type>,<remote IP>,"
-            "<remote port>[,<keepalive>]\r\n"
+            "AT+CIPSTART=<connection id>,<type>,<remote IP>,"
+            "<remote port>[,<keepalive>]"
         )
 
     @staticmethod

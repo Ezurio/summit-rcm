@@ -22,7 +22,7 @@ class ConnectionActivateCommand(Command):
         (valid, params_dict) = ConnectionActivateCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             try:
                 uuid = await NetworkService().get_connection_profile_uuid_from_id(
@@ -34,10 +34,10 @@ class ConnectionActivateCommand(Command):
                 await NetworkService().activate_connection_profile(uuid=uuid)
             else:
                 await NetworkService().deactivate_connection_profile(uuid=uuid)
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error Activating Connection: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -59,7 +59,7 @@ class ConnectionActivateCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CONNACT=<uuid>|<id>,<activate>\r\n"
+        return "AT+CONNACT=<uuid>|<id>,<activate>"
 
     @staticmethod
     def signature() -> str:

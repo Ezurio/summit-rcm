@@ -22,25 +22,25 @@ class AWMScanCommand(Command):
         (valid, params_dict) = AWMScanCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             enabled = params_dict["enabled"]
             if enabled == "":
                 awm_scan_str = AWMConfigService().get_scan_attempts()
-                return (True, f"\r\n+AWMSCAN: {awm_scan_str}\r\nOK\r\n")
+                return (True, f"+AWMSCAN: {awm_scan_str}\r\nOK")
             AWMConfigService().set_scan_attempts(enabled)
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except ConfigFileNotFoundError:
             syslog(LOG_ERR, "AWM Config File Not Found")
             if params_dict["enabled"] == "":
-                return (True, "\r\n+AWMSCAN: 1\r\nOK\r\n")
-            return (True, "\r\nERROR\r\n")
+                return (True, "+AWMSCAN: 1\r\nOK")
+            return (True, "ERROR")
         except Exception as exception:
             syslog(
                 LOG_ERR,
                 f"Error getting/setting AWM geolocation scanning: {str(exception)}",
             )
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -60,7 +60,7 @@ class AWMScanCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+AWMSCAN[=<enabled>]\r\n"
+        return "AT+AWMSCAN[=<enabled>]"
 
     @staticmethod
     def signature() -> str:

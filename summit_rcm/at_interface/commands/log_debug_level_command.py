@@ -43,7 +43,7 @@ class LogDebugLevelCommand(Command):
         (valid, params_dict) = LogDebugLevelCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             log_debug_str = ""
             if params_dict["log_level"] != "":
@@ -60,10 +60,10 @@ class LogDebugLevelCommand(Command):
                     if params_dict["type"] == Types.supplicant
                     else str(LogsService.get_wifi_driver_debug_level())
                 ) + "\r\n"
-            return (True, f"\r\n{log_debug_str}OK\r\n")
+            return (True, f"{log_debug_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting/setting log debug level: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -90,7 +90,7 @@ class LogDebugLevelCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+LOGDEBUG=<type>[,<log_level>]\r\n"
+        return "AT+LOGDEBUG=<type>[,<log_level>]"
 
     @staticmethod
     def signature() -> str:

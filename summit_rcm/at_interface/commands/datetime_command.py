@@ -22,18 +22,18 @@ class DatetimeCommand(Command):
         (valid, params_dict) = DatetimeCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["timestamp"]:
                 await DateTimeService().set_time_manual(params_dict["timestamp"])
-                return (True, "\r\nOK\r\n")
+                return (True, "OK")
             success, datetime_str = DateTimeService().check_current_date_and_time()
             if success:
-                return (True, f"\r\n+DATETIME: {datetime_str}\r\nOK\r\n")
+                return (True, f"+DATETIME: {datetime_str}\r\nOK")
             raise Exception(datetime_str)
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting/setting the datetime: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -48,7 +48,7 @@ class DatetimeCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+DATETIME[=<timestamp>]\r\n"
+        return "AT+DATETIME[=<timestamp>]"
 
     @staticmethod
     def signature() -> str:

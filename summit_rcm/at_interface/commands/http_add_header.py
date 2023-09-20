@@ -22,13 +22,13 @@ class HTTPAddHeader(Command):
         (valid, params_dict) = HTTPAddHeader.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             HTTPService().add_http_header(params_dict["key"], params_dict["value"])
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error adding http header: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -46,7 +46,7 @@ class HTTPAddHeader(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+HTTPADDHDR=<key>,<value>\r\n"
+        return "AT+HTTPADDHDR=<key>,<value>"
 
     @staticmethod
     def signature() -> str:

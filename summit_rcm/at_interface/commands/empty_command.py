@@ -3,6 +3,7 @@ File that consists of the Empty Command Functionality
 """
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
+import summit_rcm.at_interface.fsm as fsm
 
 
 class EmptyCommand(Command):
@@ -16,11 +17,12 @@ class EmptyCommand(Command):
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
-        return (True, "\r\n")
+        fsm.ATInterfaceFSM().at_output("\r\n", False, False)
+        return (True, "")
 
     @staticmethod
     def usage() -> str:
-        return "\r\n"
+        return ""
 
     @staticmethod
     def signature() -> str:

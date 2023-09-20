@@ -6,6 +6,7 @@ from syslog import LOG_ERR, syslog
 from summit_rcm.utils import InProgressException
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.services.http_service import HTTPService
+import summit_rcm.at_interface.fsm as fsm
 
 
 class HTTPExecuteTransaction(Command):
@@ -22,20 +23,21 @@ class HTTPExecuteTransaction(Command):
         (valid, params_dict) = HTTPExecuteTransaction.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             return_str, length = HTTPService().execute_http_transaction(
                 params_dict["length"]
             )
             if length == -1:
                 syslog(LOG_ERR, "Escaping Data Mode")
-                return (True, "\r\n")
-            return (True, f"\r\n+HTTPEXE: {return_str}\r\nOK\r\n")
+                fsm.ATInterfaceFSM().at_output("\r\n", False, False)
+                return (True, "")
+            return (True, f"+HTTPEXE: {return_str}\r\nOK")
         except InProgressException:
             return (False, "")
         except Exception as exception:
             syslog(LOG_ERR, f"Error executing http transaction: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -53,7 +55,7 @@ class HTTPExecuteTransaction(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+HTTPEXE[=<length>]\r\n"
+        return "AT+HTTPEXE[=<length>]"
 
     @staticmethod
     def signature() -> str:

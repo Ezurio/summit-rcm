@@ -22,13 +22,13 @@ class FWUpdateStatusCommand(Command):
         (valid, params_dict) = FWUpdateStatusCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             status, info = FirmwareUpdateService().get_update_status()
-            return (True, f"\r\n+FWSTATUS: {status.value}\r\nOK\r\n")
+            return (True, f"+FWSTATUS: {status.value}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting firmware update status: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -42,7 +42,7 @@ class FWUpdateStatusCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FWSTATUS\r\n"
+        return "AT+FWSTATUS"
 
     @staticmethod
     def signature() -> str:

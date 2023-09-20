@@ -31,7 +31,7 @@ class FWUpdateSendCommand(Command):
         (valid, params_dict) = FWUpdateSendCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             status, _ = FirmwareUpdateService().get_update_status()
             if status != SummitRCMUpdateStatus.UPDATING:
@@ -40,7 +40,7 @@ class FWUpdateSendCommand(Command):
                 "length"
             ] - FWUpdateSendCommand.ITERATIONS * int(FILE_STREAMING_BUFFER_SIZE)
             if not ATFilesService().transfer_in_process():
-                fsm.ATInterfaceFSM().dte_output("\r\n> ")
+                fsm.ATInterfaceFSM().at_output("> ", print_trailing_line_break=False)
             done, body, length = await ATFilesService().write_upload_body(
                 length_remaining, int(FILE_STREAMING_BUFFER_SIZE)
             )
@@ -48,17 +48,18 @@ class FWUpdateSendCommand(Command):
                 return (False, "")
             if length == -1:
                 syslog(LOG_ERR, "Escaping Data Mode")
-                return (True, "\r\n")
+                fsm.ATInterfaceFSM().at_output("\r\n", False, False)
+                return (True, "")
             FirmwareUpdateService().handle_update_file_chunk(body)
             if length_remaining - length > 0:
                 FWUpdateSendCommand.ITERATIONS += 1
                 return (False, "")
             FWUpdateSendCommand.ITERATIONS = 0
             FirmwareUpdateService().cancel_update()
-            return (True, f"\r\n+FWSEND: {params_dict['length']}\r\nOK\r\n")
+            return (True, f"+FWSEND: {params_dict['length']}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error sending the firmware update: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -78,7 +79,7 @@ class FWUpdateSendCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FWSEND=<length>\r\n"
+        return "AT+FWSEND=<length>"
 
     @staticmethod
     def signature() -> str:

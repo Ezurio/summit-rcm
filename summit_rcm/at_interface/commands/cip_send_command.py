@@ -22,15 +22,15 @@ class CIPSendCommand(Command):
         (valid, params_dict) = CIPSendCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             connection_status = ConnectionService().is_connection_busy(
                 id=params_dict["connection_id"]
             )
             if connection_status is None:
-                return (True, "\r\nERROR\r\n")
+                return (True, "ERROR")
             elif not connection_status:
-                fsm.ATInterfaceFSM().dte_output("\r\n> ")
+                fsm.ATInterfaceFSM().at_output("> ", print_trailing_line_break=False)
 
             (done, sent) = ConnectionService().send_data(
                 id=params_dict["connection_id"], length=params_dict["length"]
@@ -40,15 +40,16 @@ class CIPSendCommand(Command):
                 return (False, "")
 
             if params_dict["length"] == sent:
-                return (True, "\r\nOK\r\n")
+                return (True, "OK")
             elif sent == -1:
                 syslog(LOG_ERR, "Escaping Data Mode")
-                return (True, "\r\n")
+                fsm.ATInterfaceFSM().at_output("\r\n", False, False)
+                return (True, "")
             else:
-                return (True, "\r\nERROR\r\n")
+                return (True, "ERROR")
         except Exception as exception:
             syslog(LOG_ERR, f"Error sending CIP data: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:

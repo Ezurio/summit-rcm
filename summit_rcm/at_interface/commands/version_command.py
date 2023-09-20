@@ -21,8 +21,8 @@ class VersionCommand(Command):
         (valid, params_dict) = VersionCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
-        return (True, f"\r\n+VER: {SUMMIT_RCM_VERSION}\r\nOK\r\n")
+            return (True, "ERROR")
+        return (True, f"+VER: {SUMMIT_RCM_VERSION}\r\nOK")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -36,7 +36,7 @@ class VersionCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+VER\r\n"
+        return "AT+VER"
 
     @staticmethod
     def signature() -> str:

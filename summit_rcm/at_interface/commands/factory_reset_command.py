@@ -21,17 +21,17 @@ class FactoryResetCommand(Command):
         (valid, params_dict) = FactoryResetCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             return_str = await SystemService().initiate_factory_reset()
             if return_str != 0:
-                return (True, "\r\nERROR\r\n")
+                return (True, "ERROR")
             if params_dict["reboot"]:
                 await SystemService().set_power_state("reboot")
-            return (True, f"\r\n+FACTRESET: {return_str}\r\nOK\r\n")
+            return (True, f"+FACTRESET: {return_str}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error Performing a Factory Reset: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -50,7 +50,7 @@ class FactoryResetCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FACTRESET[=<reboot>]\r\n"
+        return "AT+FACTRESET[=<reboot>]"
 
     @staticmethod
     def signature() -> str:

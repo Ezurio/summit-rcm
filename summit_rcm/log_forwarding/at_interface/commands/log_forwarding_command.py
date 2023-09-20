@@ -30,14 +30,14 @@ class LogForwardingCommand(Command):
         (valid, params_dict) = LogForwardingCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             await LogForwardingService().set_state(params_dict["state"])
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             err_msg = str(exception) if str(exception) else exception.__class__.__name__
             syslog(LOG_ERR, f"Error setting log forwarding state: {err_msg}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -57,7 +57,7 @@ class LogForwardingCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+LOGFWD=<state>\r\n"
+        return "AT+LOGFWD=<state>"
 
     @staticmethod
     def signature() -> str:

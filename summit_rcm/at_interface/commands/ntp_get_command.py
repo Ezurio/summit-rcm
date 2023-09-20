@@ -29,7 +29,7 @@ class NTPGetCommand(Command):
         (valid, params_dict) = NTPGetCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             sources_str = ""
             if params_dict["scope"] == Types.ALL_CHRONY_SOURCES:
@@ -44,10 +44,10 @@ class NTPGetCommand(Command):
                 sources_list = await ChronyNTPService.chrony_get_current_sources()
                 for source in sources_list:
                     sources_str += f"+NTPGET: {source}\r\n"
-            return (True, f"\r\n{sources_str}OK\r\n")
+            return (True, f"{sources_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting NTP Sources: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -67,7 +67,7 @@ class NTPGetCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+NTPGET[=<scope>]\r\n"
+        return "AT+NTPGET[=<scope>]"
 
     @staticmethod
     def signature() -> str:

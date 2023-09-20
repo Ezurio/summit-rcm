@@ -21,17 +21,17 @@ class ConnectionListCommand(Command):
         (valid, params_dict) = ConnectionListCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             connections_str = ""
             connections_list = await NetworkService().get_all_connection_profiles()
             for connection in connections_list:
                 connection["activated"] = 1 if connection["activated"] else 0
                 connections_str += f"+CONNLIST: {connection['uuid']}:{connection['id']},{connection['activated']}\r\n"
-            return (True, f"\r\n{connections_str}OK\r\n")
+            return (True, f"{connections_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error listing network connection: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -45,7 +45,7 @@ class ConnectionListCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CONNLIST\r\n"
+        return "AT+CONNLIST"
 
     @staticmethod
     def signature() -> str:

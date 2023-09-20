@@ -28,7 +28,7 @@ class TimezoneGetCommand(Command):
         (valid, params_dict) = TimezoneGetCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["scope"] == Scopes.GLOBAL:
                 timezone_str = ""
@@ -37,10 +37,10 @@ class TimezoneGetCommand(Command):
                     timezone_str += f"+TZGET: {timezone}\r\n"
             else:
                 timezone_str = f"+TZGET: {DateTimeService().local_zone}\r\n"
-            return (True, f"\r\n{timezone_str}OK\r\n")
+            return (True, f"{timezone_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting timezone: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -60,7 +60,7 @@ class TimezoneGetCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+TZGET[=<scope>]\r\n"
+        return "AT+TZGET[=<scope>]"
 
     @staticmethod
     def signature() -> str:

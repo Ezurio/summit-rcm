@@ -21,9 +21,9 @@ class ATEchoDisableCommand(Command):
         (valid, params_dict) = ATEchoDisableCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         fsm.ATInterfaceFSM().enable_echo(False)
-        return (True, "\r\nOK\r\n")
+        return (True, "OK")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -37,7 +37,7 @@ class ATEchoDisableCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nATE0\r\n"
+        return "ATE0"
 
     @staticmethod
     def signature() -> str:
