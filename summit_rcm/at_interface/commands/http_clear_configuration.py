@@ -21,13 +21,13 @@ class HTTPClearConfiguration(Command):
         (valid, params_dict) = HTTPClearConfiguration.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             HTTPService().clear_http_configuration()
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error clearing http configuration: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -41,7 +41,7 @@ class HTTPClearConfiguration(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+HTTPCLR\r\n"
+        return "AT+HTTPCLR"
 
     @staticmethod
     def signature() -> str:

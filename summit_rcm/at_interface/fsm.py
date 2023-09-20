@@ -17,11 +17,15 @@ from summit_rcm.at_interface.commands.cip_start_command import CIPStartCommand
 from summit_rcm.at_interface.commands.cip_send_command import CIPSendCommand
 from summit_rcm.at_interface.commands.cip_close_command import CIPCloseCommand
 from summit_rcm.at_interface.commands.ping_command import PingCommand
-from summit_rcm.at_interface.commands.connection_list_command import ConnectionListCommand
+from summit_rcm.at_interface.commands.connection_list_command import (
+    ConnectionListCommand,
+)
 from summit_rcm.at_interface.commands.power_command import PowerCommand
 from summit_rcm.at_interface.commands.factory_reset_command import FactoryResetCommand
 from summit_rcm.at_interface.commands.fips_command import FipsCommand
-from summit_rcm.at_interface.commands.connection_activate_command import ConnectionActivateCommand
+from summit_rcm.at_interface.commands.connection_activate_command import (
+    ConnectionActivateCommand,
+)
 from summit_rcm.at_interface.commands.http_configure_transaction import (
     HTTPConfigureTransaction,
 )
@@ -72,8 +76,11 @@ from summit_rcm.at_interface.commands.log_get_command import LogGetCommand
 from summit_rcm.at_interface.commands.log_debug_level_command import (
     LogDebugLevelCommand,
 )
-from summit_rcm.at_interface.commands.at_echo_disable_command import ATEchoDisableCommand
+from summit_rcm.at_interface.commands.at_echo_disable_command import (
+    ATEchoDisableCommand,
+)
 from summit_rcm.at_interface.commands.at_echo_enable_command import ATEchoEnableCommand
+
 try:
     from summit_rcm.log_forwarding.at_interface.commands.log_forwarding_command import (
         LogForwardingCommand,
@@ -256,7 +263,7 @@ class ATInterfaceFSM(metaclass=Singleton):
         (command_to_run, params_to_use, print_usage) = self.lookup_command(command)
         if command_to_run is None:
             self.current_command = None
-            self.dte_output("\r\nERROR: Invalid Command\r\n")
+            self.at_output("ERROR")
             await self.invalid_command()
             return
 
@@ -275,14 +282,6 @@ class ATInterfaceFSM(metaclass=Singleton):
         params = self.current_command_params
         print_usage = self.current_command_print_usage
 
-        if command is None:
-            self.dte_output("Error processing command!\r\n")
-            self.current_command = None
-            self.current_command_params = ""
-            self.current_command_print_usage = False
-            await self.command_complete()
-            return
-
         self.log_debug(
             f"*** EXEC: id: {command.signature()}, name: {command.name()}, "
             f"params: {params}, print usage: {print_usage} ***\r\n"
@@ -293,7 +292,7 @@ class ATInterfaceFSM(metaclass=Singleton):
         else:
             (done, resp) = await command.execute(params)
         self.log_debug(f"*** RESP: {resp} ***\r\n")
-        self.dte_output(resp)
+        self.at_output(resp)
 
         if done:
             self.current_command = None
@@ -336,19 +335,28 @@ class ATInterfaceFSM(metaclass=Singleton):
     def check_escape(self):
         pass
 
-    def dte_output(self, c):
+    def at_output(
+        self,
+        c,
+        print_leading_line_break: bool = True,
+        print_trailing_line_break: bool = True,
+    ):
         if self._transport and len(c) > 0:
             if isinstance(c, str):
                 c = bytes(c, "utf-8")
+            if print_leading_line_break:
+                c = bytes("\r\n", "utf-8") + c
+            if print_trailing_line_break:
+                c = c + bytes("\r\n", "utf-8")
             self._transport.write(c)
 
     def log_debug(self, msg):
         if self.debug:
-            self.dte_output(f"DBG: {str(msg)}")
+            self.at_output(f"DBG: {str(msg)}", False, False)
 
     def echo(self, msg):
         if self.echo_enabled:
-            self.dte_output(str(msg))
+            self.at_output(str(msg), False, False)
 
     def enable_echo(self, enabled: bool):
         self.echo_enabled = enabled

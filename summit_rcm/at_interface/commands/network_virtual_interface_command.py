@@ -28,18 +28,18 @@ class NetworkVirtualInterfaceCommand(Command):
         (valid, params_dict) = NetworkVirtualInterfaceCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["add"] == Modes.ADD:
                 await NetworkService().add_virtual_interface()
             else:
                 await NetworkService().remove_virtual_interface()
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(
                 LOG_ERR, f"Error adding/removing virtual interface: {str(exception)}"
             )
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -59,7 +59,7 @@ class NetworkVirtualInterfaceCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+NETIFVIRT=<add>\r\n"
+        return "AT+NETIFVIRT=<add>"
 
     @staticmethod
     def signature() -> str:

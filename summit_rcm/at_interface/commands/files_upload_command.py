@@ -38,10 +38,10 @@ class FilesUploadCommand(Command):
         (valid, params_dict) = FilesUploadCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if not ATFilesService().transfer_in_process():
-                fsm.ATInterfaceFSM().dte_output("\r\n> ")
+                fsm.ATInterfaceFSM().at_output("> ", print_trailing_line_break=False)
             done, body, length = await ATFilesService().write_upload_body(
                 params_dict["length"]
             )
@@ -49,7 +49,8 @@ class FilesUploadCommand(Command):
                 return (False, "")
             if length == -1:
                 syslog(LOG_ERR, "Escaping Data Mode")
-                return (True, "\r\n")
+                fsm.ATInterfaceFSM().at_output("\r\n", False, False)
+                return (True, "")
             file_type = params_dict["type"]
             if file_type == Types.FILE_TYPE_CERT:
                 await FilesService.handle_cert_file_upload_bytes(
@@ -73,10 +74,10 @@ class FilesUploadCommand(Command):
                 )
                 if not success:
                     raise Exception(message)
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error uploading file: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -110,7 +111,7 @@ class FilesUploadCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FILESUP=<type>,<length>[,<name>][,<password>][,<mode>]\r\n"
+        return "AT+FILESUP=<type>,<length>[,<name>][,<password>][,<mode>]"
 
     @staticmethod
     def signature() -> str:

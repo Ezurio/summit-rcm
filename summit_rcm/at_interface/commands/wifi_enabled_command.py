@@ -22,16 +22,16 @@ class WiFiEnabledCommand(Command):
         (valid, params_dict) = WiFiEnabledCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["enabled"] != "":
                 await NetworkService().set_wireless_enabled(params_dict["enabled"])
-                return (True, "\r\nOK\r\n")
+                return (True, "OK")
             wifi_enabled = await NetworkService().get_wireless_enabled()
-            return (True, f"\r\n+WENABLE: {1 if wifi_enabled else 0}\r\nOK\r\n")
+            return (True, f"+WENABLE: {1 if wifi_enabled else 0}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error enabling/disabling Wi-Fi: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -49,7 +49,7 @@ class WiFiEnabledCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+WENABLE[=<enabled>]\r\n"
+        return "AT+WENABLE[=<enabled>]"
 
     @staticmethod
     def signature() -> str:

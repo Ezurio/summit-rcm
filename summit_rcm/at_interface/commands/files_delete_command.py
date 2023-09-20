@@ -21,13 +21,13 @@ class FilesDeleteCommand(Command):
         (valid, params_dict) = FilesDeleteCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             FilesService().delete_cert_file(params_dict["name"])
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error deleting certificate file: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -44,7 +44,7 @@ class FilesDeleteCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FILESDEL=<name>\r\n"
+        return "AT+FILESDEL=<name>"
 
     @staticmethod
     def signature() -> str:

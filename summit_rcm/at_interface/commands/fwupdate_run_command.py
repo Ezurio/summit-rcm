@@ -34,20 +34,20 @@ class FWUpdateRunCommand(Command):
         (valid, params_dict) = FWUpdateRunCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["mode"] == Modes.FWUPDATE_STOP:
                 FirmwareUpdateService().cancel_update()
-                return (True, "\r\nOK\r\n")
+                return (True, "OK")
             FirmwareUpdateService().start_update(
                 params_dict["url"], params_dict["image"]
             )
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(
                 LOG_ERR, f"Error starting/stopping firmware update: {str(exception)}"
             )
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -71,7 +71,7 @@ class FWUpdateRunCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FWRUN=<mode>[,<image>[,<url>]]\r\n"
+        return "AT+FWRUN=<mode>[,<image>[,<url>]]"
 
     @staticmethod
     def signature() -> str:

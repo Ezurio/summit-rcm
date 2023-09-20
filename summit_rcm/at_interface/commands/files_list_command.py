@@ -28,7 +28,7 @@ class FilesListCommand(Command):
         (valid, params_dict) = FilesListCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             files_str = ""
             if params_dict["type"] == Types.FILE_TYPE_CERT_AND_PAC:
@@ -39,10 +39,10 @@ class FilesListCommand(Command):
                 files_list = FilesService().get_pac_files()
             for file in files_list:
                 files_str += f"+FILESLIST: {file}\r\n"
-            return (True, f"\r\n{files_str}OK\r\n")
+            return (True, f"{files_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting cert and/or pac files: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -62,7 +62,7 @@ class FilesListCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FILESLIST[=<type>]\r\n"
+        return "AT+FILESLIST[=<type>]"
 
     @staticmethod
     def signature() -> str:

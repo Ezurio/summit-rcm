@@ -30,23 +30,23 @@ class FipsCommand(Command):
         (valid, params_dict) = FipsCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["state"]:
                 if await FipsService().get_fips_state() == "unsupported":
                     raise FipsUnsupportedError("Fips Unsupported")
                 success = await FipsService().set_fips_state(params_dict["state"])
                 if not success:
-                    return (True, "\r\nERROR\r\n")
+                    return (True, "ERROR")
                 if params_dict["reboot"]:
                     await SystemService().set_power_state("reboot")
-                return (True, "\r\nOK\r\n")
+                return (True, "OK")
             else:
                 fips_str = await FipsService().get_fips_state()
-            return (True, f"\r\n+FIPS: {fips_str}\r\nOK\r\n")
+            return (True, f"+FIPS: {fips_str}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error setting/getting FIPS state: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -70,7 +70,7 @@ class FipsCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FIPS[=<state>[,<reboot>]]\r\n"
+        return "AT+FIPS[=<state>[,<reboot>]]"
 
     @staticmethod
     def signature() -> str:

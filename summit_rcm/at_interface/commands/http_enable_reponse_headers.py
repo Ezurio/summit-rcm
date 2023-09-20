@@ -21,16 +21,16 @@ class HTTPEnableResponseHeader(Command):
         (valid, params_dict) = HTTPEnableResponseHeader.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             return_str = HTTPService().enable_response_headers(params_dict["enabled"])
-            return (True, f"\r\n+HTTPRSHDR: {int(return_str)}\r\nOK\r\n")
+            return (True, f"+HTTPRSHDR: {int(return_str)}\r\nOK")
         except Exception as exception:
             syslog(
                 LOG_ERR,
                 f"Error enabling/disabling http response headers: {str(exception)}",
             )
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -50,7 +50,7 @@ class HTTPEnableResponseHeader(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+HTTPRSHDR=<enabled>\r\n"
+        return "AT+HTTPRSHDR=<enabled>"
 
     @staticmethod
     def signature() -> str:

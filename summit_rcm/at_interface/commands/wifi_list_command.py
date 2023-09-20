@@ -22,7 +22,7 @@ class WifiListCommand(Command):
         (valid, params_dict) = WifiListCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             ap_str = ""
             ap_list = await NetworkService().get_access_points()
@@ -39,10 +39,10 @@ class WifiListCommand(Command):
                 ap_str += f"{ap_dict['lastSeen']},"
                 ap_str += f"{ap_dict['security']},"
                 ap_str += f"{ap_dict['keymgmt']}\r\n"
-            return (True, f"\r\n{ap_str}OK\r\n")
+            return (True, f"{ap_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error listing wifi access points: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -56,7 +56,7 @@ class WifiListCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+WLIST\r\n"
+        return "AT+WLIST"
 
     @staticmethod
     def signature() -> str:

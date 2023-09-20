@@ -21,17 +21,17 @@ class CIPCloseCommand(Command):
         (valid, params_dict) = CIPCloseCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             connection_id = int(params_dict["connection_id"])
             if not ConnectionService().connections[
                 connection_id
             ].connected or not ConnectionService().close_connection(id=connection_id):
-                return (True, "\r\nERROR\r\n")
-            return (True, "\r\nOK\r\n")
+                return (True, "ERROR")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error closing the connection: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -51,7 +51,7 @@ class CIPCloseCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CIPCLOSE=<connection id>\r\n"
+        return "AT+CIPCLOSE=<connection id>"
 
     @staticmethod
     def signature() -> str:

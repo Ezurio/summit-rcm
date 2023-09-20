@@ -57,7 +57,7 @@ class ATInterface:
         ATInterfaceFSM()._transport = transport
         ATInterfaceFSM()._protocol = protocol
         await DateTimeService().populate_time_zone_list()
-        ATInterfaceFSM().dte_output("\r\nREADY\r\n")
+        ATInterfaceFSM().at_output("READY")
         self.loop.call_later(0.1, self.repeat)
 
     def repeat(self):

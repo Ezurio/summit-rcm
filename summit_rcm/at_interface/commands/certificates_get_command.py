@@ -23,18 +23,18 @@ class CertificatesGetCommand(Command):
         (valid, params_dict) = CertificatesGetCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             certificates_dict, return_msg = CertificatesService.get_cert_info(
                 params_dict["name"], params_dict["password"]
             )
             if return_msg == "":
                 certificates_str = dumps(certificates_dict, separators=(",", ":"))
-                return (True, f"\r\n+CERTGET: {certificates_str}\r\nOK\r\n")
+                return (True, f"+CERTGET: {certificates_str}\r\nOK")
             raise Exception(return_msg)
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting certificate information: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -52,7 +52,7 @@ class CertificatesGetCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CERTGET=<name>[,<password>]\r\n"
+        return "AT+CERTGET=<name>[,<password>]"
 
     @staticmethod
     def signature() -> str:
