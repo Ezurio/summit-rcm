@@ -26,7 +26,7 @@ class PingCommand(Command):
         (valid, params_dict) = PingCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         command = [
             "ping",
             "-c",
@@ -44,12 +44,12 @@ class PingCommand(Command):
             match = re.search(r"\d+\.\d+/(\d+\.\d+)/\d+\.\d+", ping_str)
             if match:
                 ping_str = match.group(1)
-                return (True, f"\r\n+PING: {ping_str}\r\nOK\r\n")
+                return (True, f"+PING: {ping_str}\r\nOK")
             else:
-                return (True, "\r\nERROR\r\n")
+                return (True, "ERROR")
         except Exception as exception:
             syslog(LOG_ERR, f"Error pinging target address: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -76,7 +76,7 @@ class PingCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+PING=<target>[,<timeout>[,<protocol>]]\r\n"
+        return "AT+PING=<target>[,<timeout>[,<protocol>]]"
 
     @staticmethod
     def signature() -> str:

@@ -29,16 +29,16 @@ class SISOModeCommand(Command):
         (valid, params_dict) = SISOModeCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["mode"] == "":
                 siso_mode_str = str(RadioSISOModeService().get_current_siso_mode())
-                return (True, f"\r\n+SISOMODE: {siso_mode_str}\r\nOK\r\n")
+                return (True, f"+SISOMODE: {siso_mode_str}\r\nOK")
             RadioSISOModeService().set_siso_mode(params_dict["mode"])
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting/setting Radio SISO Mode: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -59,7 +59,7 @@ class SISOModeCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+SISOMODE[=<mode>]\r\n"
+        return "AT+SISOMODE[=<mode>]"
 
     @staticmethod
     def signature() -> str:

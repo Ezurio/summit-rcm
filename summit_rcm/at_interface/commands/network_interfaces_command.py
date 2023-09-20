@@ -23,7 +23,7 @@ class NetworkInterfacesCommand(Command):
         (valid, params_dict) = NetworkInterfacesCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             interfaces_string = ""
             ifname = params_dict["interface name"]
@@ -33,16 +33,16 @@ class NetworkInterfacesCommand(Command):
                     interfaces_string += f"{interface},"
                 interfaces_string = interfaces_string[:-1]
             elif ifname not in interfaces_list:
-                return (True, "\r\nERROR\r\n")
+                return (True, "ERROR")
             else:
                 interfaces_dict = await NetworkService.get_interface_status(
                     ifname, is_legacy=False
                 )
                 interfaces_string = dumps(interfaces_dict, separators=(",", ":"))
-            return (True, f"\r\n+NETIF: {interfaces_string}\r\nOK\r\n")
+            return (True, f"+NETIF: {interfaces_string}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting network interfaces: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -57,7 +57,7 @@ class NetworkInterfacesCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+NETIF[=<interface name>]\r\n"
+        return "AT+NETIF[=<interface name>]"
 
     @staticmethod
     def signature() -> str:

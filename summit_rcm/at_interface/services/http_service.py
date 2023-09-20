@@ -142,6 +142,6 @@ class HTTPService(object, metaclass=Singleton):
             self.rx_timestamp = time.time()
 
         if self.listener == -1:
-            fsm.ATInterfaceFSM().dte_output("\r\n> ")
+            fsm.ATInterfaceFSM().at_output("> ", print_trailing_line_break=False)
             self.listener = statemachine.register_listener(write_http_body)
         raise InProgressException()

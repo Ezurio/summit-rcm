@@ -34,7 +34,7 @@ class HTTPConfigureTransaction(Command):
         (valid, params_dict) = HTTPConfigureTransaction.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             HTTPService().configure_http_transaction(
                 params_dict["host"],
@@ -43,10 +43,10 @@ class HTTPConfigureTransaction(Command):
                 params_dict["route"],
                 params_dict["timeout"],
             )
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error configuring http transaction: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -72,7 +72,7 @@ class HTTPConfigureTransaction(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+HTTPCONF=<host>,<port>,<method>,<route>[,timeout]\r\n"
+        return "AT+HTTPCONF=<host>,<port>,<method>,<route>[,timeout]"
 
     @staticmethod
     def signature() -> str:

@@ -42,7 +42,7 @@ class LogGetCommand(Command):
         (valid, params_dict) = LogGetCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             logs_list = LogsService.get_journal_log_data(
                 params_dict["type"], params_dict["priority"], params_dict["days"]
@@ -50,10 +50,10 @@ class LogGetCommand(Command):
             logs_str = ""
             for log in logs_list:
                 logs_str += f"+LOGGET: {log}\r\n"
-            return (True, f"\r\n{logs_str}OK\r\n")
+            return (True, f"{logs_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting journal log data: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -75,7 +75,7 @@ class LogGetCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+LOGGET=<type>,<priority>,<days>\r\n"
+        return "AT+LOGGET=<type>,<priority>,<days>"
 
     @staticmethod
     def signature() -> str:

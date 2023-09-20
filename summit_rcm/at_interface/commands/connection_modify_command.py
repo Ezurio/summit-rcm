@@ -32,7 +32,7 @@ class ConnectionModifyCommand(Command):
         (valid, params_dict) = ConnectionModifyCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             mode = params_dict["mode"]
             if params_dict["uuid"]:
@@ -52,10 +52,10 @@ class ConnectionModifyCommand(Command):
                 )
             elif mode == Modes.DELETE:
                 await NetworkService().delete_connection_profile(uuid=uuid)
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error Creating Connection: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -87,7 +87,7 @@ class ConnectionModifyCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CONNMOD=<mode>[,<uuid>|<id>][,<settings>]\r\n"
+        return "AT+CONNMOD=<mode>[,<uuid>|<id>][,<settings>]"
 
     @staticmethod
     def signature() -> str:

@@ -47,18 +47,20 @@ class FilesExportCommand(Command):
         (valid, params_dict) = FilesExportCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             if params_dict["mode"]:
                 file = await FilesService().handle_file_download(params_dict["path"])
                 await file.seek(params_dict["offset"])
                 file_chunk = await file.read(params_dict["chunk size"])
                 file_chunk_size = len(file_chunk)
-                fsm.ATInterfaceFSM().dte_output(f"\r\n+FILESEXP: {file_chunk_size},")
-                fsm.ATInterfaceFSM().dte_output(file_chunk)
+                fsm.ATInterfaceFSM().at_output(
+                    f"+FILESEXP: {file_chunk_size},", print_trailing_line_break=False
+                )
+                fsm.ATInterfaceFSM().at_output(file_chunk, False, False)
                 return (
                     True,
-                    "\r\nOK\r\n",
+                    "OK",
                 )
             filetype = params_dict["type"]
             if filetype == Types.FILE_TYPE_CONFIG:
@@ -82,12 +84,12 @@ class FilesExportCommand(Command):
             if success:
                 return (
                     True,
-                    f"\r\n+FILESEXP: {str(os.path.getsize(path))}\r\nOK\r\n",
+                    f"+FILESEXP: {str(os.path.getsize(path))}\r\nOK",
                 )
             raise Exception(message)
         except Exception as exception:
             syslog(LOG_ERR, f"Error exporting zip archive: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -127,7 +129,7 @@ class FilesExportCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+FILESEXP=<mode>,<type>[,<password>][,<chunk size>,<offset>]\r\n"
+        return "AT+FILESEXP=<mode>,<type>[,<password>][,<chunk size>,<offset>]"
 
     @staticmethod
     def signature() -> str:

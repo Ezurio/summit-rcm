@@ -28,15 +28,15 @@ class NTPConfigureCommand(Command):
         (valid, params_dict) = NTPConfigureCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             await ChronyNTPService.chrony_configure_sources(
                 params_dict["command"], params_dict["sources"]
             )
-            return (True, "\r\nOK\r\n")
+            return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error configuring NTP Sources: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -65,7 +65,7 @@ class NTPConfigureCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+NTPCONF=<command>,<sources>\r\n"
+        return "AT+NTPCONF=<command>,<sources>"
 
     @staticmethod
     def signature() -> str:

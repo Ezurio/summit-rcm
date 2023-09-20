@@ -15,6 +15,7 @@ class Connection:
     """
     Defines an IP Connection
     """
+
     id: int
     type: str
     addr: str
@@ -51,20 +52,26 @@ class Connection:
         self.busy = busy
 
     def on_connection_made(self):
-        fsm.ATInterfaceFSM().dte_output(f"+IP:{self.id},Connected\r\n")
+        fsm.ATInterfaceFSM().at_output(
+            f"+IP:{self.id},Connected", print_leading_line_break=False
+        )
 
     def on_data_received(self, data: bytes):
-        fsm.ATInterfaceFSM().dte_output(
-            f"+IPD:{self.id},{len(data)},{str(data.decode('utf-8'))}\r\n"
+        fsm.ATInterfaceFSM().at_output(
+            f"+IPD:{self.id},{len(data)},{str(data.decode('utf-8'))}",
+            print_leading_line_break=False,
         )
 
     def on_datagram_received(self, data: bytes, addr: Tuple[str, int]):
-        fsm.ATInterfaceFSM().dte_output(
-            f"+IPD:{self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}\r\n"
+        fsm.ATInterfaceFSM().at_output(
+            f"+IPD:{self.id},{len(data)},'{addr[0]}',{addr[1]},{str(data.decode('utf-8'))}",
+            print_leading_line_break=False,
         )
 
     def on_connection_lost(self):
-        fsm.ATInterfaceFSM().dte_output(f"+IP:{self.id},Disconnected\r\n")
+        fsm.ATInterfaceFSM().at_output(
+            f"+IP:{self.id},Disconnected", print_leading_line_break=False
+        )
         if ConnectionService().connections[self.id].connected:
             ConnectionService().close_connection(self.id)
 
@@ -73,6 +80,7 @@ class ConnectionService(object, metaclass=Singleton):
     """
     Service class to handle IP Connections
     """
+
     MAX_CONNECTIONS: int = 6
     escape_delay: float = 0.02
     escape_count: int = 0

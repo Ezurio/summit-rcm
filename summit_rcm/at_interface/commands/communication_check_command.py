@@ -20,8 +20,8 @@ class CommunicationCheckCommand(Command):
         (valid, params_dict) = CommunicationCheckCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
-        return (True, "\r\nOK\r\n")
+            return (True, "ERROR")
+        return (True, "OK")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -34,7 +34,7 @@ class CommunicationCheckCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT\r\n"
+        return "AT"
 
     @staticmethod
     def signature() -> str:

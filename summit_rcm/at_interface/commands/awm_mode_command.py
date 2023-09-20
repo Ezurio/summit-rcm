@@ -22,13 +22,13 @@ class AWMModeCommand(Command):
         (valid, params_dict) = AWMModeCommand.parse_params(params)
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
         try:
             awm_lite_str = str(int(AWMConfigService().get_lite_mode_enabled()))
-            return (True, f"\r\n+AWMMODE: {awm_lite_str}\r\nOK\r\n")
+            return (True, f"+AWMMODE: {awm_lite_str}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting AWM operating mode: {str(exception)}")
-            return (True, "\r\nERROR\r\n")
+            return (True, "ERROR")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:
@@ -42,7 +42,7 @@ class AWMModeCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+AWMMODE\r\n"
+        return "AT+AWMMODE"
 
     @staticmethod
     def signature() -> str:
