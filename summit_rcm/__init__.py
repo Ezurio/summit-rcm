@@ -698,6 +698,7 @@ try:
         """
         Add the following legacy routes, if enabled, and determine if websockets access should
         require a valid, authenticated session:
+        - /bluetooth
         - /bluetooth/{controller}
         - /bluetooth/{controller}/{device}
         """
@@ -710,6 +711,7 @@ try:
             from summit_rcm.rest_api.legacy.bluetooth import (
                 BluetoothControllerLegacyResource,
                 BluetoothDeviceLegacyResource,
+                BluetoothLegacyResource,
             )
 
             summit_rcm_plugins.append("bluetooth")
@@ -728,6 +730,7 @@ try:
                         ws_route="/bluetoothWebsocket/ws", is_legacy=True
                     )
 
+                add_route("/bluetooth", BluetoothLegacyResource())
                 add_route(
                     "/bluetooth/{controller}", BluetoothControllerLegacyResource()
                 )
@@ -744,6 +747,7 @@ try:
         """
         Add the following v2 routes, if enabled, and determine if websockets access should require a
         valid, authenticated session:
+        - /api/v2/bluetooth
         - /api/v2/bluetooth/{controller}
         - /api/v2/bluetooth/{controller}/{device}
         """
@@ -755,10 +759,11 @@ try:
             from summit_rcm.rest_api.v2.bluetooth.bluetooth import (
                 BluetoothControllerV2Resource,
                 BluetoothDeviceV2Resource,
+                BluetoothV2Resource,
             )
             from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
 
-            summit_rcm_plugins.append("/api/v2/bluetooth")
+            SessionCheckingMiddleware().paths.append("/api/v2/bluetooth")
 
             if Bluetooth and websockets_auth_by_header_token:
                 SessionCheckingMiddleware().paths.append("/api/v2/bluetooth/ws")
@@ -774,6 +779,7 @@ try:
                         ws_route="/api/v2/bluetooth/ws", is_legacy=False
                     )
 
+                add_route("/api/v2/bluetooth", BluetoothV2Resource())
                 add_route(
                     "/api/v2/bluetooth/{controller}", BluetoothControllerV2Resource()
                 )

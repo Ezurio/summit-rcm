@@ -5,16 +5,13 @@ Module for controlling/interface with Bluetooth devices
 import asyncio
 import itertools
 import logging
-import os
 import re
 from syslog import syslog, LOG_ERR, LOG_INFO
 from typing import Any, Optional, List, Dict
-from subprocess import run, TimeoutExpired
 from dbus_fast import Message, MessageType, Variant
 from dbus_fast.aio.proxy_object import ProxyInterface
 import falcon
 from summit_rcm.dbus_manager import DBusManager
-from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.bluetooth import bt_plugin
 from summit_rcm import definition
 from summit_rcm.bluetooth.ble import (
