@@ -4,10 +4,33 @@
 from summit_rcm.bluetooth.bt_rest_service import BluetoothRESTService
 
 
+class BluetoothV2Resource:
+    """
+    Resource to handle v2 controller requests when no device or controller is specified which is
+    just a wrapper around the common BluetoothRESTService request handler
+    """
+
+    async def on_get(self, req, resp):
+        """
+        GET handler for the /bluetooth endpoint
+        """
+        resp = await BluetoothRESTService.handle_get(
+            req, resp, None, None, is_legacy=False
+        )
+
+    async def on_put(self, req, resp):
+        """
+        PUT handler for the /bluetooth endpoint
+        """
+        resp = await BluetoothRESTService.handle_put(
+            req, resp, None, None, is_legacy=False
+        )
+
+
 class BluetoothControllerV2Resource:
     """
-    Resource to handle v2 controller requests when no device which is just a wrapper around the
-    common BluetoothRESTService request handler
+    Resource to handle v2 controller requests when no device is specified which is just a wrapper
+    around the common BluetoothRESTService request handler
     """
 
     async def on_get(self, req, resp, controller):
