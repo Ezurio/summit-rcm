@@ -12,6 +12,7 @@ from subprocess import TimeoutExpired, run
 from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
 from typing import List, Optional, Tuple
+from urllib.parse import urlparse
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,
@@ -1612,14 +1613,23 @@ class NetworkService(metaclass=Singleton):
         return ""
 
     @staticmethod
-    def cert_to_filename(cert: str):
+    def cert_to_filename(cert: bytearray | list) -> Optional[str]:
         """
         Return base name only.
         """
-        if not cert:
-            return ""
+        try:
+            if not cert:
+                return None
 
-        return cert[len(definition.FILEDIR_DICT["cert"]) :]
+            if isinstance(cert, list):
+                cert = bytearray(cert)
+            elif not isinstance(cert, bytearray):
+                raise Exception("Invalid type")
+
+            return Path(urlparse(cert.split(b"\0")[0].decode("utf-8")).path).name
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not decode certificate filename: {exception}")
+            return None
 
     @staticmethod
     async def get_connection_profile_settings(
@@ -2316,7 +2326,10 @@ class NetworkService(metaclass=Singleton):
                     definition.SUMMIT_RCM_NM_SETTING_802_1X_TEXT
                 ] = NM_SETTING_8021X_DEFAULTS
                 for param in setting_8021x:
-                    # The following properties are omitted as they are binary blobs
+                    # The following properties are presented as a bytearray containing "file://"
+                    # followed by the path to the target file and a terminating null byte
+                    # See below for more info:
+                    # https://lazka.github.io/pgi-docs/#NM-1.0/classes/Setting8021x.html#NM.Setting8021x.props.ca_cert
                     if param in [
                         "ca-cert",
                         "client-cert",
@@ -2325,6 +2338,9 @@ class NetworkService(metaclass=Singleton):
                         "phase2-private-key",
                         "private-key",
                     ]:
+                        settings[definition.SUMMIT_RCM_NM_SETTING_802_1X_TEXT][
+                            param
+                        ] = NetworkService.cert_to_filename(setting_8021x[param].value)
                         continue
 
                     # The following properties are passwords/secrets and are therefore hidden
