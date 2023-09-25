@@ -1743,7 +1743,13 @@ class NetworkManagerService(object, metaclass=Singleton):
             new_connection["802-1x"] = {}
 
             # NetworkManager expects some 802-1x properties to be an array of strings
-            for key in ["altsubject-matches", "eap", "phase2-altsubject-matches"]:
+            for key in [
+                "eap",
+                "phase2-auth",
+                "phase2-autheap",
+                "altsubject-matches",
+                "phase2-altsubject-matches",
+            ]:
                 if connection["802-1x"].get(key):
                     if not isinstance(connection["802-1x"][key], list):
                         connection["802-1x"][key] = [str(connection["802-1x"][key])]
