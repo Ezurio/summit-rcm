@@ -1775,6 +1775,12 @@ class NetworkManagerService(object, metaclass=Singleton):
                         connection["802-1x"][cert]
                     )
 
+            if connection["802-1x"].get("pac-file"):
+                # pac-file parameter provided, prepend path to certs
+                connection["802-1x"][
+                    "pac-file"
+                ] = f"{summit_rcm.definition.FILEDIR_DICT.get('pac')}{connection['802-1x']['pac-file']}"
+
             await self.prepare_setting("802-1x", connection, new_connection)
 
         if connection.get("gsm"):
