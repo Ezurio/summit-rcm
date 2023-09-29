@@ -2,11 +2,14 @@
 Module for handling 'sessions' as a Falcon middleware
 """
 
+from syslog import syslog
 from typing import Any
-import base64
-import json
 import falcon.asgi
-from summit_rcm.services.login_service import LoginService
+from summit_rcm.services.login_service import MAX_SESSION_AGE_S, LoginService
+from summit_rcm.utils import (
+    convert_base64_string_to_dict,
+    convert_dict_to_base64_string,
+)
 
 
 class SessionsMiddleware:
@@ -22,9 +25,7 @@ class SessionsMiddleware:
             session_cookie = req.get_cookie_values(self._session_cookie)
             if not session_cookie:
                 raise Exception("No cookie found")
-            return json.loads(
-                base64.urlsafe_b64decode(session_cookie[0].encode()).decode()
-            )
+            return convert_base64_string_to_dict(session_cookie[0])
         except Exception:
             return {}
 
@@ -97,17 +98,30 @@ class SessionsMiddleware:
         resource,
         req_succeeded: bool,
     ) -> None:
-        if not (
-            req_succeeded
-            and hasattr(resp.context, "_session")
-            and resp.context._session
-            and hasattr(resp.context, "valid_session")
-        ):
-            resp.context.valid_session = False
-            return
+        try:
+            if not req_succeeded:
+                resp.context.valid_session = False
+                return
 
-        if resp.context.valid_session:
-            session_base64 = base64.urlsafe_b64encode(
-                json.dumps(resp.context._session).encode()
-            ).decode()
-            resp.set_cookie(self._session_cookie, session_base64, path="/")
+            if hasattr(req.context, "_session") and req.context.valid_session:
+                # Session was previously validated in process_request()
+                resp.set_cookie(
+                    self._session_cookie,
+                    convert_dict_to_base64_string(req.context._session),
+                    path="/",
+                    max_age=MAX_SESSION_AGE_S,
+                )
+                return
+
+            if hasattr(resp.context, "_session") and resp.context.valid_session:
+                # Session was just validated by a login request
+                resp.set_cookie(
+                    self._session_cookie,
+                    convert_dict_to_base64_string(resp.context._session),
+                    path="/",
+                    max_age=MAX_SESSION_AGE_S,
+                )
+                return
+        except Exception as exception:
+            syslog(f"Error processing response - {str(exception)}")
+        resp.context.valid_session = False
