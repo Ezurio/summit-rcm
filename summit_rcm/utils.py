@@ -1,5 +1,7 @@
 """Module to hold various utility functions"""
 
+import base64
+import json
 from re import sub
 from typing import Any
 from pathlib import Path
@@ -69,3 +71,19 @@ def get_current_side():
         raise ValueError(
             "get_current_side: could not determine boot side from kernel cmdline"
         )
+
+
+def convert_dict_to_base64_string(json_dict: dict) -> str:
+    """Convert the provided JSON object (dictionary) to a base64-encoded string"""
+    if not isinstance(json_dict, dict):
+        raise ValueError(f"Expected 'dict' not '{type(json_dict)}'")
+
+    return base64.urlsafe_b64encode(json.dumps(json_dict).encode()).decode()
+
+
+def convert_base64_string_to_dict(base64_string: str) -> dict:
+    """Convert the provided base64-encoded string to a JSON object (dictionary)"""
+    if not isinstance(base64_string, str):
+        raise ValueError(f"Expected 'str' not '{type(base64_string)}'")
+
+    return json.loads(base64.urlsafe_b64decode(base64_string.encode()).decode())
