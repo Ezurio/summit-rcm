@@ -65,8 +65,15 @@ from summit_rcm.at_interface.commands.files_delete_command import FilesDeleteCom
 from summit_rcm.at_interface.commands.files_export_command import FilesExportCommand
 from summit_rcm.at_interface.commands.files_list_command import FilesListCommand
 from summit_rcm.at_interface.commands.files_upload_command import FilesUploadCommand
-from summit_rcm.at_interface.commands.ntp_get_command import NTPGetCommand
-from summit_rcm.at_interface.commands.ntp_configure_command import NTPConfigureCommand
+
+try:
+    from summit_rcm.at_interface.commands.ntp_get_command import NTPGetCommand
+    from summit_rcm.at_interface.commands.ntp_configure_command import (
+        NTPConfigureCommand,
+    )
+except ImportError:
+    NTPGetCommand = None
+    NTPConfigureCommand = None
 from summit_rcm.at_interface.commands.fwupdate_run_command import FWUpdateRunCommand
 from summit_rcm.at_interface.commands.fwupdate_send_command import FWUpdateSendCommand
 from summit_rcm.at_interface.commands.fwupdate_status_command import (
@@ -131,8 +138,6 @@ AT_COMMANDS: List[Command] = [
     FilesExportCommand,
     FilesListCommand,
     FilesUploadCommand,
-    NTPGetCommand,
-    NTPConfigureCommand,
     FWUpdateRunCommand,
     FWUpdateSendCommand,
     FWUpdateStatusCommand,
@@ -141,6 +146,11 @@ AT_COMMANDS: List[Command] = [
     ATEchoDisableCommand,
     ATEchoEnableCommand,
 ]
+
+if NTPGetCommand:
+    AT_COMMANDS.append(NTPGetCommand)
+    AT_COMMANDS.append(NTPConfigureCommand)
+
 if AWMScanCommand:
     AT_COMMANDS.append(AWMScanCommand)
     AT_COMMANDS.append(AWMModeCommand)
