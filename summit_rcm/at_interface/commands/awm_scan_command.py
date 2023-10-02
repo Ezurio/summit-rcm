@@ -31,9 +31,9 @@ class AWMScanCommand(Command):
             AWMConfigService().set_scan_attempts(enabled)
             return (True, "OK")
         except ConfigFileNotFoundError:
-            syslog(LOG_ERR, "AWM Config File Not Found")
             if params_dict["enabled"] == "":
                 return (True, "+AWMSCAN: 1\r\nOK")
+            syslog(LOG_ERR, "AWM Config File Not Found")
             return (True, "ERROR")
         except Exception as exception:
             syslog(
