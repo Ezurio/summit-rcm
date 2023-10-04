@@ -87,10 +87,12 @@ static PyObject * get_cert_info(PyObject *self, PyObject *args)
 	cert = PEM_read_X509(fp, NULL, NULL, NULL);
 	if (!cert) {
 		// Could not open the cert as a PEM, let's try DER
+		ERR_clear_error();
 		rewind(fp);
 		cert = d2i_X509_fp(fp, NULL);
 		if (!cert) {
 			// Could not open the cert as a DER either, let's try PKCS12
+			ERR_clear_error();
 			if (!(password && *password))
 				password = "";
 			rewind(fp);
@@ -242,6 +244,8 @@ exit:
 		BN_free(serial_number_bn);
 	if (fp)
 		fclose(fp);
+
+	ERR_clear_error();
 
 	return result;
 }
