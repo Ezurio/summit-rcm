@@ -15,6 +15,16 @@ class Types(IntEnum):
     active = 1
 
 
+class States(IntEnum):
+    active = 0
+    reloading = 1
+    inactive = 2
+    failed = 3
+    activating = 4
+    deactivated = 5
+    unknown = 6
+
+
 class LogForwardingCommand(Command):
     """
     AT Command to set the state of the log forwarding service
@@ -32,8 +42,11 @@ class LogForwardingCommand(Command):
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
         try:
-            await LogForwardingService().set_state(params_dict["state"])
-            return (True, "OK")
+            if params_dict["state"]:
+                await LogForwardingService().set_state(params_dict["state"])
+                return (True, "OK")
+            response = States[await LogForwardingService().get_active_state()]
+            return (True, f"+LOGFWD: {response}\r\nOK")
         except Exception as exception:
             err_msg = str(exception) if str(exception) else exception.__class__.__name__
             syslog(LOG_ERR, f"Error setting log forwarding state: {err_msg}")
@@ -45,19 +58,17 @@ class LogForwardingCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in LogForwardingCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
-            params_dict["state"] = Types(int(params_list[0])).name
+            params_dict["state"] = Types(int(params_list[0])).name if params_list[0] else ""
         except ValueError:
             return (False, params_dict)
         return (valid, params_dict)
 
     @staticmethod
     def usage() -> str:
-        return "AT+LOGFWD=<state>"
+        return "AT+LOGFWD[=<state>]"
 
     @staticmethod
     def signature() -> str:
