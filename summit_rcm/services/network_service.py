@@ -181,9 +181,7 @@ class NetworkService(metaclass=Singleton):
                     domain
                 )
 
-            ipconfig_properties[
-                "NameserverData" if is_legacy else "nameserverData"
-            ] = []
+            ipconfig_properties["NameserverData" if is_legacy else "nameservers"] = []
             props_nameserver_data = (
                 props["NameserverData"]
                 if props.get("NameserverData", None) is not None
@@ -191,11 +189,9 @@ class NetworkService(metaclass=Singleton):
             )
             for nameserver in props_nameserver_data:
                 ipconfig_properties[
-                    "NameserverData" if is_legacy else "nameserverData"
+                    "NameserverData" if is_legacy else "nameservers"
                 ].append(nameserver["address"].value)
-            ipconfig_properties[
-                "WinsServerData" if is_legacy else "winsServerData"
-            ] = []
+            ipconfig_properties["WinsServerData" if is_legacy else "winsServers"] = []
             props_wins_server_data = (
                 props["WinsServerData"]
                 if props.get("WinsServerData", None) is not None
@@ -203,7 +199,7 @@ class NetworkService(metaclass=Singleton):
             )
             for wins_server in props_wins_server_data:
                 ipconfig_properties[
-                    "WinsServerData" if is_legacy else "winsServerData"
+                    "WinsServerData" if is_legacy else "winsServers"
                 ].append(wins_server)
         except Exception as exception:
             syslog(f"Could not retrieve IPv4 configuration - {str(exception)}")
@@ -304,8 +300,7 @@ class NetworkService(metaclass=Singleton):
                 ipconfig_properties["Domains" if is_legacy else "domains"].append(
                     domain
                 )
-
-            ipconfig_properties["Nameservers" if is_legacy else "nameservers"] = []
+            ipconfig_properties["NameserverData" if is_legacy else "nameservers"] = []
             props_nameservers = (
                 props["Nameservers"]
                 if props.get("Nameservers", None) is not None
@@ -313,8 +308,15 @@ class NetworkService(metaclass=Singleton):
             )
             for nameserver in props_nameservers:
                 ipconfig_properties[
-                    "Nameservers" if is_legacy else "nameservers"
+                    "NameserverData" if is_legacy else "nameservers"
                 ].append(inet_ntop(AF_INET6, nameserver))
+            if is_legacy:
+                # Legacy WebLCM included a 'WinsServerData' entry, but this data is not exposed via
+                # D-Bus by NetworkManager. So, only add this property for legacy requests.
+                #
+                # See below for more info:
+                # https://people.freedesktop.org/~lkundrak/nm-docs/gdbus-org.freedesktop.NetworkManager.IP6Config.html
+                ipconfig_properties["WinsServerData"] = []
         except Exception as exception:
             syslog(f"Could not retrieve IPv6 configuration - {str(exception)}")
             return {}
