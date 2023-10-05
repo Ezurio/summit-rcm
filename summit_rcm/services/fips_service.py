@@ -41,20 +41,6 @@ class FipsService(metaclass=Singleton):
             syslog(LOG_ERR, f"set_fips_state exception: {str(exception)}")
             return False
 
-        try:
-            from summit_rcm.stunnel.stunnel_service import StunnelService
-
-            if value in ["fips", "fips_wifi"]:
-                await StunnelService.configure_fips(enabled=True)
-            elif value == "unset":
-                await StunnelService.configure_fips(enabled=False)
-        except ImportError:
-            # stunnel module not loaded
-            pass
-        except Exception as exception:
-            syslog(f"FIPS stunnel set exception: {str(exception)}")
-            return False
-
         return True
 
     async def get_fips_state(self) -> str:

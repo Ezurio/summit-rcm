@@ -3,6 +3,8 @@ Summit RCM main module
 """
 
 import asyncio
+import importlib
+import pkgutil
 import socket
 from syslog import LOG_ERR, syslog, openlog
 from typing import Any, List
@@ -66,20 +68,16 @@ try:
                 "firmware",
                 "logData",
                 "logSetting",
-                "logForwarding",
                 "poweroff",
                 "suspend",
                 "files",
                 "certificates",
                 "datetime",
                 "fips",
-                "modemEnable",
                 "/api/v2/network/interfaces",
                 "/api/v2/network/connections",
                 "/api/v2/network/accessPoints",
                 "/api/v2/network/certificates",
-                "/api/v2/network/firewall",
-                "/api/v2/network/stunnel",
                 "/api/v2/network/wifi",
                 "/api/v2/system/power",
                 "/api/v2/system/update",
@@ -94,7 +92,7 @@ try:
             ]
 
         def session_is_valid(self, req: falcon.asgi.Request) -> bool:
-            """Determinte if the current request's session is valid"""
+            """Determine if the current request's session is valid"""
             # With the `get` method the session id will be saved which could result in session
             # fixation vulnerability. Session ids will be destroyed periodically so we have to check
             # 'USERNAME' to make sure the session is not valid after logout.
@@ -127,6 +125,10 @@ try:
             # For v2 routes, check if the requested path starts with a restricted path string
             for path in self.paths:
                 if req.path.startswith(path):
+                    return True
+
+            for plugin in summit_rcm_plugins:
+                if req.path.startswith(plugin):
                     return True
 
             return False
@@ -200,30 +202,6 @@ try:
         if DefinitionsResource:
             add_route("/definitions", DefinitionsResource())
 
-    async def add_firewall_legacy():
-        """
-        Add the following legacy routes, if enabled:
-        - /firewall
-        - /firewall/{command}
-        """
-        try:
-            from summit_rcm.iptables.firewall_service import FirewallService
-            from summit_rcm.rest_api.legacy.firewall import FirewallResourceLegacy
-
-            summit_rcm_plugins.append("firewall")
-        except ImportError:
-            FirewallService = None
-            FirewallResourceLegacy = None
-
-        if FirewallService and FirewallResourceLegacy:
-            try:
-                firewall_resource_legacy = FirewallResourceLegacy()
-                add_route("/firewall", firewall_resource_legacy)
-                add_route("/firewall/{command}", firewall_resource_legacy)
-            except Exception as exception:
-                syslog(LOG_ERR, f"Could not load firewall endpoints - {str(exception)}")
-                raise exception
-
     async def add_users_legacy():
         """
         Add the following legacy routes, if enabled:
@@ -263,8 +241,6 @@ try:
         - /api/v2/network/certificates
         - /api/v2/network/certificates/{name}
         - /api/v2/network/wifi
-        - /api/v2/network/firewall/forwardedPorts
-        - /api/v2/network/stunnel
         """
         try:
             from summit_rcm.rest_api.v2.network.status import NetworkStatusResource
@@ -288,21 +264,6 @@ try:
             from summit_rcm.rest_api.v2.network.certificates import CertificateResource
             from summit_rcm.rest_api.v2.network.wifi import WiFiResource
 
-            try:
-                from summit_rcm.iptables.firewall_service import FirewallService
-                from summit_rcm.rest_api.v2.network.firewall import (
-                    FirewallForwardedPortsResource,
-                )
-            except ImportError:
-                FirewallService = None
-                FirewallForwardedPortsResource = None
-
-            try:
-                from summit_rcm.stunnel.stunnel_service import StunnelService
-                from summit_rcm.rest_api.v2.network.stunnel import StunnelResource
-            except ImportError:
-                StunnelService = None
-                StunnelResource = None
         except ImportError:
             NetworkStatusResource = None
 
@@ -341,16 +302,6 @@ try:
                 add_route("/api/v2/network/certificates", CertificatesResource())
                 add_route("/api/v2/network/certificates/{name}", CertificateResource())
                 add_route("/api/v2/network/wifi", WiFiResource())
-                if FirewallService and FirewallForwardedPortsResource:
-                    add_route(
-                        "/api/v2/network/firewall/forwardedPorts",
-                        FirewallForwardedPortsResource(),
-                    )
-                if StunnelService and StunnelResource:
-                    add_route(
-                        "/api/v2/network/stunnel",
-                        StunnelResource(),
-                    )
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load network endpoints - {str(exception)}")
                 raise exception
@@ -422,6 +373,8 @@ try:
                 add_route("/reboot", Reboot())
                 add_route("/factoryReset", FactoryReset())
                 add_route("/fips", Fips())
+                summit_rcm_plugins.append("factoryReset")
+                summit_rcm_plugins.append("reboot")
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load advanced endpoints - {str(exception)}")
                 raise exception
@@ -481,21 +434,9 @@ try:
         Add the following legacy routes, if enabled:
         - /logData
         - /logSetting
-        - /logForwarding
         """
         try:
             from summit_rcm.rest_api.legacy.log import LogData, LogSetting
-
-            try:
-                from summit_rcm.log_forwarding.services.log_forwarding_service import (
-                    LogForwardingService,
-                )
-                from summit_rcm.log_forwarding.rest_api.legacy.log_forwarding import (
-                    LogForwarding,
-                )
-            except ImportError:
-                LogForwardingService = None
-                LogForwarding = None
         except ImportError:
             LogData = None
 
@@ -503,8 +444,6 @@ try:
             try:
                 add_route("/logData", LogData())
                 add_route("/logSetting", LogSetting())
-                if LogForwardingService and LogForwarding:
-                    add_route("/logForwarding", LogForwarding())
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load logging endpoints - {str(exception)}")
                 raise exception
@@ -537,258 +476,6 @@ try:
                 syslog(
                     LOG_ERR,
                     f"Could not load firmware update endpoint - {str(exception)}",
-                )
-                raise exception
-
-    async def add_unauthenticated_legacy():
-        """
-        Add the /allowUnauthenticatedResetReboot legacy route, if enabled, and configure the logic
-        for requiring a valid, authenticated session for access to the /reboot and /factoryReset
-        endpoints
-        """
-        try:
-            from summit_rcm.rest_api.legacy.unauthenticated import (
-                AllowUnauthenticatedResetReboot,
-            )
-
-            summit_rcm_plugins.append("allowUnauthenticatedResetReboot")
-        except ImportError:
-            AllowUnauthenticatedResetReboot = None
-
-        if AllowUnauthenticatedResetReboot:
-            try:
-                unauthenticated = AllowUnauthenticatedResetReboot()
-                if not unauthenticated.allow_unauthenticated_reset_reboot:
-                    summit_rcm_plugins.append("factoryReset")
-                    summit_rcm_plugins.append("reboot")
-
-                add_route("/allowUnauthenticatedResetReboot", unauthenticated)
-                return
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    "Could not load endpoint to allow unauthenticated access to reset/reboot - "
-                    f"{str(exception)}",
-                )
-                raise exception
-
-        summit_rcm_plugins.append("factoryReset")
-        summit_rcm_plugins.append("reboot")
-
-    async def add_awm_legacy():
-        """Add the /awm legacy route, if enabled"""
-        try:
-            from summit_rcm.awm.awm_config_service import AWMConfigService
-            from summit_rcm.rest_api.legacy.awm import AWMResourceLegacy
-
-            summit_rcm_plugins.append("awm")
-        except ImportError:
-            AWMConfigService = None
-            AWMResourceLegacy = None
-
-        if AWMConfigService and AWMResourceLegacy:
-            try:
-                add_route("/awm", AWMResourceLegacy())
-            except Exception as exception:
-                syslog(LOG_ERR, f"Could not load AWM endpoint - {str(exception)}")
-                raise exception
-
-    async def add_stunnel_legacy():
-        """Add the /stunnel legacy route, if enabled"""
-        try:
-            from summit_rcm.stunnel.stunnel_service import StunnelService
-            from summit_rcm.rest_api.legacy.stunnel import StunnelResourceLegacy
-
-            summit_rcm_plugins.append("stunnel")
-        except ImportError:
-            StunnelService = None
-            StunnelResourceLegacy = None
-
-        if StunnelService and StunnelResourceLegacy:
-            try:
-                add_route("/stunnel", StunnelResourceLegacy())
-            except Exception as exception:
-                syslog(LOG_ERR, f"Could not load stunnel endpoint - {str(exception)}")
-                raise exception
-
-    async def add_modem_legacy():
-        """
-        Add the following legacy routes, if enabled:
-        - /positioning
-        - /positioningSwitch
-        - /modemFirmwareUpdate
-        - /modemEnable
-        """
-        try:
-            from summit_rcm.modem.modem import (
-                PositioningSwitch,
-                Positioning,
-                ModemFirmwareUpdate,
-                ModemEnable,
-            )
-
-            summit_rcm_plugins.append("positioning")
-            summit_rcm_plugins.append("positioningSwitch")
-            summit_rcm_plugins.append("modemFirmwareUpdate")
-            summit_rcm_plugins.append("modemEnable")
-        except ImportError:
-            PositioningSwitch = None
-
-        if PositioningSwitch:
-            try:
-                add_route("/positioning", Positioning())
-                add_route("/positioningSwitch", PositioningSwitch())
-                add_route("/modemFirmwareUpdate", ModemFirmwareUpdate())
-                add_route("/modemEnable", ModemEnable())
-            except Exception as exception:
-                syslog(LOG_ERR, f"Could not load modem endpoints - {str(exception)}")
-                raise exception
-
-    async def add_radio_siso_mode_legacy():
-        """Add the /radioSISOMode legacy route, if enabled"""
-        try:
-            from summit_rcm.radio_siso_mode.radio_siso_mode_service import (
-                RadioSISOModeService,
-            )
-            from summit_rcm.rest_api.legacy.radio_siso_mode import (
-                RadioSISOModeResourceLegacy,
-            )
-
-            summit_rcm_plugins.append("radioSISOMode")
-        except ImportError:
-            RadioSISOModeService = None
-            RadioSISOModeResourceLegacy = None
-
-        if RadioSISOModeService and RadioSISOModeResourceLegacy:
-            try:
-                add_route("/radioSISOMode", RadioSISOModeResourceLegacy())
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    f"Could not load Radio SISO mode control endpoint - {str(exception)}",
-                )
-                raise exception
-
-    async def add_ntp_legacy():
-        """
-        Add the following legacy routes, if enabled:
-        - /ntp
-        - /ntp/{command}
-        """
-        try:
-            from summit_rcm.chrony.ntp_service import ChronyNTPService
-            from summit_rcm.rest_api.legacy.ntp import NTPResourceLegacy
-
-            summit_rcm_plugins.append("ntp")
-        except ImportError:
-            ChronyNTPService = None
-            NTPResourceLegacy = None
-
-        if ChronyNTPService and NTPResourceLegacy:
-            try:
-                ntp_resource_legacy = NTPResourceLegacy()
-                add_route("/ntp", ntp_resource_legacy)
-                add_route("/ntp/{command}", ntp_resource_legacy)
-            except Exception as exception:
-                syslog(LOG_ERR, f"Could not load NTP endpoints - {str(exception)}")
-                raise exception
-
-    async def add_bluetooth_legacy():
-        """
-        Add the following legacy routes, if enabled, and determine if websockets access should
-        require a valid, authenticated session:
-        - /bluetooth
-        - /bluetooth/{controller}
-        - /bluetooth/{controller}/{device}
-        """
-        try:
-            # Note: Authenticating websocket users by header token is non-standard; an alternative
-            # method may be required for Javascript browser clients.
-
-            from summit_rcm.bluetooth.bt import Bluetooth
-            from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
-            from summit_rcm.rest_api.legacy.bluetooth import (
-                BluetoothControllerLegacyResource,
-                BluetoothDeviceLegacyResource,
-                BluetoothLegacyResource,
-            )
-
-            summit_rcm_plugins.append("bluetooth")
-
-            if Bluetooth and websockets_auth_by_header_token:
-                SessionCheckingMiddleware().paths.append("/bluetoothWebsocket/ws")
-        except ImportError:
-            Bluetooth = None
-
-        if Bluetooth:
-            try:
-                await Bluetooth().setup(app)
-
-                if websockets_auth_by_header_token:
-                    Bluetooth().add_ws_route(
-                        ws_route="/bluetoothWebsocket/ws", is_legacy=True
-                    )
-
-                add_route("/bluetooth", BluetoothLegacyResource())
-                add_route(
-                    "/bluetooth/{controller}", BluetoothControllerLegacyResource()
-                )
-                add_route(
-                    "/bluetooth/{controller}/{device}", BluetoothDeviceLegacyResource()
-                )
-            except Exception as exception:
-                syslog(
-                    LOG_ERR, f"Could not load Bluetooth endpoints - {str(exception)}"
-                )
-                raise exception
-
-    async def add_bluetooth_v2():
-        """
-        Add the following v2 routes, if enabled, and determine if websockets access should require a
-        valid, authenticated session:
-        - /api/v2/bluetooth
-        - /api/v2/bluetooth/{controller}
-        - /api/v2/bluetooth/{controller}/{device}
-        """
-        try:
-            # Note: Authenticating websocket users by header token is non-standard; an alternative
-            # method may be required for Javascript browser clients.
-
-            from summit_rcm.bluetooth.bt import Bluetooth
-            from summit_rcm.rest_api.v2.bluetooth.bluetooth import (
-                BluetoothControllerV2Resource,
-                BluetoothDeviceV2Resource,
-                BluetoothV2Resource,
-            )
-            from summit_rcm.bluetooth.bt_ble import websockets_auth_by_header_token
-
-            SessionCheckingMiddleware().paths.append("/api/v2/bluetooth")
-
-            if Bluetooth and websockets_auth_by_header_token:
-                SessionCheckingMiddleware().paths.append("/api/v2/bluetooth/ws")
-        except ImportError:
-            Bluetooth = None
-
-        if Bluetooth:
-            try:
-                await Bluetooth().setup(app)
-
-                if websockets_auth_by_header_token:
-                    Bluetooth().add_ws_route(
-                        ws_route="/api/v2/bluetooth/ws", is_legacy=False
-                    )
-
-                add_route("/api/v2/bluetooth", BluetoothV2Resource())
-                add_route(
-                    "/api/v2/bluetooth/{controller}", BluetoothControllerV2Resource()
-                )
-                add_route(
-                    "/api/v2/bluetooth/{controller}/{device}",
-                    BluetoothDeviceV2Resource(),
-                )
-            except Exception as exception:
-                syslog(
-                    LOG_ERR, f"Could not load Bluetooth endpoints - {str(exception)}"
                 )
                 raise exception
 
@@ -833,26 +520,6 @@ try:
             from summit_rcm.rest_api.v2.system.debug import DebugExportResource
             from summit_rcm.rest_api.v2.system.version import VersionResource
 
-            try:
-                from summit_rcm.chrony.ntp_service import ChronyNTPService
-                from summit_rcm.rest_api.v2.system.ntp import (
-                    NTPSourcesResource,
-                    NTPSourceResource,
-                )
-            except ImportError:
-                ChronyNTPService = None
-                NTPSourcesResource = None
-
-            try:
-                from summit_rcm.log_forwarding.services.log_forwarding_service import (
-                    LogForwardingService,
-                )
-                from summit_rcm.log_forwarding.rest_api.v2.system.log_forwarding import (
-                    LogForwardingResource,
-                )
-            except ImportError:
-                LogForwardingService = None
-                LogForwardingResource = None
         except ImportError:
             PowerResource = None
 
@@ -874,13 +541,6 @@ try:
                 add_route("/api/v2/system/logs/export", LogsExportResource())
                 add_route("/api/v2/system/debug/export", DebugExportResource())
                 add_route("/api/v2/system/version", VersionResource())
-                if ChronyNTPService and NTPSourcesResource:
-                    add_route("/api/v2/system/datetime/ntp", NTPSourcesResource())
-                    add_route(
-                        "/api/v2/system/datetime/ntp/{address}", NTPSourceResource()
-                    )
-                if LogForwardingService and LogForwardingResource:
-                    add_route("/api/v2/system/logs/forwarding", LogForwardingResource())
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load system endpoints - {str(exception)}")
                 raise exception
@@ -923,6 +583,38 @@ try:
         # Add middleware to inject secure headers
         app.add_middleware(SecureHeadersMiddleware())
 
+    async def add_plugins():
+        """
+        Add all plugin routes for legacy and v2
+        """
+
+        discovered_plugins = {
+            name: importlib.import_module(name)
+            for finder, name, ispkg
+            in pkgutil.iter_modules()
+            if name.startswith('summit_rcm_')
+        }
+
+        for plugin in discovered_plugins:
+            try:
+                routes = await discovered_plugins[plugin].get_legacy_routes()
+                if routes:
+                    for route in routes:
+                        add_route(route, routes[route])
+                        summit_rcm_plugins.append(route[1:])
+            except Exception as exception:
+                syslog(
+                    LOG_ERR, f"Error importing legacy plugin {plugin}: {str(exception)}"
+                )
+            try:
+                routes = await discovered_plugins[plugin].get_v2_routes()
+                if routes:
+                    for route in routes:
+                        add_route(route, routes[route])
+                        summit_rcm_plugins.append(route)
+            except Exception as exception:
+                syslog(LOG_ERR, f"Error importing v2 plugin {plugin}: {str(exception)}")
+
     async def add_routes() -> None:
         """Add routes to the ASGI application"""
         await asyncio.gather(
@@ -930,10 +622,8 @@ try:
             add_network_v2(),
             add_system_v2(),
             add_login_v2(),
-            add_bluetooth_v2(),
             # legacy routes
             add_network_legacy(),
-            add_firewall_legacy(),
             add_firmware_legacy(),
             add_definitions_legacy(),
             add_users_legacy(),
@@ -942,14 +632,9 @@ try:
             add_files_legacy(),
             add_certificates_legacy(),
             add_logs_legacy(),
-            add_unauthenticated_legacy(),
-            add_awm_legacy(),
-            add_stunnel_legacy(),
-            add_modem_legacy(),
             add_date_time_legacy(),
-            add_ntp_legacy(),
-            add_bluetooth_legacy(),
-            add_radio_siso_mode_legacy(),
+            # plugin routes
+            add_plugins(),
         )
 
     def add_route(route_path: str, resource: Any, **kwargs):
