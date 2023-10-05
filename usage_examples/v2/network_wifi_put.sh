@@ -1,7 +1,5 @@
 #! /bin/bash
 
-SISO_MODE="${SISO_MODE:--1}"
-SCANNING_ENABLED="${SCANNING_ENABLED:-1}"
 WIFI_RADIO_SOFTWARE_ENABLED="${WIFI_RADIO_SOFTWARE_ENABLED:-true}"
 
 source ../global_settings
@@ -11,8 +9,6 @@ echo "Set Wi-Fi settings"
 echo "========================="
 echo
 
-echo "Desired SISO Mode: ${SISO_MODE}"
-echo "Desired Geolocation Scanning Enabled: ${SCANNING_ENABLED}"
 echo "Desired Wi-Fi Radio Software Enabled: ${WIFI_RADIO_SOFTWARE_ENABLED}"
 # The Wi-Fi radio cannot be hardware disabled via software
 echo "Desired Wi-Fi Radio Hardware Enabled: true"
@@ -24,8 +20,6 @@ curl -s --location \
     --header "Content-Type: application/json" \
     -b cookie -c cookie --insecure \
     --data '{
-        "sisoMode": '"${SISO_MODE}"',
-        "geolocationScanningEnabled": '"${SCANNING_ENABLED}"',
         "wifiRadioSoftwareEnabled": '"${WIFI_RADIO_SOFTWARE_ENABLED}"',
         "wifiRadioHardwareEnabled": true
     }' \

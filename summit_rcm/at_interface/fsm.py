@@ -1,6 +1,8 @@
 """
 AT interface's finite state machine module
 """
+import importlib
+import pkgutil
 from syslog import syslog, LOG_ERR
 from typing import Callable, List, Optional, Tuple
 from asyncio import Transport, Protocol
@@ -65,15 +67,6 @@ from summit_rcm.at_interface.commands.files_delete_command import FilesDeleteCom
 from summit_rcm.at_interface.commands.files_export_command import FilesExportCommand
 from summit_rcm.at_interface.commands.files_list_command import FilesListCommand
 from summit_rcm.at_interface.commands.files_upload_command import FilesUploadCommand
-
-try:
-    from summit_rcm.at_interface.commands.ntp_get_command import NTPGetCommand
-    from summit_rcm.at_interface.commands.ntp_configure_command import (
-        NTPConfigureCommand,
-    )
-except ImportError:
-    NTPGetCommand = None
-    NTPConfigureCommand = None
 from summit_rcm.at_interface.commands.fwupdate_run_command import FWUpdateRunCommand
 from summit_rcm.at_interface.commands.fwupdate_send_command import FWUpdateSendCommand
 from summit_rcm.at_interface.commands.fwupdate_status_command import (
@@ -88,21 +81,13 @@ from summit_rcm.at_interface.commands.at_echo_disable_command import (
 )
 from summit_rcm.at_interface.commands.at_echo_enable_command import ATEchoEnableCommand
 
-try:
-    from summit_rcm.log_forwarding.at_interface.commands.log_forwarding_command import (
-        LogForwardingCommand,
-    )
-except ImportError:
-    LogForwardingCommand = None
-try:
-    from summit_rcm.awm.at_interface.commands.awm_scan_command import AWMScanCommand
-    from summit_rcm.awm.at_interface.commands.awm_mode_command import AWMModeCommand
-except ImportError:
-    AWMScanCommand = None
-try:
-    from summit_rcm.radio_siso_mode.at_interface.commands.siso_mode_command import SISOModeCommand
-except ImportError:
-    SISOModeCommand = None
+
+discovered_plugins = {
+            name: importlib.import_module(name)
+            for finder, name, ispkg
+            in pkgutil.iter_modules()
+            if name.startswith('summit_rcm_')
+}
 
 AT_COMMANDS: List[Command] = [
     CIPStartCommand,
@@ -147,19 +132,13 @@ AT_COMMANDS: List[Command] = [
     ATEchoEnableCommand,
 ]
 
-if NTPGetCommand:
-    AT_COMMANDS.append(NTPGetCommand)
-    AT_COMMANDS.append(NTPConfigureCommand)
-
-if AWMScanCommand:
-    AT_COMMANDS.append(AWMScanCommand)
-    AT_COMMANDS.append(AWMModeCommand)
-
-if SISOModeCommand:
-    AT_COMMANDS.append(SISOModeCommand)
-
-if LogForwardingCommand:
-    AT_COMMANDS.append(LogForwardingCommand)
+for plugin in discovered_plugins:
+    try:
+        at_commands = discovered_plugins[plugin].get_at_commands()
+        if at_commands:
+            AT_COMMANDS.extend(at_commands)
+    except Exception:
+        continue
 
 
 class ATInterfaceFSM(metaclass=Singleton):

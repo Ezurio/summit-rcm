@@ -60,12 +60,9 @@ class VersionService(metaclass=Singleton):
                         )
                         break
                 try:
-                    from summit_rcm.bluetooth.bt import Bluetooth
-                except ImportError:
-                    Bluetooth = None
-                self._version["bluez"] = (
-                    self.get_bluez_version() if Bluetooth is not None else "n/a"
-                )
+                    self._version["bluez"] = self.get_bluez_version()
+                except Exception:
+                    self._version["bluez"] = "n/a"
                 self._version["uBoot"] = await self.get_uboot_version()
 
             if is_legacy:
