@@ -405,7 +405,8 @@ class NetworkInterfaceStatistics(object):
             name = req.params.get("name", None)
             if not name:
                 result["InfoMsg"] = "No interface name provided"
-                return result
+                resp.media = result
+                return
 
             (success, stats) = await NetworkService.get_interface_statistics(
                 target_interface_name=name, is_legacy=True
