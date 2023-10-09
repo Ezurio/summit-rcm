@@ -44,7 +44,7 @@ class ConnectionModifyCommand(Command):
                     uuid = params_dict["uuid"]
             if mode == Modes.CREATE:
                 await NetworkService().create_connection_profile(
-                    params_dict["settings"]
+                    params_dict["settings"], overwrite_existing=False
                 )
             elif mode == Modes.UDPATE:
                 await NetworkService().update_connection_profile(
