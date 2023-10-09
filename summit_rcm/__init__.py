@@ -35,13 +35,12 @@ try:
 
         async def process_response(self, req, resp, resource, req_succeeded):
             """Add secure headers to the response before it's returned to the client"""
-            headers = resp.headers
-            headers["X-Frame-Options"] = "DENY"
-            headers["X-XSS-Protection"] = "1; mode=block"
-            headers["X-Content-Type-Options"] = "nosniff"
-            headers["Content-Security-Policy"] = "default-src 'self'"
+            resp.set_header("X-Frame-Options", "DENY")
+            resp.set_header("X-XSS-Protection", "1; mode=block")
+            resp.set_header("X-Content-Type-Options", "nosniff")
+            resp.set_header("Content-Security-Policy", "default-src 'self'")
             # Add Strict-Transport headers
-            headers["Strict-Transport-Security"] = "max-age=600"  # ten minutes
+            resp.set_header("Strict-Transport-Security", "max-age=600")  # ten minutes
 
     class LifespanMiddleware:
         """Middleware that handles ASGI lifespan events"""
