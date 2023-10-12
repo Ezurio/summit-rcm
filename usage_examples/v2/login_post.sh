@@ -7,17 +7,40 @@ echo "Session login"
 echo "========================="
 echo
 
-echo -n "Status Code: "
+echo "Attempting to login with $SUMMIT_RCM_PASSWORD"
 
-curl -s --location \
-    -w "%{http_code}\nResponse:\n" \
-    --request POST ${URL}/api/v2/login \
+http_code=$(curl -s --location \
+    -w "%{http_code}" \
+    --request POST "${URL}"/api/v2/login \
     --header 'Content-Type: application/json' \
     -b cookie -c cookie --insecure \
     --data '{
         "username": "'"${SUMMIT_RCM_USERNAME}"'",
         "password": "'"${SUMMIT_RCM_PASSWORD}"'"
-    }' \
-    -o >(${JQ_APP})
+    }')
+
+echo "Status Code: $http_code"
+
+if [ "$http_code" = "403" ]; then
+    echo "Unable to login with $SUMMIT_RCM_PASSWORD"
+    echo "Attempting to login with $ORIGINAL_SUMMIT_RCM_PASSWORD"
+    http_code=$(curl -s --location \
+        -w "%{http_code}" \
+        --request POST "${URL}"/api/v2/login \
+        --header 'Content-Type: application/json' \
+        -b cookie -c cookie --insecure \
+        --data '{
+            "username": "'"${SUMMIT_RCM_USERNAME}"'",
+            "password": "'"${ORIGINAL_SUMMIT_RCM_PASSWORD}"'"
+        }')
+    if [ "$http_code" = "200" ]; then
+        echo "Status Code: $http_code"
+        echo "Login Successful"
+        echo "Please considering changing the default password!"
+        echo "See usage_examples/v2/login_users_update_password.sh"
+    fi
+elif [ "$http_code" = "200" ]; then
+    echo "Login Successful"
+fi
 
 wait

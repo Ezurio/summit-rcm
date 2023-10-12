@@ -14,7 +14,7 @@ echo -n "Status Code: "
 
 curl -s --location \
     -w "%{http_code}\nResponse:\n" \
-    --request DELETE ${URL}/api/v2/login/users/${TARGET_USER_USERNAME} \
+    --request DELETE "${URL}"/api/v2/login/users/"${TARGET_USER_USERNAME}" \
     -b cookie -c cookie --insecure \
     -o >(${JQ_APP})
 
