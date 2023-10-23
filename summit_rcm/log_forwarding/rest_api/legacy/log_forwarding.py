@@ -72,6 +72,9 @@ class LogForwarding:
                 return
 
             await LogForwardingService().set_state(requested_state)
+            result["log_forwarding_state"] = await LogForwardingService().get_active_state()
+            result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
+            result["InfoMsg"] = ""
         except AlreadyActiveError:
             result["InfoMsg"] = "Log forwarding already active"
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
