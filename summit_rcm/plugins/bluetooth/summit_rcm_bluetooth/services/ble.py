@@ -2,6 +2,7 @@
 Module to handle BLE control.
 """
 
+from enum import Enum
 from syslog import syslog, LOG_ERR
 from typing import Tuple
 from dbus_fast import DBusError
@@ -287,3 +288,24 @@ class AuthenticationAgent(ServiceInterface):
     @method()
     def Cancel(self):
         syslog("AuthenticationAgent Cancel")
+
+
+class BLEWriteCharacteristicType(str, Enum):
+    """
+    Enumeration of valid Bluetooth GATT write characteristic types
+
+    See below for more info:
+    https://github.com/bluez/bluez/blob/master/doc/org.bluez.GattCharacteristic.rst#void-writevaluearraybyte-value-dict-options
+    """
+
+    BLE_CHR_WRITE_TYPE_DEFAULT = ""
+    BLE_CHR_WRITE_TYPE_COMMAND = "command"
+    BLE_CHR_WRITE_TYPE_REQUEST = "request"
+    BLE_CHR_WRITE_TYPE_RELIABLE = "reliable"
+
+
+class VSPSocketRxTypeEnum(str, Enum):
+    """Enumeration of valid VSP socket Rx types"""
+
+    BLE_VSP_SOCKET_RX_TYPE_RAW = "raw"
+    BLE_VSP_SOCKET_RX_TYPE_JSON = "JSON"

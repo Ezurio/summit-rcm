@@ -4,6 +4,11 @@ Module to support iptables firewall configuration for legacy routes.
 
 from typing import List
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.definition import SUMMIT_RCM_ERRORS
 from summit_rcm_firewall.services.firewall_service import (
     IP_VERSIONS,
@@ -12,6 +17,32 @@ from summit_rcm_firewall.services.firewall_service import (
     FirewallService,
     ForwardedPort,
 )
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        DefaultResponseModelLegacy,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm_firewall.rest_api.utils.spectree.models import (
+        ForwardedPortsResponseModelLegacy,
+        ForwardedPortModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    DefaultResponseModelLegacy = None
+    UnauthorizedErrorResponseModel = None
+    ForwardedPortsResponseModelLegacy = None
+    ForwardedPortModelLegacy = None
+    network_tag = None
+
+
+spec = SpectreeService()
 
 
 class FirewallResourceLegacy:
@@ -40,9 +71,18 @@ class FirewallResourceLegacy:
             f" {not_one_of}, ",
         }
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ForwardedPortsResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, _, resp):
         """
-        GET handler for the /firewall endpoint
+        Retrieve a list of ports currently forwarded via iptables firewall rules (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -61,9 +101,20 @@ class FirewallResourceLegacy:
             result["InfoMsg"] = f"Error: {str(exception)}"
         resp.media = result
 
+    @spec.validate(
+        json=ForwardedPortModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        path_parameter_descriptions={"command": "The command to execute"},
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp, command):
         """
-        PUT handler for the /firewall/{command} endpoint
+        Update the list of ports currently forwarded via iptables firewall rules (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON

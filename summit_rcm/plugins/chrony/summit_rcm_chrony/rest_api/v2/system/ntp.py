@@ -4,11 +4,46 @@ Module to support NTP configuration via chrony for v2 routes.
 
 from syslog import LOG_ERR, syslog
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm_chrony.services.ntp_service import (
     REMOVE_SOURCE,
     OVERRIDE_SOURCES,
     ChronyNTPService,
 )
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        NotFoundErrorResponseModel,
+        InternalServerErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm_chrony.rest_api.utils.spectree.models import (
+        ChronySourcesResponseModel,
+        ChronySourceModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    NotFoundErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    ChronySourcesResponseModel = None
+    ChronySourceModel = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class NTPSourcesResource:
@@ -16,9 +51,18 @@ class NTPSourcesResource:
     Resource to handle queries and requests for chrony NTP sources
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ChronySourcesResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_get(self, _, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /system/datetime/ntp endpoint
+        Retrieve chrony NTP sources
         """
         try:
             resp.media = await ChronyNTPService.chrony_get_sources()
@@ -28,11 +72,22 @@ class NTPSourcesResource:
             syslog(LOG_ERR, f"Unable to retrieve chrony NTP sources: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ChronySourcesResponseModel,
+        resp=Response(
+            HTTP_200=ChronySourcesResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        PUT handler for the /system/datetime/ntp endpoint
+        Update chrony NTP sources
         """
         try:
             put_data = await req.get_media(default_when_empty=None)
@@ -71,9 +126,21 @@ class NTPSourceResource:
     Resource to handle queries and requests for a specific chrony NTP source by address
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ChronySourceModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        path_parameter_descriptions={"address": "The address of the NTP source"},
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_get(self, _, resp: falcon.asgi.Response, address: str) -> None:
         """
-        GET handler for the /system/datetime/ntp/{address} endpoint
+        Retrieve a specific chrony NTP source by address
         """
         try:
             if not address:
@@ -92,11 +159,23 @@ class NTPSourceResource:
             syslog(LOG_ERR, f"Unable to retrieve chrony NTP source: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        path_parameter_descriptions={"address": "The address of the NTP source"},
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_delete(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, address: str
     ) -> None:
         """
-        DELETE handler for the /system/datetime/ntp/{address} endpoint
+        Remove a specific chrony NTP source by address
         """
         try:
             if not address:

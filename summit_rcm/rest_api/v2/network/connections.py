@@ -5,6 +5,11 @@ Module to interact with network connection profiles
 import os
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.rest_api.services.rest_files_service import (
     RESTFilesService as FilesService,
 )
@@ -16,15 +21,56 @@ from summit_rcm.services.network_service import (
     NetworkService,
 )
 
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        ConnectionProfile,
+        ConnectionProfileExportRequestModel,
+        ConnectionProfileImportRequestFormModel,
+        ConnectionProfiles,
+        InternalServerErrorResponseModel,
+        NotFoundErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    ConnectionProfile = None
+    ConnectionProfileExportRequestModel = None
+    ConnectionProfileImportRequestFormModel = None
+    ConnectionProfiles = None
+    InternalServerErrorResponseModel = None
+    NotFoundErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    network_tag = None
+
+
+spec = SpectreeService()
+
 
 class NetworkConnectionsResource(object):
     """
     Resource to handle queries and requests for all network connection profiles
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ConnectionProfiles,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /network/connections endpoint
+        Retrieve a list of connection profiles
         """
         try:
             resp.media = await NetworkService.get_all_connection_profiles(
@@ -39,11 +85,21 @@ class NetworkConnectionsResource(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_post(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        POST handler for the /network/connections endpoint
+        Add a new connection profile
         """
         try:
             post_data: dict = await req.get_media()
@@ -86,11 +142,22 @@ class NetworkConnectionsExportResource:
     Resource to handle queries and requests for exporting network connections
     """
 
+    @spec.validate(
+        json=ConnectionProfileExportRequestModel,
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_get(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        GET handler for the /network/connections/export endpoint
+        Retrieve a password-protected archive export of the current connection profiles
         """
         archive = ""
         try:
@@ -120,11 +187,22 @@ class NetworkConnectionsImportResource:
     Resource to handle queries and requests for importing network connections
     """
 
+    @spec.validate(
+        form=ConnectionProfileImportRequestFormModel,
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        PUT handler for the /network/connections/import endpoint
+        Import a password-protected archive of connection profiles
         """
         try:
             password = ""
@@ -169,11 +247,22 @@ class NetworkConnectionResourceByUuid(object):
     Resource to handle queries and requests for a specific network connection profile by UUID
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_get(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, uuid: str
     ) -> None:
         """
-        GET handler for the /network/connections/uuid/{uuid} endpoint
+        Retrieve details about a connection profile by UUID
         """
         try:
             if not uuid:
@@ -194,11 +283,24 @@ class NetworkConnectionResourceByUuid(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_201=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, uuid: str
     ) -> None:
         """
-        PUT handler for the /network/connections/uuid/{uuid} endpoint
+        Create/replace a connection profile by UUID
         """
         try:
             if not uuid:
@@ -242,11 +344,23 @@ class NetworkConnectionResourceByUuid(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_patch(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, uuid: str
     ) -> None:
         """
-        PATCH handler for the /network/connections/uuid/{uuid} endpoint
+        Update/activate/deactivate a connection profile by UUID
         """
         try:
             if not uuid:
@@ -285,11 +399,22 @@ class NetworkConnectionResourceByUuid(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_delete(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, uuid: str
     ) -> None:
         """
-        DELETE handler for the /network/connections/uuid/{uuid} endpoint
+        Remove a connection profile by UUID
         """
         try:
             if not uuid:
@@ -315,11 +440,22 @@ class NetworkConnectionResourceById(object):
     Resource to handle queries and requests for a specific network connection profile by id
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_get(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, id: str
     ) -> None:
         """
-        GET handler for the /network/connections/id/{id} endpoint
+        Retrieve details about a connection profile by id (name)
         """
         try:
             if not id:
@@ -340,11 +476,24 @@ class NetworkConnectionResourceById(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_201=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, id: str
     ) -> None:
         """
-        PUT handler for the /network/connections/id/{id} endpoint
+        Create/replace a connection profile by id (name)
         """
         try:
             if not id:
@@ -401,11 +550,23 @@ class NetworkConnectionResourceById(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=ConnectionProfile,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_patch(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, id: str
     ) -> None:
         """
-        PATCH handler for the /network/connections/id/{id} endpoint
+        Update/activate/deactivate a connection profile by id (name)
         """
         try:
             if not id:
@@ -451,11 +612,22 @@ class NetworkConnectionResourceById(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_delete(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, id: str
     ) -> None:
         """
-        DELETE handler for the /network/connections/id/{id} endpoint
+        Remove a connection profile by id (name)
         """
         try:
             if not id:

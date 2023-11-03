@@ -71,7 +71,7 @@ def get_cython_options():
 
     package_names = [p.replace("/", ".") for p in packages]
 
-    modules_to_exclude = []
+    modules_to_exclude = ["summit_rcm_chrony.rest_api.utils.spectree.models"]
 
     cython_package_names = frozenset([])
 
@@ -98,7 +98,37 @@ def get_cython_options():
     return cmdclass, ext_modules
 
 
+def generate_docs():
+    from summit_rcm.rest_api.utils.spectree.generate_api_spec import generate_api_spec
+
+    routes = {}
+
+    try:
+        from summit_rcm_chrony.rest_api.legacy.ntp import NTPResourceLegacy
+
+        routes["/ntp"] = NTPResourceLegacy
+        routes["/ntp/{command}"] = NTPResourceLegacy
+    except ImportError:
+        pass
+
+    try:
+        from summit_rcm_chrony.rest_api.v2.system.ntp import (
+            NTPSourcesResource,
+            NTPSourceResource,
+        )
+
+        routes["/api/v2/system/datetime/ntp"] = NTPSourcesResource
+        routes["/api/v2/system/datetime/ntp/{address}"] = NTPSourceResource
+    except ImportError:
+        pass
+
+    generate_api_spec(routes)
+
+
 def run_setup(CYTHON):
+    if os.environ.get("DOCS_GENERATION", "False") == "True":
+        generate_docs()
+
     if CYTHON:
         cmdclass, ext_modules = get_cython_options()
     else:

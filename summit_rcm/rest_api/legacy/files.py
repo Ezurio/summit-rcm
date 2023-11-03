@@ -1,11 +1,17 @@
 """
 Module to handle legacy files endpoint
 """
+
 import os
 from pathlib import Path
 import shutil
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.rest_api.services.rest_files_service import (
     RESTFilesService as FilesService,
 )
@@ -15,13 +21,59 @@ from summit_rcm.services.files_service import (
     NETWORKMANAGER_DIR_FULL,
 )
 
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+        InternalServerErrorResponseModel,
+        DefaultResponseModelLegacy,
+        FileUploadRequestModelLegacy,
+        FileDownloadQueryModelLegacy,
+        FileDeleteQueryModelLegacy,
+        FileInfoRequestQueryModelLegacy,
+        FileInfoResponseModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag, network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    DefaultResponseModelLegacy = None
+    FileUploadRequestModelLegacy = None
+    FileDownloadQueryModelLegacy = None
+    FileDeleteQueryModelLegacy = None
+    FileInfoRequestQueryModelLegacy = None
+    FileInfoResponseModelLegacy = None
+    system_tag = None
+    network_tag = None
+
+
+spec = SpectreeService()
+
 UPLOAD_TMP_FILE_PATH = "/tmp/upload.tmp"
 
 
 class FileManage:
     """File Management"""
 
+    @spec.validate(
+        form=FileUploadRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag, network_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
+        """Upload file (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"], "InfoMsg": ""}
@@ -79,9 +131,9 @@ class FileManage:
 
         if upload_file_type not in definition.FILEDIR_DICT:
             syslog(f"FileManage POST type {upload_file_type} unknown")
-            result[
-                "InfoMsg"
-            ] = f"file POST type {upload_file_type} unknown"  # bad request
+            result["InfoMsg"] = (
+                f"file POST type {upload_file_type} unknown"  # bad request
+            )
             if tmp_file.exists():
                 tmp_file.unlink()
             resp.media = result
@@ -118,9 +170,9 @@ class FileManage:
                 result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             except Exception as exception:
                 syslog(f"Could not import system configuration - {str(exception)}")
-                result[
-                    "InfoMsg"
-                ] = f"Could not import system configuration - {str(exception)}"
+                result["InfoMsg"] = (
+                    f"Could not import system configuration - {str(exception)}"
+                )
             finally:
                 if tmp_file.exists():
                     tmp_file.unlink()
@@ -152,7 +204,20 @@ class FileManage:
                 tmp_file.unlink()
         resp.media = result
 
+    @spec.validate(
+        query=FileDownloadQueryModelLegacy,
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag, network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """Download file (legacy)"""
         resp.status = falcon.HTTP_200
 
         type = req.params.get("type", None)
@@ -178,7 +243,7 @@ class FileManage:
 
                 resp.stream = await FilesService.handle_file_download(archive)
                 resp.content_type = falcon.MEDIA_TEXT
-                resp.status = 200
+                resp.status = falcon.HTTP_200
                 syslog("Configuration zipped for user")
             except Exception as exception:
                 syslog(f"Could not export system config - {str(exception)}")
@@ -201,7 +266,7 @@ class FileManage:
 
                 resp.stream = await FilesService.handle_file_download(archive)
                 resp.content_type = falcon.MEDIA_TEXT
-                resp.status = 200
+                resp.status = falcon.HTTP_200
                 syslog("System log zipped for user")
             except Exception as exception:
                 syslog(f"Could not export log data - {str(exception)}")
@@ -219,7 +284,7 @@ class FileManage:
 
                 resp.stream = await FilesService.handle_file_download(archive)
                 resp.content_type = falcon.MEDIA_TEXT
-                resp.status = 200
+                resp.status = falcon.HTTP_200
                 syslog("Configuration and system log zipped/encrypted for user")
             except Exception as exception:
                 syslog(f"Could not export debug info - {str(exception)}")
@@ -233,7 +298,18 @@ class FileManage:
             resp.status = falcon.HTTP_400
         return
 
+    @spec.validate(
+        query=FileDeleteQueryModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag, network_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """Delete file (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -274,7 +350,19 @@ class FileManage:
 class FilesManage:
     """Files Management"""
 
+    @spec.validate(
+        query=FileInfoRequestQueryModelLegacy,
+        resp=Response(
+            HTTP_200=FileInfoResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag, network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """Get file info or export connection profiles (legacy)"""
         resp.status = falcon.HTTP_200
         result = {
             "SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"],
@@ -325,7 +413,18 @@ class FilesManage:
         resp.content_type = falcon.MEDIA_JSON
         resp.media = result
 
+    @spec.validate(
+        query=FileInfoRequestQueryModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag, network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
+        """Import connection profiles (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"], "InfoMsg": ""}

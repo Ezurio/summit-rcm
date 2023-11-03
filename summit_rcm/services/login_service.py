@@ -39,11 +39,11 @@ class LoginService(metaclass=Singleton):
     _valid_sessions: list[Session] = []
 
     def __init__(self) -> None:
-        self._sessions_enabled = (
-            ServerConfig()
-            .get_parser()
-            .getboolean("/", "tools.sessions.on", fallback=True)
-        )
+        # self._sessions_enabled = (
+        #     ServerConfig()
+        #     .get_parser()
+        #     .getboolean("/", "tools.sessions.on", fallback=True)
+        # )
         self._default_username = (
             ServerConfig()
             .get_parser()
@@ -62,10 +62,10 @@ class LoginService(metaclass=Singleton):
             .getboolean("summit-rcm", "allow_multiple_user_sessions", fallback=False)
         )
 
-    @property
-    def sessions_enabled(self) -> bool:
-        """Whether or not sessions are enabled"""
-        return self._sessions_enabled
+    # @property
+    # def sessions_enabled(self) -> bool:
+    #     """Whether or not sessions are enabled"""
+    #     return self._sessions_enabled
 
     @property
     def default_username(self) -> str:

@@ -5,7 +5,13 @@ Module to interact with the certificates.
 import os
 from syslog import syslog, LOG_ERR
 from typing import Optional, Tuple
-import openssl_extension
+
+try:
+    import openssl_extension
+except ImportError as error:
+    # Ignore the error if the openssl_extension module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm import definition
 
 

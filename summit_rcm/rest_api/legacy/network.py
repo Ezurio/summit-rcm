@@ -1,12 +1,88 @@
+"""
+Module to handle network queries (legacy)
+"""
+
 from syslog import syslog, LOG_ERR
-import falcon
+import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.services.network_service import NetworkService
 from summit_rcm import definition
-from summit_rcm.settings import ServerConfig
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        AccessPointsResponseModelLegacy,
+        ActivateConnectionRequestModelLegacy,
+        ConnectionProfile,
+        ConnectionProfileInfoUuidQuery,
+        ConnectionProfileLegacy,
+        ConnectionProfilesLegacy,
+        ConnectionUuidQuery,
+        DefaultResponseModelLegacy,
+        InternalServerErrorResponseModel,
+        AddNetworkInterfaceRequestModelLegacy,
+        NetworkInterfaceDriverInfoResponseModelLegacy,
+        NetworkInterfaceInfoRequestModelLegacy,
+        NetworkInterfaceResponseModelLegacy,
+        NetworkInterfaceStatsResponseModelLegacy,
+        NetworkInterfacesResponseModelLegacy,
+        RemoveNetworkInterfaceRequestModelLegacy,
+        UnauthorizedErrorResponseModel,
+        WiFiEnableInfoResponseModelLegacy,
+        WiFiEnableRequestQueryLegacy,
+        WiFiEnableRequestResponseModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    AccessPointsResponseModelLegacy = None
+    ActivateConnectionRequestModelLegacy = None
+    ConnectionProfile = None
+    ConnectionProfileInfoUuidQuery = None
+    ConnectionProfileLegacy = None
+    ConnectionProfilesLegacy = None
+    ConnectionUuidQuery = None
+    DefaultResponseModelLegacy = None
+    InternalServerErrorResponseModel = None
+    AddNetworkInterfaceRequestModelLegacy = None
+    NetworkInterfaceDriverInfoResponseModelLegacy = None
+    NetworkInterfaceInfoRequestModelLegacy = None
+    NetworkInterfaceResponseModelLegacy = None
+    NetworkInterfaceStatsResponseModelLegacy = None
+    NetworkInterfacesResponseModelLegacy = None
+    RemoveNetworkInterfaceRequestModelLegacy = None
+    UnauthorizedErrorResponseModel = None
+    WiFiEnableInfoResponseModelLegacy = None
+    WiFiEnableRequestQueryLegacy = None
+    WiFiEnableRequestResponseModelLegacy = None
+    network_tag = None
+
+spec = SpectreeService()
 
 
 class NetworkConnections:
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ConnectionProfilesLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """
+        Retrieve a list of connection profiles (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 0, "InfoMsg": "", "count": 0, "connections": {}}
@@ -26,7 +102,21 @@ class NetworkConnections:
 
 
 class NetworkConnection:
+    @spec.validate(
+        json=ActivateConnectionRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
+        """
+        Activate/deactivate a connection profile (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": "unable to set connection"}
@@ -60,7 +150,21 @@ class NetworkConnection:
             result["InfoMsg"] = f"Internal error - exception from NetworkManager: {e}"
         resp.media = result
 
+    @spec.validate(
+        json=ConnectionProfile,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
+        """
+        Create or update a connection profile (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": ""}
@@ -135,9 +239,9 @@ class NetworkConnection:
                         LOG_ERR,
                         f"Unable to create connection - {str(add_connection_exception)}",
                     )
-                    result[
-                        "InfoMsg"
-                    ] = f"Unable to create connection - {str(add_connection_exception)}"
+                    result["InfoMsg"] = (
+                        f"Unable to create connection - {str(add_connection_exception)}"
+                    )
                     resp.media = result
                     return
                 result["InfoMsg"] = f"connection {name} created"
@@ -149,7 +253,21 @@ class NetworkConnection:
             syslog(LOG_ERR, f"Unable to create connection - {str(e)}")
             resp.media = result
 
+    @spec.validate(
+        query=ConnectionUuidQuery,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """
+        Delete a connection profile (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": ""}
@@ -163,7 +281,21 @@ class NetworkConnection:
 
         resp.media = result
 
+    @spec.validate(
+        query=ConnectionProfileInfoUuidQuery,
+        resp=Response(
+            HTTP_200=ConnectionProfileLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """
+        Retrieve a connection profile (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": ""}
@@ -210,9 +342,19 @@ class NetworkConnection:
 
 
 class NetworkAccessPoints:
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        Start a manual scan
+        Start a manual scan (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -227,8 +369,18 @@ class NetworkAccessPoints:
 
         resp.media = result
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=AccessPointsResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
-        """Get Cached AP list"""
+        """Get Cached AP list (legacy)"""
 
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -258,7 +410,20 @@ class NetworkAccessPoints:
 
 
 class NetworkInterfaces:
+    @spec.validate(
+        resp=Response(
+            HTTP_200=NetworkInterfacesResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """
+        Retrieve a list of network interfaces (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": "", "interfaces": []}
@@ -272,9 +437,20 @@ class NetworkInterfaces:
 
         resp.media = result
 
+    @spec.validate(
+        json=AddNetworkInterfaceRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
         """
-        Add virtual interface
+        Add virtual interface (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -295,9 +471,9 @@ class NetworkInterfaces:
             int_type = "managed"
 
         if interface != "wlan1":
-            result[
-                "InfoMsg"
-            ] = f"Invalid interface {interface}. Supported interface wlan1"
+            result["InfoMsg"] = (
+                f"Invalid interface {interface}. Supported interface wlan1"
+            )
             resp.media = result
             return
 
@@ -315,7 +491,21 @@ class NetworkInterfaces:
 
         resp.media = result
 
+    @spec.validate(
+        query=RemoveNetworkInterfaceRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """
+        Remove virtual interface (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         interface = str(req.params.get("interface", ""))
@@ -333,7 +523,21 @@ class NetworkInterfaces:
 
 
 class NetworkInterface:
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """
+        Retrieve details about a specific network interface (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": ""}
@@ -369,18 +573,29 @@ class NetworkInterface:
                 LOG_ERR,
                 f"Unable to retrieve detailed network interface configuration: {str(e)}",
             )
-            result[
-                "InfoMsg"
-            ] = "Unable to retrieve detailed network interface configuration"
+            result["InfoMsg"] = (
+                "Unable to retrieve detailed network interface configuration"
+            )
             result["SDCERR"] = 1
 
         resp.media = result
 
 
 class NetworkInterfaceStatistics(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceStatsResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
         """
-        Retrieve receive/transmit statistics for the requested interface
+        Retrieve receive/transmit statistics for the requested interface (legacy)
         """
 
         resp.status = falcon.HTTP_200
@@ -420,9 +635,20 @@ class NetworkInterfaceStatistics(object):
 
 
 class NetworkInterfaceDriverInfo(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceDriverInfoResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
         """
-        Retrieve driver info for the requested interface
+        Retrieve driver info for the requested interface (legacy)
         """
 
         resp.status = falcon.HTTP_200
@@ -455,18 +681,31 @@ class NetworkInterfaceDriverInfo(object):
 
 
 class WifiEnable:
+    @spec.validate(
+        resp=Response(
+            HTTP_200=WiFiEnableInfoResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """
+        Retrieve the status of the wireless radio (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": definition.SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")}
 
         try:
-            result[
-                "wifi_radio_software_enabled"
-            ] = await NetworkService.get_wireless_enabled()
-            result[
-                "wifi_radio_hardware_enabled"
-            ] = await NetworkService.get_wireless_hardware_enabled()
+            result["wifi_radio_software_enabled"] = (
+                await NetworkService.get_wireless_enabled()
+            )
+            result["wifi_radio_hardware_enabled"] = (
+                await NetworkService.get_wireless_hardware_enabled()
+            )
             result["InfoMsg"] = "wifi enable results"
         except Exception as exception:
             syslog(f"Unable to read WirelessEnabled status - {str(exception)}")
@@ -477,7 +716,21 @@ class WifiEnable:
 
         resp.media = result
 
+    @spec.validate(
+        query=WiFiEnableRequestQueryLegacy,
+        resp=Response(
+            HTTP_200=WiFiEnableRequestResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
+        """
+        Enable/disable the wireless radio (legacy)
+        """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {}
@@ -517,9 +770,9 @@ class WifiEnable:
 
         # Read the new value
         try:
-            result[
-                "wifi_radio_software_enabled"
-            ] = await NetworkService.get_wireless_enabled()
+            result["wifi_radio_software_enabled"] = (
+                await NetworkService.get_wireless_enabled()
+            )
         except Exception as exception:
             syslog(f"Unable to read WirelessEnabled status - {str(exception)}")
             result["InfoMsg"] = "Unable to read WirelessEnabled status"

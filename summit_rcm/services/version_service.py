@@ -6,7 +6,13 @@ import os
 import re
 from syslog import LOG_ERR, syslog
 from subprocess import run, TimeoutExpired, check_output
-import aiofiles
+
+try:
+    import aiofiles
+except ImportError as error:
+    # Ignore the error if the aiofiles module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from asyncio import create_subprocess_exec, subprocess
 from summit_rcm.services.network_manager_service import (
     NMDeviceType,

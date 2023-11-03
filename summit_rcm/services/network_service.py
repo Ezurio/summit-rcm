@@ -12,9 +12,15 @@ from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
-from pyroute2.iwutil import IW
-from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
-from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
+
+try:
+    from pyroute2.iwutil import IW
+    from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
+    from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
+except ImportError as error:
+    # Ignore the error if the pyroute2 module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,

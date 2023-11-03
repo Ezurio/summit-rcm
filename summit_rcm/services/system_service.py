@@ -1,32 +1,38 @@
 from syslog import LOG_ERR, syslog
-from summit_rcm.utils import Singleton
-from dbus_fast import Message, MessageType
-from summit_rcm.dbus_manager import DBusManager
 import os
+from subprocess import call
+
+try:
+    from dbus_fast import Message, MessageType
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+from summit_rcm.utils import Singleton
 from summit_rcm.definition import (
     LOGIND_BUS_NAME,
     LOGIND_MAIN_IFACE,
     LOGIND_MAIN_OBJ,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
+    PowerStateEnum,
 )
-from subprocess import call
 
-VALID_POWER_STATES = ["on", "off", "suspend", "reboot"]
 FACTORY_RESET_SCRIPT = "/usr/sbin/do_factory_reset.sh"
 
 
 class SystemService(metaclass=Singleton):
     def __init__(self) -> None:
-        self._power_state: str = "on"
+        self._power_state: PowerStateEnum = PowerStateEnum.ON
 
     @property
-    def power_state(self) -> str:
+    def power_state(self) -> PowerStateEnum:
         """
         Retrive the current power state
         """
         return self._power_state
 
-    async def set_power_state(self, value: str):
+    async def set_power_state(self, value: PowerStateEnum):
         """
         Configure the desired power state for the module. Possible values are:
         - on
@@ -35,13 +41,19 @@ class SystemService(metaclass=Singleton):
         - reboot
         """
         if value == "on":
-            self._power_state = "on"
+            self._power_state = PowerStateEnum.ON
         elif value == "off":
-            self._power_state = "off" if await self.__power_off() else "on"
+            self._power_state = (
+                PowerStateEnum.OFF if await self.__power_off() else PowerStateEnum.ON
+            )
         elif value == "reboot":
-            self._power_state = "reboot" if await self.__reboot() else "on"
+            self._power_state = (
+                PowerStateEnum.REBOOT if await self.__reboot() else PowerStateEnum.ON
+            )
         elif value == "suspend":
-            self._power_state = "suspend" if await self.__suspend() else "on"
+            self._power_state = (
+                PowerStateEnum.SUSPEND if await self.__suspend() else PowerStateEnum.ON
+            )
 
     async def initiate_factory_reset(self) -> int:
         """

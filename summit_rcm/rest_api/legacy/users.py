@@ -6,17 +6,68 @@ import base64
 import json
 from syslog import syslog
 from datetime import datetime
-import falcon
+import falcon.asgi
+from summit_rcm.settings import ServerConfig, SystemSettingsManage
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.definition import SUMMIT_RCM_ERRORS, USER_PERMISSION_TYPES
 from summit_rcm.services.user_service import UserService
 from summit_rcm.services.login_service import MAX_SESSION_AGE_S, LoginService, Session
-from summit_rcm.settings import ServerConfig, SystemSettingsManage
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        DefaultResponseModelLegacy,
+        GetUsersResponseModelLegacy,
+        InternalServerErrorResponseModel,
+        LoginRequestModel,
+        LoginResponseModelLegacy,
+        NewUserRequestModel,
+        UnauthorizedErrorResponseModel,
+        UpdateUserRequestModelLegacy,
+        UpdateUserResponseModelLegacy,
+        UsernameQuery,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import login_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    DefaultResponseModelLegacy = None
+    GetUsersResponseModelLegacy = None
+    InternalServerErrorResponseModel = None
+    LoginRequestModel = None
+    LoginResponseModelLegacy = None
+    NewUserRequestModel = None
+    UnauthorizedErrorResponseModel = None
+    UpdateUserRequestModelLegacy = None
+    UpdateUserResponseModelLegacy = None
+    UsernameQuery = None
+    login_tag = None
+
+
+spec = SpectreeService()
 
 
 class UserManage:
+    @spec.validate(
+        json=UpdateUserRequestModelLegacy,
+        resp=Response(
+            HTTP_200=UpdateUserResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        Update password/permission
+        Update password/permission (legacy)
         """
 
         resp.status = falcon.HTTP_200
@@ -76,7 +127,19 @@ class UserManage:
                 result["InfoMsg"] = "invalid session"
         resp.media = result
 
+    @spec.validate(
+        json=NewUserRequestModel,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
+        """Add new user (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -113,7 +176,19 @@ class UserManage:
 
         resp.media = result
 
+    @spec.validate(
+        query=UsernameQuery,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """Remove existing user (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -138,7 +213,18 @@ class UserManage:
 
         resp.media = result
 
-    async def on_get(self, req, resp):
+    @spec.validate(
+        resp=Response(
+            HTTP_200=GetUsersResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+        deprecated=True,
+    )
+    async def on_get(self, _, resp):
+        """Retrieve user info (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -155,7 +241,18 @@ class UserManage:
 
 
 class LoginManage:
+    @spec.validate(
+        json=LoginRequestModel,
+        resp=Response(
+            HTTP_200=LoginResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        tags=[login_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
+        """Login and retrieve a new session token or refresh an existing one (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {
@@ -166,7 +263,7 @@ class LoginManage:
         }
 
         # Check if sessions are enabled
-        if not LoginService().sessions_enabled:
+        if not ServerConfig().sessions_enabled:
             result["PERMISSION"] = USER_PERMISSION_TYPES["UserPermissionTypes"]
             result["SDCERR"] = SUMMIT_RCM_ERRORS.get("SDCERR_SUCCESS")
             result["InfoMsg"] = "User logged in"
@@ -311,7 +408,18 @@ class LoginManage:
             }
         resp.media = result
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """Log out of an existing session (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {

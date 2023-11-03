@@ -5,6 +5,7 @@ from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
+from summit_rcm.definition import PowerStateEnum
 from summit_rcm.services.system_service import SystemService
 
 
@@ -31,7 +32,7 @@ class PowerCommand(Command):
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
         try:
-            await SystemService().set_power_state(params_dict["state"])
+            await SystemService().set_power_state(PowerStateEnum(params_dict["state"]))
             return (True, "OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error while setting the power state: {str(exception)}")

@@ -6,8 +6,15 @@ import time
 from datetime import datetime
 from subprocess import run
 import json
-from dbus_fast import Message, MessageType, Variant
-from summit_rcm.dbus_manager import DBusManager
+import os
+
+try:
+    from dbus_fast import Message, MessageType, Variant
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.utils import Singleton, variant_to_python
 from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.definition import (
@@ -15,27 +22,13 @@ from summit_rcm.definition import (
     WPA_OBJ,
     WIFI_DRIVER_DEBUG_PARAM,
     DBUS_PROP_IFACE,
+    DriverLogLevelEnum,
+    JournalctlLogTypesEnum,
+    SupplicantLogLevelEnum,
 )
 
-JOURNALCTL_LOG_TYPES = [
-    "kernel",
-    "NetworkManager",
-    "summit-rcm",
-    "adaptive_ww",
-    "All",
-]
 JOURNALCTL_DAYS_SINCE_FORMAT_STRING = "%Y-%m-%d %H:%M:%S"
 JOURNALCTL_LOG_ENTRY_FORMAT_STRING = "%Y-%m-%d %H:%M:%S.%f"
-
-VALID_SUPPLICANT_DEBUG_LEVELS = [
-    "none",
-    "error",
-    "warning",
-    "info",
-    "debug",
-    "msgdump",
-    "excessive",
-]
 
 
 class LogsService(metaclass=Singleton):
@@ -49,22 +42,20 @@ class LogsService(metaclass=Singleton):
         )
 
     @staticmethod
-    def get_journal_log_data(log_type: str, priority: int, days: int) -> list:
+    def get_journal_log_data(
+        log_type: JournalctlLogTypesEnum, priority: int, days: int
+    ) -> list:
         """Retrieve journal log data using the given parameters as a list"""
         if priority not in range(0, 8, 1):
             raise ValueError("Priority must be an int between 0-7")
 
-        log_type = log_type.lower()
+        log_type = str(log_type.value).lower()
         if log_type == "networkmanager":
             log_type = "NetworkManager"
         elif log_type == "all":
             log_type = "All"
         elif log_type == "python":
             log_type = "summit-rcm"
-        if log_type not in JOURNALCTL_LOG_TYPES:
-            raise ValueError(
-                f"supplied type parameter must be one of {str(JOURNALCTL_LOG_TYPES)}"
-            )
 
         journalctl_args = [
             "journalctl",
@@ -109,7 +100,7 @@ class LogsService(metaclass=Singleton):
         return logs
 
     @staticmethod
-    async def get_supplicant_debug_level() -> str:
+    async def get_supplicant_debug_level() -> SupplicantLogLevelEnum:
         """Retrieve the supplication debug level ('DebugLevel' property)"""
 
         bus = await DBusManager().get_bus()
@@ -127,10 +118,10 @@ class LogsService(metaclass=Singleton):
         if reply.message_type == MessageType.ERROR:
             raise Exception(reply.body[0])
 
-        return str(variant_to_python(reply.body[0]))
+        return SupplicantLogLevelEnum(str(variant_to_python(reply.body[0])))
 
     @staticmethod
-    async def set_supplicant_debug_level(supp_level: str):
+    async def set_supplicant_debug_level(supp_level: SupplicantLogLevelEnum):
         """Configure the supplication debug level ('DebugLevel' property)"""
 
         bus = await DBusManager().get_bus()
@@ -141,28 +132,30 @@ class LogsService(metaclass=Singleton):
                 interface=DBUS_PROP_IFACE,
                 member="Set",
                 signature="ssv",
-                body=[WPA_IFACE, "DebugLevel", Variant("s", supp_level)],
+                body=[WPA_IFACE, "DebugLevel", Variant("s", supp_level.value)],
             )
         )
 
         if reply.message_type == MessageType.ERROR:
-            raise Exception(f"Error setting supplicant 'DebugLevel' to {supp_level}")
+            raise Exception(
+                f"Error setting supplicant 'DebugLevel' to {supp_level.value}"
+            )
 
     @staticmethod
-    def get_wifi_driver_debug_level() -> int:
+    def get_wifi_driver_debug_level() -> DriverLogLevelEnum:
         """Retrieve the Wi-Fi driver's debug level"""
 
         with open(WIFI_DRIVER_DEBUG_PARAM, "r") as driver_debug_file:
             if driver_debug_file.mode == "r":
-                return int(driver_debug_file.read(1))
+                return DriverLogLevelEnum(driver_debug_file.read(1))
 
     @staticmethod
-    def set_wifi_driver_debug_level(drv_level: int):
+    def set_wifi_driver_debug_level(drv_level: DriverLogLevelEnum):
         """Configure the Wi-Fi driver's debug level"""
 
         with open(WIFI_DRIVER_DEBUG_PARAM, "w") as driver_debug_file:
             if driver_debug_file.mode == "w":
-                driver_debug_file.write(str(drv_level))
+                driver_debug_file.write(str(drv_level.value))
 
 
 class JournalctlError(Exception):

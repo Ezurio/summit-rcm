@@ -1,10 +1,37 @@
 """Module to handle legacy certificates endpoint"""
 
 from syslog import LOG_ERR, syslog
-import falcon
+import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.services.files_service import FilesService
 from summit_rcm import definition
 from summit_rcm.services.certificates_service import CertificatesService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        UnauthorizedErrorResponseModel,
+        CertificateInfoResponseLegacy,
+        CertificateInfoRequestQueryLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    UnauthorizedErrorResponseModel = None
+    CertificateInfoResponseLegacy = None
+    CertificateInfoRequestQueryLegacy = None
+    network_tag = None
+
+
+spec = SpectreeService()
 
 
 class Certificates:
@@ -12,10 +39,20 @@ class Certificates:
     Certificate management
     """
 
+    @spec.validate(
+        query=CertificateInfoRequestQueryLegacy,
+        resp=Response(
+            HTTP_200=CertificateInfoResponseLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
         """
         Retrieve either a list of all certificates or info on just one if the name parameter is
-        provided
+        provided (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
