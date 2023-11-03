@@ -8,7 +8,14 @@ import logging
 from subprocess import Popen
 from syslog import syslog, LOG_ERR
 from typing import Tuple, Optional
-import swclient
+import os
+
+try:
+    import swclient
+except ImportError as error:
+    # Ignore the error if the swclient module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.utils import Singleton, get_current_side
 
 

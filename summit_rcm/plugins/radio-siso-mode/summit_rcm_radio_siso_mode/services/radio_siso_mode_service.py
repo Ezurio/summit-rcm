@@ -2,9 +2,21 @@
 Module to support configuration of the radio's SISO mode parameter.
 """
 
+from enum import IntEnum
 import os
 from subprocess import run
 from syslog import LOG_ERR, syslog
+
+
+class RadioSISOModeEnum(IntEnum):
+    """
+    Enum to represent the possible SISO modes
+    """
+
+    SYSTEM_DEFAULT = -1
+    MIMO = 0
+    ANT0 = 1
+    ANT1 = 2
 
 
 class RadioSISOModeService:
@@ -17,16 +29,6 @@ class RadioSISOModeService:
     LRDMWL_HOLDERS_PATH = f"{LRDMWL_MODULE_PATH}/holders"
     SISO_MODE_PARAMETER_PATH = f"{LRDMWL_MODULE_PATH}/parameters/SISO_mode"
     MODPROBE_PATH = "/usr/sbin/modprobe"
-    SISO_MODE_SYSTEM_DEFAULT = -1
-    SISO_MODE_MIMO = 0
-    SISO_MODE_ANT0 = 1
-    SISO_MODE_ANT1 = 2
-    SISO_MODES = [
-        SISO_MODE_SYSTEM_DEFAULT,
-        SISO_MODE_MIMO,
-        SISO_MODE_ANT0,
-        SISO_MODE_ANT1,
-    ]
 
     @staticmethod
     def get_running_driver_interface() -> str:
@@ -43,27 +45,28 @@ class RadioSISOModeService:
             return ""
 
     @staticmethod
-    def get_current_siso_mode() -> int:
+    def get_current_siso_mode() -> RadioSISOModeEnum:
         """
         Retrieve the current SISO_mode parameter from the driver
         """
         with open(
             RadioSISOModeService.SISO_MODE_PARAMETER_PATH, "r"
         ) as siso_mode_parameter:
-            siso_mode = int(siso_mode_parameter.readline().strip())
-            if siso_mode not in RadioSISOModeService.SISO_MODES:
+            try:
+                siso_mode = RadioSISOModeEnum(
+                    int(siso_mode_parameter.readline().strip())
+                )
+            except ValueError:
                 raise Exception("invalid parameter value")
 
             return siso_mode
 
     @staticmethod
-    def set_siso_mode(siso_mode: int) -> None:
+    def set_siso_mode(siso_mode: RadioSISOModeEnum) -> None:
         """
         Unload and then reload the lrdmwl and lrdmwl_sdio driver modules to use the desired SISO
         mode.
         """
-        if siso_mode not in RadioSISOModeService.SISO_MODES:
-            raise Exception("invalid parameter value")
 
         if siso_mode == RadioSISOModeService.get_current_siso_mode():
             # Already using the desired SISO mode
@@ -87,9 +90,11 @@ class RadioSISOModeService:
             [
                 RadioSISOModeService.MODPROBE_PATH,
                 "lrdmwl",
-                f"SISO_mode={str(siso_mode)}"
-                if siso_mode is not RadioSISOModeService.SISO_MODE_SYSTEM_DEFAULT
-                else "",
+                (
+                    f"SISO_mode={str(siso_mode)}"
+                    if siso_mode is not RadioSISOModeEnum.SYSTEM_DEFAULT
+                    else ""
+                ),
             ],
         )
         if proc.returncode:

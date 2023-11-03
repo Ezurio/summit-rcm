@@ -5,6 +5,7 @@ from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
+from summit_rcm.definition import JournalctlLogTypesEnum
 from summit_rcm.services.logs_service import LogsService
 
 
@@ -45,7 +46,9 @@ class LogGetCommand(Command):
             return (True, "ERROR")
         try:
             logs_list = LogsService.get_journal_log_data(
-                params_dict["type"], params_dict["priority"], params_dict["days"]
+                JournalctlLogTypesEnum(params_dict["type"]),
+                params_dict["priority"],
+                params_dict["days"],
             )
             logs_str = ""
             for log in logs_list:

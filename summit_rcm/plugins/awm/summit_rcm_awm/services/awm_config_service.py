@@ -6,7 +6,13 @@ import os
 from syslog import syslog
 from threading import Lock
 import configparser
-import libconf
+
+try:
+    import libconf
+except ImportError as error:
+    # Ignore the error if the libconf module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.utils import Singleton
 
 

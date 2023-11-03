@@ -2,9 +2,38 @@
 Module to support configuration of AWM for legacy routes.
 """
 
-import falcon
+import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm import definition
 from summit_rcm_awm.services.awm_config_service import AWMConfigService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm_awm.rest_api.utils.spectree.models import (
+        AWMStateResponseModelLegacy,
+        AWMStateRequestModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    UnauthorizedErrorResponseModel = None
+    AWMStateResponseModelLegacy = None
+    AWMStateRequestModelLegacy = None
+    network_tag = None
+
+
+spec = SpectreeService()
 
 
 class AWMResourceLegacy:
@@ -12,9 +41,18 @@ class AWMResourceLegacy:
     Resource to expose AWM configuration
     """
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=AWMStateResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
         """
-        GET handler for the /awm endpoint
+        Retrieve current AWM configuration (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -36,9 +74,19 @@ class AWMResourceLegacy:
         result["InfoMsg"] = ""
         resp.media = result
 
+    @spec.validate(
+        json=AWMStateRequestModelLegacy,
+        resp=Response(
+            HTTP_200=AWMStateResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /awm endpoint
+        Set AWM configuration (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON

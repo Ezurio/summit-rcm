@@ -4,15 +4,44 @@ Legacy 'definitions' module
 
 from syslog import syslog
 import falcon.asgi
-from summit_rcm import definition
 from summit_rcm.settings import ServerConfig, SystemSettingsManage
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
+from summit_rcm import definition
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        DefinitionsResponseModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    DefinitionsResponseModelLegacy = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class DefinitionsResource(object):
     """Resource to handle definitions requests"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefinitionsResponseModelLegacy,
+        ),
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
-        """GET handler for /definitions endpoint"""
+        """Retrieve definitions (legacy)"""
         try:
             plugins = []
             for k in ServerConfig().get_parser().options("plugins"):
@@ -20,8 +49,8 @@ class DefinitionsResource(object):
             plugins.sort()
 
             settings = {}
-            # If sessions aren't enabled, set the session_timeout to -1 to alert the frontend that we
-            # don't need to auto log out.
+            # If sessions aren't enabled, set the session_timeout to -1 to alert the frontend that
+            # we don't need to auto log out.
             settings["session_timeout"] = (
                 SystemSettingsManage.get_session_timeout()
                 if ServerConfig()

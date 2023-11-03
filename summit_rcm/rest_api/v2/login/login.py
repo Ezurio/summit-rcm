@@ -5,22 +5,60 @@ import json
 from syslog import LOG_ERR, syslog
 from datetime import datetime
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.definition import USER_PERMISSION_TYPES
 from summit_rcm.services.login_service import LoginService, MAX_SESSION_AGE_S, Session
 from summit_rcm.services.user_service import UserService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        ForbiddenErrorResponseModel,
+        InternalServerErrorResponseModel,
+        LoginRequestModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import login_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    ForbiddenErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    LoginRequestModel = None
+    login_tag = None
+
+
+spec = SpectreeService()
 
 
 class LoginResource:
     """Resource to handle queries and requests for login session management"""
 
+    @spec.validate(
+        json=LoginRequestModel,
+        resp=Response(
+            HTTP_200=None,
+            HTTP_403=ForbiddenErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        tags=[login_tag],
+    )
     async def on_post(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        POST handler for the /login endpoint
+        Login and retrieve a new session token or refresh an existing one
         """
         try:
-            if not LoginService().sessions_enabled:
+            if not ServerConfig().sessions_enabled:
                 # If sessions aren't enabled, then the login request is "successful"
                 resp.status = falcon.HTTP_200
                 return
@@ -114,11 +152,20 @@ class LoginResource:
             syslog(LOG_ERR, f"Unable to login: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_delete(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        DELETE handler for the /login endpoint
+        Log out of an existing session
         """
         try:
             username = req.context.get_session("USERNAME")

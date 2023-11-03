@@ -3,8 +3,39 @@ Module to support NTP configuration via chrony for legacy routes.
 """
 
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm_chrony.services.ntp_service import ChronyNTPService, SOURCE_COMMANDS
 from summit_rcm.definition import SUMMIT_RCM_ERRORS
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        UnauthorizedErrorResponseModel,
+        DefaultResponseModelLegacy,
+    )
+    from summit_rcm_chrony.rest_api.utils.spectree.models import (
+        ChronySourcesResponseModelLegacy,
+        ChronySourcesRequestModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    UnauthorizedErrorResponseModel = None
+    DefaultResponseModelLegacy = None
+    ChronySourcesResponseModelLegacy = None
+    ChronySourcesRequestModelLegacy = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class NTPResourceLegacy:
@@ -23,9 +54,18 @@ class NTPResourceLegacy:
             f" {not_one_of}, ",
         }
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ChronySourcesResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_get(self, _, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /ntp endpoint
+        Retrieve chrony NTP sources (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -42,11 +82,22 @@ class NTPResourceLegacy:
             result["InfoMsg"] = f"Unable to retrieve chrony sources - {str(exception)}"
         resp.media = result
 
+    @spec.validate(
+        json=ChronySourcesRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        path_parameter_descriptions={"command": "The command to execute"},
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, command: str
     ) -> None:
         """
-        PUT handler for the /ntp/{command} endpoint
+        Update chrony NTP sources (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON

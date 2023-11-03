@@ -8,7 +8,30 @@ from syslog import syslog
 from typing import Deque, Dict
 from uuid import uuid4
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm_bluetooth.services.bt_ble import ble_notification_objects
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        NotFoundErrorResponseModel,
+    )
+    from summit_rcm_bluetooth.rest_api.utils.spectree.tags import bluetooth_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    NotFoundErrorResponseModel = None
+    bluetooth_tag = None
+
+
+spec = SpectreeService()
 
 SLEEP_DELAY_S = 0.1
 
@@ -25,8 +48,18 @@ class BluetoothWebSocketResource:
         if self in ble_notification_objects:
             ble_notification_objects.remove(self)
 
+    @spec.validate(
+        resp=Response(HTTP_200=None, HTTP_404=NotFoundErrorResponseModel),
+        security=SpectreeService().security,
+        tags=[bluetooth_tag],
+    )
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
-        """Handle GET request"""
+        """
+        Check if the Bluetooth WebSocket connection is available
+
+        This endpoint is used to check if the Bluetooth WebSocket connection is available and simply
+        returns a 200 OK response if it is. Otherwise, a 404 Not Found response is returned.
+        """
         resp.status = falcon.HTTP_200
         if not self.is_legacy:
             return

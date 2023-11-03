@@ -5,13 +5,51 @@ Module to interact with system logs
 import os
 from syslog import syslog
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
+from summit_rcm.definition import (
+    DriverLogLevelEnum,
+    JournalctlLogTypesEnum,
+    SupplicantLogLevelEnum,
+)
 from summit_rcm.services.files_service import FilesService
 from summit_rcm.services.logs_service import (
-    JOURNALCTL_LOG_TYPES,
-    VALID_SUPPLICANT_DEBUG_LEVELS,
     JournalctlError,
     LogsService,
 )
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        InternalServerErrorResponseModel,
+        LogVerbosity,
+        LogsDataRequestQuery,
+        LogsDataResponseModel,
+        LogsExportRequestModel,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    LogVerbosity = None
+    LogsDataRequestQuery = None
+    LogsDataResponseModel = None
+    LogsExportRequestModel = None
+    UnauthorizedErrorResponseModel = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class LogsExportResource:
@@ -19,11 +57,22 @@ class LogsExportResource:
     Resource to handle queries and requests for exporting logs
     """
 
+    @spec.validate(
+        json=LogsExportRequestModel,
+        resp=Response(
+            HTTP_200=None,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_get(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        GET handler for the /system/logs/export endpoint
+        Retrieve a password-protected zip archive of the journal logs
         """
         archive = ""
         try:
@@ -53,20 +102,29 @@ class LogsDataResource:
     Resource to handle queries and requests for retrieving journal log data
     """
 
+    @spec.validate(
+        query=LogsDataRequestQuery,
+        resp=Response(
+            HTTP_200=LogsDataResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_get(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        GET handler for the /system/logs/data endpoint
+        Retrieve journal log data
         """
         try:
             priority = int(req.params.get("priority", 7))
             if priority not in range(0, 8, 1):
                 raise ValueError("Priority must be an int between 0-7")
             days = int(req.params.get("days", 1))
-            log_type = req.params.get("type", "All")
-            if log_type not in JOURNALCTL_LOG_TYPES:
-                raise ValueError()
+            log_type = JournalctlLogTypesEnum(req.params.get("type", "All"))
 
             resp.media = LogsService.get_journal_log_data(
                 log_type=log_type, priority=priority, days=days
@@ -95,13 +153,22 @@ class LogsConfigResource:
     async def get_current_debug_levels(self) -> dict:
         """Retrieve the current debug levels for the supplicant and Wi-Fi driver"""
         return {
-            "suppDebugLevel": await LogsService.get_supplicant_debug_level(),
-            "driverDebugLevel": LogsService.get_wifi_driver_debug_level(),
+            "suppDebugLevel": (await LogsService.get_supplicant_debug_level()).value,
+            "driverDebugLevel": LogsService.get_wifi_driver_debug_level().value,
         }
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=LogVerbosity,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /system/logs/config endpoint
+        Retrieve current log verbosity levels for the supplicant and Wi-Fi driver
         """
         try:
             resp.media = await self.get_current_debug_levels()
@@ -111,23 +178,34 @@ class LogsConfigResource:
             syslog(f"Could not retrieve log configuration - {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=LogVerbosity,
+        resp=Response(
+            HTTP_200=LogVerbosity,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        PUT handler for the /system/logs/config endpoint
+        Set the log verbosity levels for the supplicant and Wi-Fi driver
         """
         try:
             put_data = await req.get_media()
 
             # Read in and validate the input data
-            supp_level = str(put_data.get("suppDebugLevel", "")).lower()
-            if not supp_level or supp_level not in VALID_SUPPLICANT_DEBUG_LEVELS:
+            supp_level = SupplicantLogLevelEnum(
+                put_data.get("suppDebugLevel", "").lower()
+            )
+            if not supp_level:
                 raise ValueError()
 
-            drv_level = int(put_data.get("driverDebugLevel", None))
-            if drv_level not in [0, 1]:
-                raise ValueError()
+            drv_level = DriverLogLevelEnum(put_data.get("driverDebugLevel", None))
 
             # Configure new values
             await LogsService.set_supplicant_debug_level(supp_level)

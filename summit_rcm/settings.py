@@ -14,7 +14,6 @@ from threading import Lock
 
 
 class SummitRCMConfigManage(object):
-
     """
     summit-rcm.ini has multi sections:
     1. Each user has a section with username as the section name;
@@ -113,7 +112,6 @@ class SummitRCMConfigManage(object):
 
 
 class SystemSettingsManage(object):
-
     """Manage 'settings' section"""
 
     section = "settings"
@@ -245,9 +243,48 @@ class ServerConfig(object, metaclass=Singleton):
         try:
             self.parser = configparser.ConfigParser()
             self.parser.read(definition.SUMMIT_RCM_SERVER_CONF_FILE)
+
+            self._sessions_enabled = self.parser.getboolean(
+                section="/", option="tools.session.on", fallback=True
+            )
+            self._validate_request = self.parser.getboolean(
+                section="summit-rcm", option="rest_api_validate_request", fallback=False
+            )
+            self._validate_response = self.parser.getboolean(
+                section="summit-rcm",
+                option="rest_api_validate_response",
+                fallback=False,
+            )
+            self._rest_api_docs_enabled = self.parser.getboolean(
+                section="summit-rcm", option="rest_api_docs", fallback=False
+            ) or os.environ.get("DOCS_GENERATION", "False") == "True"
         except Exception:
             syslog(LOG_ERR, "Unable to parse server configuration")
             self.parser = None
+            self._sessions_enabled = True
+            self._validate_request = False
+            self._validate_response = False
+            self._rest_api_docs_enabled = False
 
     def get_parser(self) -> Optional[configparser.ConfigParser]:
         return self.parser
+
+    @property
+    def sessions_enabled(self) -> bool:
+        """Determine whether or not cookie-based sessions are enabled"""
+        return self._sessions_enabled
+
+    @property
+    def rest_api_docs_enabled(self) -> bool:
+        """Determine whether or not the REST API documentation is enabled"""
+        return self._rest_api_docs_enabled
+
+    @property
+    def validate_request(self) -> bool:
+        """Determine whether or not request validation is enabled"""
+        return self._validate_request
+
+    @property
+    def validate_response(self) -> bool:
+        """Determine whether or not response validation is enabled"""
+        return self._validate_response

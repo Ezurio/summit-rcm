@@ -7,16 +7,31 @@ import importlib
 import pkgutil
 from syslog import LOG_ERR, syslog, openlog
 from types import ModuleType
-from typing import Any, List
-import ssl
+from typing import Any, Iterable, List, Optional
+import os
+
+try:
+    import ssl
+except ImportError as error:
+    # Ignore the error if the ssl module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+
 from summit_rcm.utils import Singleton
 from summit_rcm.services.date_time_service import DateTimeService
+from summit_rcm.rest_api.services.spectree_service import SpectreeService
 from summit_rcm.settings import ServerConfig
 
 
 try:
     import falcon.asgi
-    import uvicorn.config
+
+    try:
+        import uvicorn.config
+    except ImportError as error:
+        # Ignore the error if the uvicorn module is not available if generating documentation
+        if os.environ.get("DOCS_GENERATION") != "True":
+            raise error
 
     app = falcon.asgi.App()
     REST_ENABLED = True
@@ -37,9 +52,16 @@ try:
         async def process_response(self, req, resp, resource, req_succeeded):
             """Add secure headers to the response before it's returned to the client"""
             resp.set_header("X-Frame-Options", "DENY")
-            resp.set_header("X-XSS-Protection", "1; mode=block")
             resp.set_header("X-Content-Type-Options", "nosniff")
-            resp.set_header("Content-Security-Policy", "default-src 'self'")
+            resp.set_header(
+                "Content-Security-Policy",
+                "default-src "
+                "'self' "
+                "cdn.jsdelivr.net "
+                "fonts.googleapis.com "
+                "fonts.gstatic.com "
+                "'unsafe-inline'",
+            )
             # Add Strict-Transport headers
             resp.set_header("Strict-Transport-Security", "max-age=600")  # ten minutes
 
@@ -576,13 +598,13 @@ try:
                 syslog(LOG_ERR, f"Could not load login endpoints - {str(exception)}")
                 raise exception
 
-    def add_default_middleware(enable_session_checking: bool) -> None:
+    def add_default_middleware() -> None:
         """Add middleware to the ASGI application"""
         # Add ASGI lifespan middleware
         app.add_middleware(LifespanMiddleware())
 
         # Add middleware to force session checking if enabled
-        if enable_session_checking:
+        if ServerConfig().sessions_enabled:
             from summit_rcm.sessions_middleware import SessionsMiddleware
 
             app.add_middleware(SessionsMiddleware())
@@ -639,10 +661,23 @@ try:
             add_plugins(),
         )
 
+        if ServerConfig().rest_api_docs_enabled:
+            SpectreeService().register(app)
+
     def add_route(route_path: str, resource: Any, **kwargs):
         """Add a route to the app and log it"""
         app.add_route(uri_template=route_path, resource=resource, kwargs=kwargs)
         syslog(f"route loaded: {str(route_path)}")
+
+    def discover_plugins(path: Optional[Iterable[str]] = None):
+        """Discover all plugins"""
+        global discovered_plugins
+
+        discovered_plugins = {
+            name: importlib.import_module(name)
+            for finder, name, ispkg in pkgutil.iter_modules(path=path)
+            if name.startswith("summit_rcm_")
+        }
 
     async def start_server():
         """Start the webserver and add middleware"""
@@ -651,9 +686,6 @@ try:
         syslog("Starting webserver")
 
         parser = ServerConfig().get_parser()
-        enable_sessions = parser.getboolean(
-            section="/", option="tools.sessions.on", fallback=True
-        )
         ssl_private_key = (
             parser["global"]
             .get("server.ssl_private_key", "/etc/summit-rcm/ssl/server.key")
@@ -707,11 +739,7 @@ try:
         )
 
         # Populate the list of discovered plugins
-        discovered_plugins = {
-            name: importlib.import_module(name)
-            for finder, name, ispkg in pkgutil.iter_modules()
-            if name.startswith("summit_rcm_")
-        }
+        discover_plugins()
 
         # Call any plugin config pre-load hooks
         for name, module in discovered_plugins.items():
@@ -766,7 +794,7 @@ try:
         server = uvicorn.Server(config)
 
         # Add any middleware
-        add_default_middleware(enable_sessions)
+        add_default_middleware()
         for name, module in discovered_plugins.items():
             try:
                 app.add_middleware(await module.get_middleware())

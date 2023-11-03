@@ -2,23 +2,62 @@
 Module to support advanced configuration for legacy routes
 """
 
-import falcon
 import os
 from syslog import syslog, LOG_ERR
+import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.definition import (
     SUMMIT_RCM_ERRORS,
     MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE,
+    PowerStateEnum,
 )
 from summit_rcm.services.system_service import SystemService, FACTORY_RESET_SCRIPT
 from summit_rcm.services.fips_service import FipsService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        DefaultResponseModelLegacy,
+        UnauthorizedErrorResponseModel,
+        FIPSSetRequestModelLegacy,
+        FIPSInfoResponseModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    DefaultResponseModelLegacy = None
+    UnauthorizedErrorResponseModel = None
+    FIPSSetRequestModelLegacy = None
+    FIPSInfoResponseModelLegacy = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class PowerOff:
     """Resource to handler power off requests"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /poweroff endpoint
+        Power off the device (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -33,7 +72,7 @@ class PowerOff:
             return
 
         try:
-            await SystemService().set_power_state("off")
+            await SystemService().set_power_state(PowerStateEnum.OFF)
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Poweroff initiated"
@@ -46,9 +85,18 @@ class PowerOff:
 class Suspend:
     """Resource to handler suspend requests"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /suspend endpoint
+        Suspend the device (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -63,7 +111,7 @@ class Suspend:
             return
 
         try:
-            await SystemService().set_power_state("suspend")
+            await SystemService().set_power_state(PowerStateEnum.SUSPEND)
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Suspend initiated"
@@ -77,9 +125,18 @@ class Suspend:
 class Reboot:
     """Resource to handler reboot requests"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /reboot endpoint
+        Reboot the device (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -94,7 +151,7 @@ class Reboot:
             return
 
         try:
-            await SystemService().set_power_state("reboot")
+            await SystemService().set_power_state(PowerStateEnum.REBOOT)
 
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = "Reboot initiated"
@@ -107,9 +164,18 @@ class Reboot:
 class FactoryReset:
     """Resource to handler factory reset requests"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /factoryReset endpoint
+        Factory reset the device (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -142,9 +208,19 @@ class FactoryReset:
 class Fips:
     """Resource to handler factory reset requests"""
 
+    @spec.validate(
+        json=FIPSSetRequestModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req, resp):
         """
-        PUT handler for the /fips endpoint
+        Configure FIPS mode (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
@@ -169,9 +245,18 @@ class Fips:
 
         resp.media = result
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=FIPSInfoResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
         """
-        GET handler for the /fips endpoint
+        Retrieve current FIPS status (legacy)
         """
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON

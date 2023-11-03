@@ -1,11 +1,19 @@
 """
 Module to handle AT Interface Command Execution
 """
+
+import os
 import asyncio
 from re import search
 from typing import Tuple, Optional
 import serial_asyncio
-import aiofiles
+
+try:
+    import aiofiles
+except ImportError as error:
+    # Ignore the error if the aiofiles module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 
 
 REBOOT_COMMANDS = [
@@ -21,6 +29,7 @@ class ATInterfaceSerialProtocol(asyncio.Protocol):
     """
     Class that defines the AT interface serial protocol
     """
+
     carrot_received = False
     ok_received = False
     error_received = False
@@ -88,6 +97,7 @@ class ATSession(object):
     """
     Class that defines an AT session instance and handles executing AT commands
     """
+
     def __init__(self, serial_port: str, baud_rate: int):
         self.serial_port = serial_port
         self.baud_rate = baud_rate
@@ -139,7 +149,10 @@ class ATSession(object):
         except AttributeError:
             data = self.protocol.data_buffer
             validate_response = data
-        if search(expected_response, validate_response) is None and self.validate_response:
+        if (
+            search(expected_response, validate_response) is None
+            and self.validate_response
+        ):
             raise ATUnexpectedResponseException(f"Received Unexpected Response: {data}")
         self.protocol.data_buffer = b""
         self.validate_response = True

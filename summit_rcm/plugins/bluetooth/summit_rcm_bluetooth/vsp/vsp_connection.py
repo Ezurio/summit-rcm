@@ -17,6 +17,8 @@ from summit_rcm_bluetooth.services.ble import (
     DBUS_OM_IFACE,
     DEVICE_IFACE,
     find_device,
+    BLEWriteCharacteristicType,
+    VSPSocketRxTypeEnum,
 )
 from summit_rcm_bluetooth.services.bt_plugin import BluetoothPlugin
 from summit_rcm.tcp_connection import (
@@ -49,7 +51,9 @@ class VspConnection:
         self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
         self.vsp_write_chr_uuid = None
         self.vsp_write_chr_type: str = ""
-        self.socket_rx_type: str = "JSON"
+        self.socket_rx_type: VSPSocketRxTypeEnum = (
+            VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
+        )
         self._logger = logging.getLogger(__name__)
         self.auth_failure_unpair = False
         self.write_size: int = DEFAULT_WRITE_SIZE
@@ -95,7 +99,11 @@ class VspConnection:
                     f"VSP device_prop_changed_cb: Connected: "
                     f"{variant_to_python(changed_props['Connected'])}",
                 )
-                if self.writer and self.socket_rx_type == "JSON":
+                if (
+                    self.writer
+                    and self.socket_rx_type
+                    == VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
+                ):
                     self.writer.write(
                         '{"Connected": '
                         f"{variant_to_python(changed_props['Connected'])}}}\n".encode()
@@ -151,7 +159,8 @@ class VspConnection:
             if self.connected and self.writer:
                 self.writer.write(
                     f'{{"Received": "0x{value.hex()}"}}\n'.encode()
-                    if self.socket_rx_type == "JSON"
+                    if self.socket_rx_type
+                    == VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
                     else value
                 )
         except OSError as error:
@@ -160,11 +169,20 @@ class VspConnection:
     def generic_val_error_cb(self, error):
         syslog("generic_val_error_cb: D-Bus call failed: " + str(error))
         if "Not connected" in error.args:
-            if self.connected and self.writer and self.socket_rx_type == "JSON":
+            if (
+                self.connected
+                and self.writer
+                and self.socket_rx_type
+                == VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
+            ):
                 self.writer.write('{"Connected": 0}\n'.encode())
 
     def gatt_vsp_write_val_error_cb(self, error):
-        if self.connected and self.socket_rx_type == "JSON" and self.writer:
+        if (
+            self.connected
+            and self.socket_rx_type == VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
+            and self.writer
+        ):
             self.writer.write('{"Error": "Transmit failed"}\n'.encode())
         self.generic_val_error_cb(error)
 
@@ -223,9 +241,11 @@ class VspConnection:
                 try:
                     await self.vsp_write_chrc[1].call_write_value(
                         bytearray(data),
-                        {"type": self.vsp_write_chr_type}
-                        if self.vsp_write_chr_type
-                        else {},
+                        (
+                            {"type": self.vsp_write_chr_type}
+                            if self.vsp_write_chr_type
+                            else {}
+                        ),
                     )
                     return True
                 except dbus_fast.DBusError as error:
@@ -303,7 +323,10 @@ class VspConnection:
         except ValueError:
             return "invalid value for tcpPort param"
         if "socketRxType" in params:
-            self.socket_rx_type = params["socketRxType"]
+            try:
+                self.socket_rx_type = VSPSocketRxTypeEnum(params["socketRxType"])
+            except ValueError:
+                return "invalid value for socketRxType param"
         if "vspWriteChrSize" in params:
             try:
                 self.write_size = int(params["vspWriteChrSize"])
@@ -312,8 +335,11 @@ class VspConnection:
             except ValueError:
                 return "invalid value for vspWriteChrSize param"
         if "vspWriteChrType" in params:
-            self.vsp_write_chr_type = str(params["vspWriteChrType"])
-            if self.vsp_write_chr_type not in ["", "command", "request", "reliable"]:
+            try:
+                self.vsp_write_chr_type = BLEWriteCharacteristicType(
+                    params["vspWriteChrType"]
+                )
+            except ValueError:
                 return "invalid value for vspWriteChrType param"
 
         vsp_service = await self.create_vsp_service()

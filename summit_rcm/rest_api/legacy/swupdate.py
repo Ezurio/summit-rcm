@@ -4,6 +4,11 @@ Module to handle legacy firmware updates via swupdate
 
 from syslog import syslog, LOG_ERR
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.services.firmware_update_service import (
     NoUpdateInProgressError,
     UpdateError,
@@ -13,9 +18,50 @@ from summit_rcm.rest_api.services.rest_firmware_update_service import (
     MEDIA_OCTET_STREAM,
 )
 
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        UnauthorizedErrorResponseModel,
+        LengthRequiredErrorResponseModel,
+        UnsupportedMediaTypeErrorResponseModel,
+        InternalServerErrorResponseModel,
+        DefaultResponseModelLegacy,
+        FirmwareUpdateModelLegacy,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    UnauthorizedErrorResponseModel = None
+    LengthRequiredErrorResponseModel = None
+    UnsupportedMediaTypeErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    DefaultResponseModelLegacy = None
+    FirmwareUpdateModelLegacy = None
+    system_tag = None
+
+
+spec = SpectreeService()
+
 
 class SWUpdate(object):
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_411=LengthRequiredErrorResponseModel,
+            HTTP_415=UnsupportedMediaTypeErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_put(self, req: falcon.asgi.Request, resp: falcon.asgi.Response):
+        """Upload firmware update file as an octet stream (legacy)"""
         resp.status = falcon.HTTP_200
 
         if not req.content_type or MEDIA_OCTET_STREAM not in req.content_type:
@@ -48,7 +94,16 @@ class SWUpdate(object):
             resp.status = falcon.HTTP_500
             resp.text = f"Software Update error: {str(exception)}"
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_get(self, req, resp):
+        """Retrieve the current update status (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 1, "InfoMsg": "Device is busy"}
@@ -64,7 +119,17 @@ class SWUpdate(object):
 
         resp.media = result
 
+    @spec.validate(
+        json=FirmwareUpdateModelLegacy,
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_post(self, req, resp):
+        """Start a firmware update (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
 
@@ -96,7 +161,16 @@ class SWUpdate(object):
 
         resp.media = result
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=DefaultResponseModelLegacy,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
     async def on_delete(self, req, resp):
+        """Cancel an in-progress firmware update (legacy)"""
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         result = {"SDCERR": 0, "InfoMsg": ""}

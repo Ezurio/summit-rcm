@@ -4,6 +4,7 @@ File that consists of the FactoryReset Command Functionality
 from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
+from summit_rcm.definition import PowerStateEnum
 from summit_rcm.services.system_service import SystemService
 
 
@@ -27,7 +28,7 @@ class FactoryResetCommand(Command):
             if return_str != 0:
                 return (True, "ERROR")
             if params_dict["reboot"]:
-                await SystemService().set_power_state("reboot")
+                await SystemService().set_power_state(PowerStateEnum.REBOOT)
             return (True, f"+FACTRESET: {return_str}\r\nOK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error Performing a Factory Reset: {str(exception)}")

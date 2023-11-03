@@ -4,7 +4,34 @@ Module to interact with Wi-Fi settings
 
 from syslog import LOG_ERR, syslog
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.services.network_service import NetworkService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        InternalServerErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+        WiFiEnableInfoResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    InternalServerErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    WiFiEnableInfoResponseModel = None
+    network_tag = None
+
+
+spec = SpectreeService()
 
 
 class WiFiResource(object):
@@ -17,12 +44,12 @@ class WiFiResource(object):
         result = {}
 
         try:
-            result[
-                "wifiRadioSoftwareEnabled"
-            ] = await NetworkService.get_wireless_enabled()
-            result[
-                "wifiRadioHardwareEnabled"
-            ] = await NetworkService.get_wireless_hardware_enabled()
+            result["wifiRadioSoftwareEnabled"] = (
+                await NetworkService.get_wireless_enabled()
+            )
+            result["wifiRadioHardwareEnabled"] = (
+                await NetworkService.get_wireless_hardware_enabled()
+            )
         except Exception as exception:
             syslog(f"Unable to read Wi-Fi enabled properties: {str(exception)}")
             result["wifiRadioSoftwareEnabled"] = False
@@ -30,9 +57,18 @@ class WiFiResource(object):
 
         return result
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=WiFiEnableInfoResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /network/wifi endpoint
+        Retrieve current Wi-Fi radio state
         """
         try:
             resp.media = await self.get_current_settings()
@@ -45,11 +81,21 @@ class WiFiResource(object):
             )
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=WiFiEnableInfoResponseModel,
+        resp=Response(
+            HTTP_200=WiFiEnableInfoResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        PUT handler for the /network/wifi endpoint
+        Enable/disable Wi-Fi radio
         """
         try:
             # Parse inputs

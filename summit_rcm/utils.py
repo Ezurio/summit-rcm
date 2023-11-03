@@ -5,7 +5,14 @@ import json
 from re import sub
 from typing import Any
 from pathlib import Path
-from dbus_fast import Variant
+import os
+
+try:
+    from dbus_fast import Variant
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 
 
 CMDLINE_BOOTSIDE_A = "ubi.block=0,1"

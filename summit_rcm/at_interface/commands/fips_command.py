@@ -5,6 +5,7 @@ from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
+from summit_rcm.definition import PowerStateEnum
 from summit_rcm.services.fips_service import FipsService, FipsUnsupportedError
 from summit_rcm.services.system_service import SystemService
 
@@ -39,7 +40,7 @@ class FipsCommand(Command):
                 if not success:
                     return (True, "ERROR")
                 if params_dict["reboot"]:
-                    await SystemService().set_power_state("reboot")
+                    await SystemService().set_power_state(PowerStateEnum.REBOOT)
                 return (True, "OK")
             else:
                 fips_str = await FipsService().get_fips_state()

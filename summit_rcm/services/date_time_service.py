@@ -6,13 +6,20 @@ from syslog import syslog, LOG_ERR
 import time
 from typing import Tuple, List
 from datetime import datetime, timezone
-from dbus_fast import Message, MessageType
+import os
+
+try:
+    from dbus_fast import Message, MessageType
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.definition import (
     TIMEDATE1_BUS_NAME,
     TIMEDATE1_MAIN_OBJ,
     SUMMIT_RCM_TIME_FORMAT,
 )
-from summit_rcm.dbus_manager import DBusManager
 from summit_rcm.utils import Singleton
 
 LOCALTIME = "/etc/localtime"

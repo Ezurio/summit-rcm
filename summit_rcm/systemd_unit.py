@@ -2,10 +2,18 @@
 Module to support interface with systemd units (services, sockets, etc.)
 """
 
+from enum import Enum
 from syslog import LOG_ERR, syslog
-from dbus_fast import Message, MessageType, Variant
-from .dbus_manager import DBusManager
-from .definition import (
+import os
+
+try:
+    from dbus_fast import Message, MessageType, Variant
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+from summit_rcm.definition import (
     SYSTEMD_BUS_NAME,
     SYSTEMD_MAIN_OBJ,
     SYSTEMD_MANAGER_IFACE,
@@ -15,6 +23,20 @@ from .definition import (
 )
 
 SYSTEMD_UNIT_VALID_CONFIG_STATES = ["active", "inactive"]
+
+
+class SystemdActiveStateEnum(str, Enum):
+    """
+    Enum for the 'ActiveState' value for a systemd unit
+    """
+
+    ACTIVE = "active"
+    RELOADING = "reloading"
+    INACTIVE = "inactive"
+    FAILED = "failed"
+    ACTIVATING = "activating"
+    DEACTIVATING = "deactivating"
+    UNKNOWN = "unknown"
 
 
 class SystemdUnit(object):
