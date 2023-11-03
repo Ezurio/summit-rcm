@@ -8,9 +8,15 @@ from syslog import LOG_ERR, syslog
 import shutil
 from pathlib import Path
 from typing import Optional, Tuple
-from dbus_fast import Message, MessageType
+
+try:
+    from dbus_fast import Message, MessageType
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 import falcon.asgi.multipart
-from summit_rcm.dbus_manager import DBusManager
 from summit_rcm.settings import ServerConfig
 from summit_rcm.definition import (
     DEVICE_CA_CERT_CHAIN_PATH,
@@ -26,7 +32,13 @@ from summit_rcm.definition import (
     SYSTEMD_MAIN_OBJ,
     SYSTEMD_MANAGER_IFACE,
 )
-import openssl_extension
+
+try:
+    import openssl_extension
+except ImportError as error:
+    # Ignore the error if the openssl_extension module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 
 
 OPENSSL_CERT_DATETIME_FORMAT = "%b %d %H:%M:%S %Y %Z"

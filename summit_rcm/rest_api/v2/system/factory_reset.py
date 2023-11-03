@@ -1,8 +1,41 @@
+"""
+Module to handle system factory reset
+"""
+
 import asyncio
 import os
-import falcon
-from summit_rcm.definition import MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE
+import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
+from summit_rcm.definition import MODEM_FIRMWARE_UPDATE_IN_PROGRESS_FILE, PowerStateEnum
 from summit_rcm.services.system_service import SystemService, FACTORY_RESET_SCRIPT
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        FactoryResetModel,
+        InternalServerErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import system_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    FactoryResetModel = None
+    InternalServerErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    system_tag = None
+
+
+spec = SpectreeService()
 
 
 class FactoryResetResource(object):
@@ -10,7 +43,24 @@ class FactoryResetResource(object):
     Resource to handle factory reset requests
     """
 
-    async def on_put(self, req: falcon.Request, resp: falcon.Response) -> None:
+    @spec.validate(
+        json=FactoryResetModel,
+        resp=Response(
+            HTTP_200=FactoryResetModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
+    async def on_put(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
+        """
+        Initiate a factory reset
+        """
+
         post_data = await req.get_media()
         initiate_factory_reset = post_data.get("initiateFactoryReset", None)
         auto_reboot = post_data.get("autoReboot", None)
@@ -50,4 +100,6 @@ class FactoryResetResource(object):
         }
 
         if auto_reboot:
-            asyncio.ensure_future(SystemService().set_power_state("reboot"))
+            asyncio.ensure_future(
+                SystemService().set_power_state(PowerStateEnum.REBOOT)
+            )

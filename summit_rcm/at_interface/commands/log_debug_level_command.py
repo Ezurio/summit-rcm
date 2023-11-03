@@ -5,6 +5,7 @@ from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
+from summit_rcm.definition import DriverLogLevelEnum, SupplicantLogLevelEnum
 from summit_rcm.services.logs_service import LogsService
 
 
@@ -47,24 +48,25 @@ class LogDebugLevelCommand(Command):
         try:
             log_debug_str = ""
             if params_dict["log_level"] != "":
-                await LogsService.set_supplicant_debug_level(
-                    params_dict["log_level"]
-                ) if params_dict[
-                    "type"
-                ] == Types.supplicant else LogsService.set_wifi_driver_debug_level(
-                    params_dict["log_level"]
-                )
+                if params_dict["type"] == Types.supplicant:
+                    await LogsService.set_supplicant_debug_level(
+                        SupplicantLogLevelEnum(params_dict["log_level"])
+                    )
+                else:
+                    LogsService.set_wifi_driver_debug_level(
+                        DriverLogLevelEnum(params_dict["log_level"])
+                    )
             else:
                 log_debug_str = (
                     "+LOGDEBUG: "
                     + (
                         str(
                             Supp_Levels[
-                                await LogsService.get_supplicant_debug_level()
+                                (await LogsService.get_supplicant_debug_level()).value
                             ].value
                         )
                         if params_dict["type"] == Types.supplicant
-                        else str(LogsService.get_wifi_driver_debug_level())
+                        else str(LogsService.get_wifi_driver_debug_level().value)
                     )
                     + "\r\n"
                 )

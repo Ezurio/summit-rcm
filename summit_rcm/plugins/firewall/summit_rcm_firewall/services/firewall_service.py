@@ -7,7 +7,12 @@ import os
 from syslog import syslog, LOG_ERR
 from typing import List, Tuple
 import asyncio
-import aiofiles
+try:
+    import aiofiles
+except ImportError as error:
+    # Ignore the error if the aiofiles module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.utils import Singleton
 
 IPTABLES = "/usr/sbin/iptables"

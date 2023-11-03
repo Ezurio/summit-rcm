@@ -2,10 +2,17 @@ from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
 from typing import Any, Dict, List
 from enum import IntFlag, IntEnum, unique
-from dbus_fast import Message, MessageType, Variant
+import os
+
+try:
+    from dbus_fast import Message, MessageType, Variant
+    from summit_rcm.dbus_manager import DBusManager
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 import summit_rcm.definition
 from summit_rcm.utils import Singleton
-from summit_rcm.dbus_manager import DBusManager
 
 
 @unique
@@ -1112,6 +1119,36 @@ class NMSettingIP6ConfigPrivacy(IntEnum):
 
 
 @unique
+class NMSettingIP6ConfigAddrGenMode(IntEnum):
+    """
+    NMSettingIP6ConfigAddrGenMode controls how the Interface Identifier for RFC4862 Stateless
+    Address Autoconfiguration is created.
+    """
+
+    NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_EUI64 = 0
+    """
+    The Interface Identifier is derived from the interface hardware address.
+    """
+
+    NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY = 1
+    """
+    The Interface Identifier is created by using a cryptographically secure hash of a secret
+    host-specific key along with the connection identification and the network address as specified
+    by RFC7217.
+    """
+
+    NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT_OR_EUI64 = 2
+    """
+    Fallback to the global default, and if unspecified use "eui64". Since: 1.40.
+    """
+
+    NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT = 3
+    """
+    Fallback to the global default, and if unspecified use "stable-privacy". Since: 1.40.
+    """
+
+
+@unique
 class NMTernary(IntEnum):
     """
     A boolean value that can be overridden by a default.
@@ -1177,6 +1214,7 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "autoconnect-priority": 0,
     "autoconnect-retries": -1,
     "autoconnect-slaves": NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT,
+    "dns-over-tls": -1,
     "gateway-ping-timeout": 0,
     "id": None,
     "interface-name": None,
@@ -1185,6 +1223,7 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "master": None,
     "mdns": -1,
     "metered": NMMetered.NM_METERED_UNKNOWN,
+    "mptcp-flags": 0,
     "mud-url": None,
     "multi-connect": 0,
     "permissions": [],
@@ -1195,6 +1234,7 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "timestamp": 0,
     "type": None,
     "uuid": None,
+    "wait-activation-delay": -1,
     "wait-device-timeout": -1,
     "zone": None,
 }
@@ -1206,6 +1246,7 @@ https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingConnection.html
 
 NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "addresses": None,
+    "auto-route-ext-gw": NMTernary.NM_TERNARY_DEFAULT,
     "dad-timeout": -1,
     "dhcp-hostname": None,
     "dhcp-hostname-flags": 0,
@@ -1223,6 +1264,7 @@ NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "may-fail": True,
     "method": None,
     "never-default": False,
+    "required-timeout": -1,
     "route-metric": -1,
     "route-table": 0,
     "routes": None,
@@ -1238,6 +1280,7 @@ NM_SETTING_IP4CONFIG_DEFAULTS: Dict[str, Any] = {
     "dhcp-client-id": None,
     "dhcp-fqdn": None,
     "dhcp-vendor-class-identifier": None,
+    "link-local": 0,
 }
 """
 Default values for the NM.SettingIP4Config settings. Values taken from:
@@ -1247,9 +1290,10 @@ https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIP4Config.html
 
 NM_SETTING_IP6CONFIG_DEFAULTS: Dict[str, Any] = {
     **NM_SETTING_IPCONFIG_DEFAULTS,
-    "addr-gen-mode": 1,
+    "addr-gen-mode": NMSettingIP6ConfigAddrGenMode.NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT,
     "dhcp-duid": None,
     "ip6-privacy": NMSettingIP6ConfigPrivacy.NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN,
+    "mtu": 0,
     "ra-timeout": 0,
     "token": None,
 }
@@ -1272,6 +1316,7 @@ https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingProxy.html
 
 
 NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
+    "accept-all-mac-addresses": NMTernary.NM_TERNARY_DEFAULT,
     "auto-negotiate": False,
     "cloned-mac-address": None,
     "duplex": None,
@@ -1769,10 +1814,10 @@ class NetworkManagerService(object, metaclass=Singleton):
                 "phase2-private-key",
             ]:
                 if connection["802-1x"].get(cert):
-                    connection["802-1x"][
-                        cert
-                    ] = await self.convert_cert_to_nm_path_scheme(
-                        connection["802-1x"][cert]
+                    connection["802-1x"][cert] = (
+                        await self.convert_cert_to_nm_path_scheme(
+                            connection["802-1x"][cert]
+                        )
                     )
 
             if connection["802-1x"].get("pac-file"):
@@ -1813,12 +1858,14 @@ class NetworkManagerService(object, metaclass=Singleton):
                                 inet_pton(AF_INET, address["address"]), byteorder
                             ),
                             int(address["prefix"]),
-                            int.from_bytes(
-                                inet_pton(AF_INET, connection["ipv4"]["gateway"]),
-                                byteorder,
-                            )
-                            if connection["ipv4"].get("gateway", None) is not None
-                            else 0,
+                            (
+                                int.from_bytes(
+                                    inet_pton(AF_INET, connection["ipv4"]["gateway"]),
+                                    byteorder,
+                                )
+                                if connection["ipv4"].get("gateway", None) is not None
+                                else 0
+                            ),
                         ]
                         for address in connection["ipv4"]["address-data"]
                     ],
@@ -1858,9 +1905,11 @@ class NetworkManagerService(object, metaclass=Singleton):
                         [
                             inet_pton(AF_INET6, address["address"]),
                             int(address["prefix"]),
-                            inet_pton(AF_INET6, connection["ipv6"]["gateway"])
-                            if connection["ipv6"].get("gateway", None) is not None
-                            else bytes(0),
+                            (
+                                inet_pton(AF_INET6, connection["ipv6"]["gateway"])
+                                if connection["ipv6"].get("gateway", None) is not None
+                                else bytes(0)
+                            ),
                         ]
                         for address in connection["ipv6"]["address-data"]
                     ],

@@ -2,15 +2,65 @@
 
 from syslog import LOG_ERR, syslog
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm.services.user_service import UserService
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
+        ConflictErrorResponseModel,
+        ForbiddenErrorResponseModel,
+        InternalServerErrorResponseModel,
+        NewUserRequestModel,
+        NotFoundErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+        UpdateUserRequestModel,
+        UserResponseModel,
+        UsersResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import login_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    BadRequestErrorResponseModel = None
+    ConflictErrorResponseModel = None
+    ForbiddenErrorResponseModel = None
+    InternalServerErrorResponseModel = None
+    NewUserRequestModel = None
+    NotFoundErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    UpdateUserRequestModel = None
+    UserResponseModel = None
+    UsersResponseModel = None
+    login_tag = None
+
+
+spec = SpectreeService()
 
 
 class UsersResource:
     """Resource to handle queries and requests for user management"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=UsersResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /login/users endpoint
+        Retrieve a list of the current users
         """
         try:
             users = []
@@ -23,11 +73,23 @@ class UsersResource:
             syslog(LOG_ERR, f"Unable to retrieve users information: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=NewUserRequestModel,
+        resp=Response(
+            HTTP_201=UserResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_409=ConflictErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_post(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        POST handler for the /login/users endpoint
+        Add a new user
         """
         try:
             post_data = await req.get_media()
@@ -64,11 +126,21 @@ class UsersResource:
 class UserResource:
     """Resource to handle queries and requests for a specific user"""
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=UserResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_get(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, username: str
     ) -> None:
         """
-        GET handler for the /login/users/{username} endpoint
+        Retrieve details about a specified user
         """
         try:
             if not UserService.user_exists(username):
@@ -85,11 +157,24 @@ class UserResource:
             syslog(LOG_ERR, f"Unable to retrieve user information: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=UpdateUserRequestModel,
+        resp=Response(
+            HTTP_200=UserResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_403=ForbiddenErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_patch(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response, username: str
     ) -> None:
         """
-        PATCH handler for the /login/users/{username} endpoint
+        Update the configuration of a specified user
         """
         try:
             put_data = await req.get_media()
@@ -132,11 +217,21 @@ class UserResource:
             syslog(LOG_ERR, f"Unable to update user: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=None,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_404=NotFoundErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[login_tag],
+    )
     async def on_delete(
         self, _: falcon.asgi.Request, resp: falcon.asgi.Response, username: str
     ) -> None:
         """
-        DELETE handler for the /login/users/{username} endpoint
+        Remove a specified user
         """
         try:
             if not UserService.user_exists(username):

@@ -1,5 +1,5 @@
 import os
-from enum import IntEnum
+from enum import Enum, IntEnum
 from summit_rcm.services.network_manager_service import (
     NM80211Mode,
     NMActiveConnectionState,
@@ -252,3 +252,42 @@ class SSLModes(IntEnum):
     SERVER_VERIFY_CLIENT = 1
     CLIENT_VERIFY_SERVER = 2
     MUTUAL_AUTH = 3
+
+
+class JournalctlLogTypesEnum(str, Enum):
+    """Enumeration of valid journalctl log identifiers"""
+
+    KERNEL = "kernel"
+    NETWORK_MANAGER = "NetworkManager"
+    SUMMIT_RCM = "summit-rcm"
+    PYTHON = "python"
+    ADAPTIVE_WW = "adaptive_ww"
+    ALL = "All"
+
+
+class SupplicantLogLevelEnum(str, Enum):
+    """Enumeration of valid supplicant log levels"""
+
+    NONE = "none"
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+    DEBUG = "debug"
+    MSGDUMP = "msgdump"
+    EXCESSIVE = "excessive"
+
+
+class DriverLogLevelEnum(int, Enum):
+    """Enumeration of valid Wi-Fi driver log levels"""
+
+    DISABLED = 0
+    ENABLED = 1
+
+
+class PowerStateEnum(str, Enum):
+    """Enumeration of valid power states"""
+
+    ON = "on"
+    OFF = "off"
+    SUSPEND = "suspend"
+    REBOOT = "reboot"

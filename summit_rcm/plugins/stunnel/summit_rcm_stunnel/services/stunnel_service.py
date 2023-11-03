@@ -3,7 +3,14 @@ Module to support stunnel configuration
 """
 
 import re
-import aiofiles
+import os
+
+try:
+    import aiofiles
+except ImportError as error:
+    # Ignore the error if the aiofiles module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.systemd_unit import (
     ActivationFailedError,
     AlreadyActiveError,

@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from syslog import LOG_ERR, syslog
 from typing import Any, Optional
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    SpectreeService,
+)
 from summit_rcm_provisioning.services.provisioning_service import (
     ProvisioningState,
     CertificateProvisioningService,
@@ -232,6 +236,11 @@ class CertificateProvisioningMiddleware:
         # If we're fully provisioned, we don't need to do any further checks
         if self._provisioning_state == ProvisioningState.FULLY_PROVISIONED:
             return
+
+        if ServerConfig().rest_api_docs_enabled:
+            UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().doc_page_path)
+            UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().spec_url)
+            UNPROVISIONED_PATH_WHITE_LIST.append("/")
 
         # If we're partially or unprovisioned, we only allow requests to the following paths:
         if req.path not in UNPROVISIONED_PATH_WHITE_LIST:

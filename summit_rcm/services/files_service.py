@@ -4,12 +4,19 @@ Module to interact with files.
 
 import asyncio
 import configparser
+import os
 from shutil import copy2, rmtree
 from subprocess import run
 from syslog import LOG_ERR, syslog
 from typing import Any, List, Tuple
 from pathlib import Path
-import aiofiles
+
+try:
+    import aiofiles
+except ImportError as error:
+    # Ignore the error if the aiofiles module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm import definition
 from summit_rcm.services.network_service import (
     ConnectionProfileReservedError,
@@ -63,7 +70,7 @@ class FilesService(metaclass=Singleton):
         return path
 
     @staticmethod
-    async def handle_file_download(path: str) -> aiofiles.base.AiofilesContextManager:
+    async def handle_file_download(path: str):
         """
         Handle when a client downloads a file
         """

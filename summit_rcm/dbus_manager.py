@@ -1,7 +1,14 @@
 from syslog import syslog, LOG_ERR
 from typing import Optional
-from dbus_fast.constants import BusType
-from dbus_fast.aio import MessageBus
+import os
+
+try:
+    from dbus_fast.constants import BusType
+    from dbus_fast.aio import MessageBus
+except ImportError as error:
+    # Ignore the error if the dbus_fast module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
 from summit_rcm.utils import Singleton
 
 

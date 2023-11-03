@@ -5,12 +5,43 @@ Module to support iptables firewall configuration for v2 routes.
 from syslog import LOG_ERR, syslog
 from typing import List
 import falcon.asgi
+from summit_rcm.settings import ServerConfig
+from summit_rcm.rest_api.services.spectree_service import (
+    DocsNotEnabledException,
+    SpectreeService,
+)
 from summit_rcm_firewall.services.firewall_service import (
     ADD_PORT,
     REMOVE_PORT,
     FirewallService,
     ForwardedPort,
 )
+
+try:
+    if not ServerConfig().rest_api_docs_enabled:
+        raise DocsNotEnabledException()
+
+    from spectree import Response
+    from summit_rcm.rest_api.utils.spectree.models import (
+        InternalServerErrorResponseModel,
+        BadRequestErrorResponseModel,
+        UnauthorizedErrorResponseModel,
+    )
+    from summit_rcm_firewall.rest_api.utils.spectree.models import (
+        ForwardedPortsResponseModel,
+    )
+    from summit_rcm.rest_api.utils.spectree.tags import network_tag
+except (ImportError, DocsNotEnabledException):
+    from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
+
+    InternalServerErrorResponseModel = None
+    BadRequestErrorResponseModel = None
+    UnauthorizedErrorResponseModel = None
+    ForwardedPortsResponseModel = None
+    network_tag = None
+
+
+spec = SpectreeService()
 
 
 class FirewallForwardedPortsResource:
@@ -40,9 +71,18 @@ class FirewallForwardedPortsResource:
                 return True
         return False
 
+    @spec.validate(
+        resp=Response(
+            HTTP_200=ForwardedPortsResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_get(self, _, resp: falcon.asgi.Response) -> None:
         """
-        GET handler for the /network/firewall/forwardedPorts endpoint
+        Retrieve a list of ports currently forwarded via iptables firewall rules
         """
         try:
             resp.media = [
@@ -54,11 +94,22 @@ class FirewallForwardedPortsResource:
             syslog(LOG_ERR, f"Unable to retrieve forwarded ports: {str(exception)}")
             resp.status = falcon.HTTP_500
 
+    @spec.validate(
+        json=ForwardedPortsResponseModel,
+        resp=Response(
+            HTTP_200=ForwardedPortsResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
     async def on_put(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
     ) -> None:
         """
-        PUT handler for the /network/firewall/forwardedPorts endpoint
+        Update the list of ports currently forwarded via iptables firewall rules
         """
         try:
             put_data = await req.get_media()
