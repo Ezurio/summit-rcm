@@ -70,7 +70,7 @@ class CIPSendCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "\r\nAT+CIPSEND=<connection id>,<length>\r\n"
+        return "\r\nAT+CIPSEND=<connection_id>,<length>\r\n"
 
     @staticmethod
     def signature() -> str:

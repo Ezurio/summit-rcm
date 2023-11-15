@@ -26,7 +26,7 @@ class FWUpdateRunCommand(Command):
 
     NAME: str = "Start/Stop Firmware Update"
     SIGNATURE: str = "at+fwrun"
-    VALID_NUM_PARAMS: List[int] = [1, 2, 3]
+    VALID_NUM_PARAMS: List[int] = [3]
     DEVICE_TYPE: str = ""
 
     @staticmethod
@@ -55,18 +55,18 @@ class FWUpdateRunCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in FWUpdateRunCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
             params_dict["mode"] = Modes(int(params_list[0]))
             params_dict["image"] = (
-                Image(int(params_list[1])).name if len(params_list) > 1 else ""
+                Image(int(params_list[1])).name if params_list[1] else ""
             )
+            params_dict["url"] = params_list[2] if params_list[2] else ""
         except ValueError:
             return (False, params_dict)
-        params_dict["url"] = params_list[2] if len(params_list) > 2 else ""
+        if params_dict["mode"] == Modes.FWUPDATE_START and params_dict["image"] == "":
+            return (False, params_dict)
         return (valid, params_dict)
 
     @staticmethod

@@ -4,7 +4,10 @@ File that consists of the AWMScan Command Functionality
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from summit_rcm.at_interface.commands.command import Command
-from summit_rcm_awm.services.awm_config_service import AWMConfigService, ConfigFileNotFoundError
+from summit_rcm_awm.services.awm_config_service import (
+    AWMConfigService,
+    ConfigFileNotFoundError,
+)
 
 
 class AWMScanCommand(Command):
@@ -51,7 +54,7 @@ class AWMScanCommand(Command):
         if not valid:
             return (False, {})
         try:
-            params_dict["enabled"] = int(params_list[0]) if params_list[0] != "" else ""
+            params_dict["enabled"] = int(params_list[0]) if params_list[0] else ""
             if params_dict["enabled"] not in (0, 1, ""):
                 raise ValueError
         except ValueError:

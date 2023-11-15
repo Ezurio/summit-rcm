@@ -61,8 +61,10 @@ class FipsCommand(Command):
             params_dict["state"] = (
                 States(int(params_list[0])).name if params_list[0] else ""
             )
+            if params_dict["state"] and given_num_param < 2:
+                raise ValueError
             params_dict["reboot"] = (
-                bool(int(params_list[1])) if len(params_list) > 1 else False
+                bool(int(params_list[1])) if given_num_param > 1 and params_list[1] else False
             )
         except ValueError:
             valid = False

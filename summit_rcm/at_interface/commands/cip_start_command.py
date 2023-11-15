@@ -21,7 +21,7 @@ class CIPStartCommand(Command):
 
     NAME: str = "Start IP connection"
     SIGNATURE: str = "at+cipstart"
-    VALID_NUM_PARAMS: List[int] = [4, 5]
+    VALID_NUM_PARAMS: List[int] = [5]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
@@ -48,8 +48,6 @@ class CIPStartCommand(Command):
         params_list = params.split(",")
         given_num_param = len(params_list)
         valid &= given_num_param in CIPStartCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
@@ -57,9 +55,7 @@ class CIPStartCommand(Command):
             params_dict["type"] = Types(int(params_list[1])).name
             params_dict["remote_ip"] = params_list[2]
             params_dict["remote_port"] = params_list[3]
-            params_dict["keepalive"] = (
-                int(params_list[4]) if given_num_param == 5 else 0
-            )
+            params_dict["keepalive"] = int(params_list[4]) if params_list[4] else 0
         except ValueError:
             valid = False
         return (valid, params_dict)

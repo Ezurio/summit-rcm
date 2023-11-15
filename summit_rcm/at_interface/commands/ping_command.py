@@ -19,7 +19,7 @@ class PingCommand(Command):
 
     NAME: str = "Ping"
     SIGNATURE: str = "at+ping"
-    VALID_NUM_PARAMS: List[int] = [1, 2, 3]
+    VALID_NUM_PARAMS: List[int] = [3]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
@@ -58,19 +58,17 @@ class PingCommand(Command):
         params_list = params.split(",")
         given_num_param = len(params_list)
         valid &= given_num_param in PingCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
             params_dict["target"] = params_list[0]
             params_dict["timeout"] = (
-                params_list[1] if given_num_param > 1 else DEFAULT_TIMEOUT
+                params_list[1] if params_list[1] else DEFAULT_TIMEOUT
             )
             params_dict["protocol"] = (
-                params_list[2] if given_num_param > 2 else DEFAULT_PROTOCOL
+                params_list[2] if params_list[2] else DEFAULT_PROTOCOL
             )
-        except Exception:
+        except Exception as exception:
             valid = False
         return (valid, params_dict)
 

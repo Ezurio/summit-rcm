@@ -15,7 +15,7 @@ class CertificatesGetCommand(Command):
 
     NAME: str = "Certificates Get"
     SIGNATURE: str = "at+certget"
-    VALID_NUM_PARAMS: List[int] = [1, 2]
+    VALID_NUM_PARAMS: List[int] = [2]
     DEVICE_TYPE: str = ""
 
     @staticmethod
@@ -45,9 +45,9 @@ class CertificatesGetCommand(Command):
         if not valid:
             return (False, {})
         params_dict["name"] = params_list[0]
+        params_dict["password"] = params_list[1]
         if params_dict["name"] == "":
             return (False, params_dict)
-        params_dict["password"] = None if len(params_list) < 2 else params_list[1]
         return (valid, params_dict)
 
     @staticmethod

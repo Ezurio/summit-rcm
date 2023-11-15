@@ -35,7 +35,7 @@ class LogDebugLevelCommand(Command):
 
     NAME: str = "Get/Set Log Debug Levels"
     SIGNATURE: str = "at+logdebug"
-    VALID_NUM_PARAMS: List[int] = [1, 2]
+    VALID_NUM_PARAMS: List[int] = [2]
     DEVICE_TYPE: str = ""
 
     @staticmethod
@@ -55,11 +55,19 @@ class LogDebugLevelCommand(Command):
                     params_dict["log_level"]
                 )
             else:
-                log_debug_str = "+LOGDEBUG: " + (
-                    str(Supp_Levels[await LogsService.get_supplicant_debug_level()].value)
-                    if params_dict["type"] == Types.supplicant
-                    else str(LogsService.get_wifi_driver_debug_level())
-                ) + "\r\n"
+                log_debug_str = (
+                    "+LOGDEBUG: "
+                    + (
+                        str(
+                            Supp_Levels[
+                                await LogsService.get_supplicant_debug_level()
+                            ].value
+                        )
+                        if params_dict["type"] == Types.supplicant
+                        else str(LogsService.get_wifi_driver_debug_level())
+                    )
+                    + "\r\n"
+                )
             return (True, f"{log_debug_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting/setting log debug level: {str(exception)}")
@@ -71,19 +79,17 @@ class LogDebugLevelCommand(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in LogDebugLevelCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
             params_dict["type"] = Types(int(params_list[0]))
-            if len(params_list) > 1:
-                if params_dict["type"] == Types.supplicant:
-                    params_dict["log_level"] = Supp_Levels(int(params_list[1])).name
-                else:
-                    params_dict["log_level"] = Driver_Levels(int(params_list[1])).value
-            else:
-                params_dict["log_level"] = ""
+            params_dict["log_level"] = (
+                Supp_Levels(int(params_list[1])).name
+                if params_dict["type"] == Types.supplicant and params_list[1]
+                else Driver_Levels(int(params_list[1])).value
+                if params_list[1]
+                else ""
+            )
         except ValueError:
             return (False, params_dict)
         return (valid, params_dict)
