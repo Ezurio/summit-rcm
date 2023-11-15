@@ -25,7 +25,7 @@ class ConnectionModifyCommand(Command):
 
     NAME: str = "Create/Update/Delete Connection"
     SIGNATURE: str = "at+connmod"
-    VALID_NUM_PARAMS: List[int] = [2]
+    VALID_NUM_PARAMS: List[int] = [3]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
@@ -61,26 +61,24 @@ class ConnectionModifyCommand(Command):
     def parse_params(params: str) -> Tuple[bool, dict]:
         valid = True
         params_dict = {}
-        params_list = params.split(",", 1)
+        params_list = params.split(",", 2)
         given_num_param = len(params_list)
         valid &= given_num_param in ConnectionModifyCommand.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
         try:
-            params_dict["mode"] = int(params_list[0])
-            mode = Modes(int(params_dict["mode"]))
-            if mode == Modes.CREATE:
-                params_dict["uuid"] = ""
-                params_dict["settings"] = loads(params_list[1])
-            elif mode == Modes.UDPATE:
-                params_list = params.split(",", 2)
-                params_dict["uuid"] = params_list[1]
-                params_dict["settings"] = loads(params_list[2])
-            else:
-                params_dict["uuid"] = params_list[1]
-                params_dict["settings"] = ""
+            params_dict["mode"] = Modes(int(params_list[0]))
+            params_dict["uuid"] = params_list[1]
+            params_dict["settings"] = loads(params_list[2]) if params_list[2] else ""
+            mode = params_dict["mode"]
+            uuid = params_dict["uuid"]
+            settings = params_dict["settings"]
+            if mode == Modes.CREATE and settings == "":
+                return (False, params_dict)
+            if mode == Modes.UDPATE and (uuid == "" or settings == ""):
+                return (False, params_dict)
+            if mode == Modes.DELETE and uuid == "":
+                return (False, params_dict)
         except ValueError:
             valid = False
         return (valid, params_dict)

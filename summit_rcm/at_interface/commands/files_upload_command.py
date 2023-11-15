@@ -31,7 +31,7 @@ class FilesUploadCommand(Command):
 
     NAME: str = "Upload Files"
     SIGNATURE: str = "at+filesup"
-    VALID_NUM_PARAMS: List[int] = [2, 3, 4]
+    VALID_NUM_PARAMS: List[int] = [5]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
@@ -89,24 +89,22 @@ class FilesUploadCommand(Command):
             return (False, {})
         try:
             params_dict["type"] = Types(int(params_list[0]))
-            params_dict["length"] = int(params_list[1]) if len(params_list) > 1 else ""
+            params_dict["length"] = int(params_list[1])
+            params_dict["name"] = params_list[2]
+            params_dict["password"] = params_list[3]
             params_dict["mode"] = (
-                Modes(int(params_list[3]))
-                if (len(params_list) > 3)
-                else Modes.OVERWRITE
+                Modes(int(params_list[4])) if params_list[4] else Modes.OVERWRITE
             )
         except ValueError:
             return (False, params_dict)
-        params_dict["name"] = (
-            params_list[2]
-            if (params_dict["type"] == Types.FILE_TYPE_CERT and len(params_list) > 2)
-            else ""
-        )
-        params_dict["password"] = (
-            params_list[2]
-            if (params_dict["type"] != Types.FILE_TYPE_CERT and len(params_list) > 2)
-            else ""
-        )
+        type = params_dict["type"]
+        password = params_dict["password"]
+        if type == Types.FILE_TYPE_CERT and params_dict["name"] == "":
+            return (False, params_dict)
+        if type == Types.FILE_TYPE_CONNECTION and password == "":
+            return (False, params_dict)
+        if type == Types.FILE_TYPE_CONFIG and password == "":
+            return (False, params_dict)
         return (valid, params_dict)
 
     @staticmethod

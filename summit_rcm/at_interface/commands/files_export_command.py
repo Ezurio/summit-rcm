@@ -40,7 +40,7 @@ class FilesExportCommand(Command):
 
     NAME: str = "Export Zip Archive"
     SIGNATURE: str = "at+filesexp"
-    VALID_NUM_PARAMS: List[int] = [2, 3, 4]
+    VALID_NUM_PARAMS: List[int] = [5]
 
     @staticmethod
     async def execute(params: str) -> Tuple[bool, str]:
@@ -102,29 +102,20 @@ class FilesExportCommand(Command):
             return (False, {})
         try:
             params_dict["mode"] = bool(int(params_list[0]))
-            if params_dict["mode"] and length != 4:
-                raise ValueError
-            params_dict["chunk size"] = (
-                int(params_list[2]) if (params_dict["mode"] and length > 2) else 0
-            )
+            params_dict["type"] = Types(int(params_list[1]))
+            params_dict["password"] = params_list[2]
+            params_dict["chunk size"] = int(params_list[3]) if params_list[3] else ""
             if params_dict["chunk size"] > MAX_FILE_CHUNK_SIZE:
                 raise ValueError
-            params_dict["offset"] = (
-                int(params_list[3]) if (params_dict["mode"] and length > 3) else 0
-            )
-            params_dict["type"] = Types(int(params_list[1]))
+            params_dict["offset"] = int(params_list[4]) if params_list[4] else ""
+            params_dict["path"] = PATHS[params_dict["type"]]
         except ValueError:
             return (False, params_dict)
-        params_dict["path"] = PATHS[params_dict["type"]]
-        params_dict["password"] = (
-            ""
-            if (
-                params_dict["type"] == Types.FILE_TYPE_DEBUG
-                or length < 3
-                or params_dict["mode"]
-            )
-            else params_list[2]
-        )
+        mode = params_dict["mode"]
+        if mode and (params_dict["chunk size"] == "" or params_dict["offset"] == ""):
+            return (False, params_dict)
+        if not mode and params_dict["password"] == "":
+            return (False, params_dict)
         return (valid, params_dict)
 
     @staticmethod

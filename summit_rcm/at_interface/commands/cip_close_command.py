@@ -51,7 +51,7 @@ class CIPCloseCommand(Command):
 
     @staticmethod
     def usage() -> str:
-        return "AT+CIPCLOSE=<connection id>"
+        return "AT+CIPCLOSE=<connection_id>"
 
     @staticmethod
     def signature() -> str:

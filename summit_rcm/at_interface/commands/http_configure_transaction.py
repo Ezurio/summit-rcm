@@ -26,7 +26,7 @@ class HTTPConfigureTransaction(Command):
 
     NAME: str = "Configure HTTP Transaction"
     SIGNATURE: str = "at+httpconf"
-    VALID_NUM_PARAMS: List[int] = [4, 5]
+    VALID_NUM_PARAMS: List[int] = [5]
     VALID_METHODS: List[str] = ["HEAD", "GET", "PUT", "POST", "DELETE", "PATCH"]
 
     @staticmethod
@@ -54,20 +54,18 @@ class HTTPConfigureTransaction(Command):
         params_dict = {}
         params_list = params.split(",")
         valid &= len(params_list) in HTTPConfigureTransaction.VALID_NUM_PARAMS
-        for param in params_list:
-            valid &= param != ""
         if not valid:
             return (False, {})
-        params_dict["host"] = params_list[0]
         try:
+            params_dict["host"] = params_list[0]
             params_dict["port"] = int(params_list[1])
-            params_dict["timeout"] = (
-                int(params_list[4]) if len(params_list) > 4 else DEFAULT_TIMEOUT
-            )
             params_dict["method"] = Types(int(params_list[2])).name
+            params_dict["route"] = params_list[3]
+            params_dict["timeout"] = (
+                int(params_list[4]) if params_list[4] else DEFAULT_TIMEOUT
+            )
         except ValueError:
             return (False, params_dict)
-        params_dict["route"] = params_list[3]
         return (valid, params_dict)
 
     @staticmethod
