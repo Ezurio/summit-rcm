@@ -670,6 +670,7 @@ try:
         enable_client_auth = parser.getboolean(
             section="summit-rcm", option="enable_client_auth", fallback=False
         )
+        port = parser.getint(section="summit-rcm", option="socket_port", fallback=443)
 
         websockets_config = "none"
         try:
@@ -682,7 +683,7 @@ try:
         config = uvicorn.Config(
             app=app,
             host="",
-            port=443,
+            port=port,
             ssl_certfile=ssl_certificate,
             ssl_keyfile=ssl_private_key,
             ssl_cert_reqs=ssl.CERT_NONE,
