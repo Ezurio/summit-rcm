@@ -5,12 +5,13 @@ Module to support configuration of AWM.
 import os
 from syslog import syslog
 from threading import Lock
+import configparser
 import libconf
 from summit_rcm.utils import Singleton
-from summit_rcm.settings import ServerConfig
 
 
 ADAPTIVE_WW_CONFIG_FILE = "/etc/default/adaptive_ww"
+SUMMIT_RCM_AWM_PLUGIN_INI_FILE = "/etc/summit-rcm-awm.ini"
 
 
 class AWMConfigService(metaclass=Singleton):
@@ -18,7 +19,30 @@ class AWMConfigService(metaclass=Singleton):
     Exposes functionality to get/set AWM configuration.
     """
 
-    _lock = Lock()
+    def __init__(self):
+        self._lock = Lock()
+        try:
+            self.parser = configparser.ConfigParser()
+            self.parser.read(SUMMIT_RCM_AWM_PLUGIN_INI_FILE)
+        except Exception as exception:
+            syslog(f"Unable to read summit-rcm-awm.ini: {str(exception)}")
+            self.parser = None
+
+    def get_awm_cfg(self) -> str:
+        """
+        Retrieve any configured value for 'awm_cfg', and if not found, raise an exception.
+        """
+
+        if not self.parser:
+            raise ConfigFileNotFoundError("Not found")
+
+        # Check if there is a configuration file which contains a "awm_cfg" entry
+        # if configuration file does not exist, awm_cfg is not disabled
+        f = self.parser["summit-rcm"].get("awm_cfg", None).strip('"')
+        if not f or not os.path.isfile(f):
+            raise ConfigFileNotFoundError("Not found")
+
+        return f
 
     def get_scan_attempts(self) -> int:
         """
@@ -27,9 +51,7 @@ class AWMConfigService(metaclass=Singleton):
 
         # Check if there is a configuration file which contains a "scan_attempts:0" entry
         # if configuration file does not exist, scan_attempts is not disabled
-        f = ServerConfig().get_parser()["summit-rcm"].get("awm_cfg", None).strip('"')
-        if not f or not os.path.isfile(f):
-            raise ConfigFileNotFoundError("Not found")
+        f = self.get_awm_cfg()
 
         with self._lock:
             with open(f, "r", encoding="utf-8") as fp:
@@ -47,9 +69,7 @@ class AWMConfigService(metaclass=Singleton):
         # Check if there is a configuration file which contains a "scan_attempts:0" entry
         # if writable configuration file does not exist, scan_attempts can not be modified
 
-        f = ServerConfig().get_parser()["summit-rcm"].get("awm_cfg", None).strip('"')
-        if not f:
-            raise ConfigFileNotFoundError("Not found")
+        f = self.get_awm_cfg()
 
         os.makedirs(os.path.dirname(f), exist_ok=True)
 
