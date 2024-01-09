@@ -48,6 +48,7 @@ class VspConnection:
         self.vsp_read_chr_uuid = None
         self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
         self.vsp_write_chr_uuid = None
+        self.vsp_write_chr_type: str = ""
         self.socket_rx_type: str = "JSON"
         self._logger = logging.getLogger(__name__)
         self.auth_failure_unpair = False
@@ -220,7 +221,12 @@ class VspConnection:
         try:
             if self.vsp_write_chrc and len(self.vsp_write_chrc):
                 try:
-                    await self.vsp_write_chrc[1].call_write_value(bytearray(data), {})
+                    await self.vsp_write_chrc[1].call_write_value(
+                        bytearray(data),
+                        {"type": self.vsp_write_chr_type}
+                        if self.vsp_write_chr_type
+                        else {},
+                    )
                     return True
                 except dbus_fast.DBusError as error:
                     self.gatt_vsp_write_val_error_cb(error)
@@ -305,6 +311,10 @@ class VspConnection:
                     raise ValueError
             except ValueError:
                 return "invalid value for vspWriteChrSize param"
+        if "vspWriteChrType" in params:
+            self.vsp_write_chr_type = str(params["vspWriteChrType"])
+            if self.vsp_write_chr_type not in ["", "command", "request", "reliable"]:
+                return "invalid value for vspWriteChrType param"
 
         vsp_service = await self.create_vsp_service()
         if not vsp_service:
