@@ -4,6 +4,10 @@ source ../global_settings
 VSP_SVC_UUID="${VSP_SVC_UUID:-6e400001-b5a3-f393-e0a9-e50e24dcca9e}"
 VSP_READ_CHR_UUID="${VSP_READ_CHR_UUID:-6e400003-b5a3-f393-e0a9-e50e24dcca9e}"
 VSP_WRITE_CHR_UUID="${VSP_WRITE_CHR_UUID:-6e400002-b5a3-f393-e0a9-e50e24dcca9e}"
+VSP_WRITE_CHR_SIZE="${VSP_WRITE_CHR_SIZE:-1}"
+# vspWriteChrType must be "", "command", "request", or "reliable"
+# See here for more info: https://github.com/bluez/bluez/blob/master/doc/org.bluez.GattCharacteristic.rst#void-writevaluearraybyte-value-dict-options
+VSP_WRITE_CHR_TYPE="${VSP_WRITE_CHR_TYPE:-}"
 # tcpPort may be in the range 1025 to 49151
 VSP_TCP_PORT="${VSP_TCP_PORT:-1025}"
 # socketRxType may be JSON or raw
@@ -54,6 +58,8 @@ ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${
         "vspSvcUuid": "'"${VSP_SVC_UUID}"'",
         "vspReadChrUuid": "'"${VSP_READ_CHR_UUID}"'",
         "vspWriteChrUuid": "'"${VSP_WRITE_CHR_UUID}"'",
+        "vspWriteChrSize": "'"${VSP_WRITE_CHR_SIZE}"'",
+        "vspWriteChrType": "'"${VSP_WRITE_CHR_TYPE}"'",
         "socketRxType": "'"${VSP_SOCKET_RX_TYPE}"'"
         }' \
     | ${JQ_APP}
