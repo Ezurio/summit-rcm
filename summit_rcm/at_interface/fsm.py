@@ -46,6 +46,9 @@ from summit_rcm.at_interface.commands.http_configure_ssl import HTTPConfigureSSL
 from summit_rcm.at_interface.commands.network_interface_statistics import (
     NetworkInterfaceStatisticsCommand,
 )
+from summit_rcm.at_interface.commands.network_interface_driver_info import (
+    NetworkInterfaceDriverInfoCommand,
+)
 from summit_rcm.at_interface.commands.network_interfaces_command import (
     NetworkInterfacesCommand,
 )
@@ -111,6 +114,7 @@ AT_COMMANDS: List[Command] = [
     HTTPClearConfiguration,
     HTTPConfigureSSL,
     NetworkInterfaceStatisticsCommand,
+    NetworkInterfaceDriverInfoCommand,
     NetworkInterfacesCommand,
     ConnectionModifyCommand,
     NetworkVirtualInterfaceCommand,

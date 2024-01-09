@@ -419,6 +419,41 @@ class NetworkInterfaceStatistics(object):
         resp.media = result
 
 
+class NetworkInterfaceDriverInfo(object):
+    async def on_get(self, req, resp):
+        """
+        Retrieve driver info for the requested interface
+        """
+
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {
+            "SDCERR": 1,
+            "InfoMsg": "",
+            "driverInfo": {
+                "adoptedCountryCode": "",
+                "otpCountryCode": "",
+            },
+        }
+
+        try:
+            name = req.params.get("name", None)
+            if not name:
+                result["InfoMsg"] = "Invalid interface name"
+                resp.media = result
+                return
+
+            result["driverInfo"] = await NetworkService.get_interface_driver_info(
+                name=name
+            )
+            result["SDCERR"] = 0
+        except FileNotFoundError:
+            result["InfoMsg"] = "Invalid interface name"
+        except Exception as e:
+            result["InfoMsg"] = f"Could not read interface statistics - {str(e)}"
+        resp.media = result
+
+
 class WifiEnable:
     async def on_get(self, req, resp):
         resp.status = falcon.HTTP_200

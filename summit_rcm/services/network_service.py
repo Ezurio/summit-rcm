@@ -2601,6 +2601,53 @@ class NetworkService(metaclass=Singleton):
 
         return result
 
+    @staticmethod
+    async def get_interface_driver_info(name: str) -> dict:
+        """
+        Retrieve driver info for the requested interface
+        """
+        result = {
+            "adoptedCountryCode": "",
+            "otpCountryCode": "",
+        }
+
+        if not name:
+            raise FileNotFoundError("No interface name provided")
+
+        driver_country_code_sysfs_file = f"/sys/class/net/{name}/phy80211/device/lrd/cc"
+
+        if os.path.exists(driver_country_code_sysfs_file):
+            # The country code sysfs file returns the adopted setting when a 0 is written to it and
+            # returns the OTP setting when a 1 is written to it
+            with open(driver_country_code_sysfs_file, "w") as f:
+                f.write("0")
+            with open(driver_country_code_sysfs_file, "r") as f:
+                result["adoptedCountryCode"] = f.read().strip()
+
+            with open(driver_country_code_sysfs_file, "w") as f:
+                f.write("1")
+            with open(driver_country_code_sysfs_file, "r") as f:
+                result["otpCountryCode"] = f.read().strip()
+
+            return result
+
+        driver_info = ""
+        with open(f"/sys/class/net/{name}/phy80211/device/lrd/info") as f:
+            driver_info = f.read()
+
+        if driver_info:
+            # Find country code info
+            match = re.search(
+                r".*Country code\s*: '(?P<ADOPTED>.*)'\s*\('(?P<OTP>.*)'\)",
+                driver_info,
+            )
+            if match:
+                result["adoptedCountryCode"] = str(match.group("ADOPTED"))
+                result["otpCountryCode"] = str(match.group("OTP"))
+                return result
+
+        raise Exception("Unable to retrieve driver info")
+
 
 class ConnectionProfileReservedError(Exception):
     """Custom error class for when the requested connection profile is reserved."""

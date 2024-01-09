@@ -161,3 +161,24 @@ class NetworkInterfaceStatsResource(object):
                 f"Unable to retrieve list of network interface: {str(e)}",
             )
             resp.status = falcon.HTTP_500
+
+
+class NetworkInterfaceDriverInfoResource(object):
+    """
+    Resource to handle queries and requests for network interface driver info
+    """
+
+    async def on_get(self, _, resp: falcon.Response, name: str) -> None:
+        try:
+            if not name:
+                resp.status = falcon.HTTP_400
+                return
+
+            resp.media = await NetworkService.get_interface_driver_info(name=name)
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except FileNotFoundError:
+            resp.status = falcon.HTTP_400
+        except Exception as e:
+            syslog(LOG_ERR, f"Unable to read interface driver info: {str(e)}")
+            resp.status = falcon.HTTP_500
