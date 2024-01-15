@@ -1498,9 +1498,6 @@ class NetworkService(metaclass=Singleton):
             # No UUID provided, look up the connection profile by id (name)
             uuid = await NetworkService.get_connection_profile_uuid_from_id(id=id)
 
-        if await NetworkService.get_active_connection_obj_path(uuid=uuid):
-            raise ConnectionProfileAlreadyActiveError("Connection is already active")
-
         if not await NetworkService.connection_profile_exists_by_uuid(uuid=uuid):
             raise ConnectionProfileNotFoundError("Not found")
 
