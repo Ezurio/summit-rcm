@@ -232,6 +232,19 @@ MODEM_CONTROL_SERVICE_FILE = "modem-control.service"
 
 INVALID_RSSI = -9999.9999
 
+# Provisioning info
+DEVICE_SERVER_KEY_PATH = "/etc/summit-rcm/provisioning/dev.key"
+DEVICE_SERVER_CSR_PATH = "/etc/summit-rcm/provisioning/dev.csr"
+DEVICE_SERVER_CERT_PATH = "/etc/summit-rcm/provisioning/dev.crt"
+DEVICE_CA_CERT_CHAIN_PATH = "/etc/summit-rcm/ssl/ca.crt"
+PROVISIONING_SERVER_KEY_PATH = "/etc/summit-rcm/ssl/provisioning.key"
+PROVISIONING_SERVER_CERT_PATH = "/etc/summit-rcm/ssl/provisioning.crt"
+PROVISIONING_CA_CERT_CHAIN_PATH = "/etc/summit-rcm/ssl/provisioning.ca.crt"
+PROVISIONING_DIR = "/etc/summit-rcm/provisioning"
+PROVISIONING_STATE_FILE_PATH = "/etc/summit-rcm/provisioning/state"
+CERT_TEMP_PATH = "/tmp/dev.crt"
+CONFIG_FILE_TEMP_PATH = "/tmp/dev.cnf"
+
 
 class SSLModes(IntEnum):
     DISABLED = -1
