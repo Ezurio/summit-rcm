@@ -1,5 +1,6 @@
 """Init File to setup the Chrony Plugin"""
 from syslog import syslog, LOG_ERR
+from typing import Optional
 
 
 def get_at_commands():
@@ -54,3 +55,16 @@ async def get_v2_routes():
     except Exception as exception:
         syslog(LOG_ERR, f"Error Importing chrony v2 routes: {str(exception)}")
     return routes
+
+
+async def get_middleware() -> Optional[list]:
+    """Handler called when adding Falcon middleware"""
+    return None
+
+
+async def server_config_preload_hook(_) -> None:
+    """Hook function called before the Uvicorn ASGI server config is loaded"""
+
+
+async def server_config_postload_hook(_) -> None:
+    """Hook function called after the Uvicorn ASGI server config is loaded"""

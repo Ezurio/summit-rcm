@@ -5,8 +5,8 @@ Summit RCM main module
 import asyncio
 import importlib
 import pkgutil
-import socket
 from syslog import LOG_ERR, syslog, openlog
+from types import ModuleType
 from typing import Any, List
 import ssl
 from summit_rcm.utils import Singleton
@@ -27,10 +27,9 @@ try:
     X509_V_FLAG_NO_CHECK_TIME = 0x200000
     """Flags for OpenSSL 1.1.1 or newer to disable time checking during certificate verification"""
 
-    SOCKET_RECEIVE_BUFFER_SIZE = 32 * 1024
-    """Server socket's receiver buffer size"""
-
     summit_rcm_plugins: List[str] = []
+
+    discovered_plugins: dict[str, ModuleType] = {}
 
     class SecureHeadersMiddleware:
         """Middleware that enables the use of secure headers"""
@@ -577,7 +576,7 @@ try:
                 syslog(LOG_ERR, f"Could not load login endpoints - {str(exception)}")
                 raise exception
 
-    def add_middleware(enable_session_checking: bool) -> None:
+    def add_default_middleware(enable_session_checking: bool) -> None:
         """Add middleware to the ASGI application"""
         # Add ASGI lifespan middleware
         app.add_middleware(LifespanMiddleware())
@@ -596,33 +595,27 @@ try:
         """
         Add all plugin routes for legacy and v2
         """
+        global discovered_plugins
 
-        discovered_plugins = {
-            name: importlib.import_module(name)
-            for finder, name, ispkg
-            in pkgutil.iter_modules()
-            if name.startswith('summit_rcm_')
-        }
-
-        for plugin in discovered_plugins:
+        for name, module in discovered_plugins.items():
             try:
-                routes = await discovered_plugins[plugin].get_legacy_routes()
+                routes = await module.get_legacy_routes()
                 if routes:
                     for route in routes:
                         add_route(route, routes[route])
                         summit_rcm_plugins.append(route[1:])
             except Exception as exception:
                 syslog(
-                    LOG_ERR, f"Error importing legacy plugin {plugin}: {str(exception)}"
+                    LOG_ERR, f"Error importing legacy plugin {name}: {str(exception)}"
                 )
             try:
-                routes = await discovered_plugins[plugin].get_v2_routes()
+                routes = await module.get_v2_routes()
                 if routes:
                     for route in routes:
                         add_route(route, routes[route])
-                        summit_rcm_plugins.append(route)
+                        summit_rcm_plugins.append(route[1:])
             except Exception as exception:
-                syslog(LOG_ERR, f"Error importing v2 plugin {plugin}: {str(exception)}")
+                syslog(LOG_ERR, f"Error importing v2 plugin {name}: {str(exception)}")
 
     async def add_routes() -> None:
         """Add routes to the ASGI application"""
@@ -653,7 +646,10 @@ try:
 
     async def start_server():
         """Start the webserver and add middleware"""
+        global discovered_plugins
+
         syslog("Starting webserver")
+
         parser = ServerConfig().get_parser()
         enable_sessions = parser.getboolean(
             section="/", option="tools.sessions.on", fallback=True
@@ -709,6 +705,25 @@ try:
             log_level="error",
             ws=websockets_config,
         )
+
+        # Populate the list of discovered plugins
+        discovered_plugins = {
+            name: importlib.import_module(name)
+            for finder, name, ispkg in pkgutil.iter_modules()
+            if name.startswith("summit_rcm_")
+        }
+
+        # Call any plugin config pre-load hooks
+        for name, module in discovered_plugins.items():
+            try:
+                await module.server_config_preload_hook(config)
+            except Exception as exception:
+                syslog(
+                    LOG_ERR,
+                    f"Error in plugin {name} config pre-load hook: {str(exception)}",
+                )
+
+        # Load the Uvicorn server config
         config.load()
 
         # Update Uvicorn server's SSL context configuration to require client authentication and
@@ -729,22 +744,43 @@ try:
                         if disable_certificate_expiry_verification
                         else ssl.CERT_REQUIRED
                     )
-                syslog("SSL client authentication enabled")
             except Exception as exception:
                 syslog(
                     LOG_ERR,
                     f"Error configuring SSL client authentication - {str(exception)}",
                 )
 
-        # Bind the socket and configure the socket's receive buffer to avoid excess memory usage
-        sock = config.bind_socket()
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCKET_RECEIVE_BUFFER_SIZE)
+        # Call any plugin config post-load hooks
+        for name, module in discovered_plugins.items():
+            try:
+                await module.server_config_postload_hook(config)
+            except Exception as exception:
+                syslog(
+                    LOG_ERR,
+                    f"Error in plugin {name} config post-load hook: {str(exception)}",
+                )
+
+        if config.ssl.verify_mode == ssl.CERT_REQUIRED:
+            syslog("SSL client authentication enabled")
 
         server = uvicorn.Server(config)
-        add_middleware(enable_sessions)
+
+        # Add any middleware
+        add_default_middleware(enable_sessions)
+        for name, module in discovered_plugins.items():
+            try:
+                app.add_middleware(await module.get_middleware())
+            except Exception as exception:
+                syslog(
+                    LOG_ERR,
+                    f"Error loading middleware for plugin {name}: {str(exception)}",
+                )
+
+        # Register uncaught exception handler
         app.add_error_handler(Exception, custom_handle_uncaught_exception)
 
-        await server.serve([sock])
+        # Start serving
+        await server.serve()
 
 except ImportError:
     REST_ENABLED = False

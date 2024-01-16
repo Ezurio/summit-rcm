@@ -1,5 +1,6 @@
 """Init File to setup the Bluetooth Plugin"""
 from syslog import syslog, LOG_ERR
+from typing import Optional
 import summit_rcm
 
 
@@ -25,7 +26,9 @@ async def get_legacy_routes():
     except ImportError:
         pass
     except Exception as exception:
-        syslog(LOG_ERR, f"Error Importing unauthenticated legacy routes: {str(exception)}")
+        syslog(
+            LOG_ERR, f"Error Importing unauthenticated legacy routes: {str(exception)}"
+        )
     return routes
 
 
@@ -43,9 +46,7 @@ async def get_v2_routes():
         routes[
             "/api/v2/system/allowUnauthenticatedResetReboot"
         ] = AllowUnauthenticatedResource()
-        unauthenticated = (
-            UnauthenticatedService().get_allow_unauthenticated_enabled()
-        )
+        unauthenticated = UnauthenticatedService().get_allow_unauthenticated_enabled()
         restricted_paths = summit_rcm.SessionCheckingMiddleware().paths
         if "/api/v2/system/power" in restricted_paths and unauthenticated:
             restricted_paths.remove("/api/v2/system/power")
@@ -56,3 +57,16 @@ async def get_v2_routes():
     except Exception as exception:
         syslog(LOG_ERR, f"Error Importing unauthenticated v2 routes: {str(exception)}")
     return routes
+
+
+async def get_middleware() -> Optional[list]:
+    """Handler called when adding Falcon middleware"""
+    return None
+
+
+async def server_config_preload_hook(_) -> None:
+    """Hook function called before the Uvicorn ASGI server config is loaded"""
+
+
+async def server_config_postload_hook(_) -> None:
+    """Hook function called after the Uvicorn ASGI server config is loaded"""

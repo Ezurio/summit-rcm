@@ -339,7 +339,7 @@ class HidBarcodeScanner(TcpConnection):
             port = params["tcpPort"]
             if not self.validate_port(int(port)):
                 return f"port {port} not valid"
-            host = TCP_SOCKET_HOST  # cherrypy.server.socket_host
+            host = TCP_SOCKET_HOST
             self.sock = self.tcp_server(host, params)
             if self.sock:
                 self.thread = threading.Thread(
