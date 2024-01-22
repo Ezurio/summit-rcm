@@ -19,6 +19,7 @@
 #include <openssl/bio.h>
 #include <openssl/pkcs12.h>
 #include <openssl/opensslv.h>
+#include <openssl/err.h>
 
 #include <stdio.h>
 
@@ -58,7 +59,7 @@ static PyObject * get_cert_info(PyObject *self, PyObject *args)
 	ASN1_TIME *not_after;
 	char not_before_str[DATE_LEN];
 	char not_after_str[DATE_LEN];
-	STACK_OF(X509_EXTENSION) *exts = NULL;
+	const STACK_OF(X509_EXTENSION) *exts = NULL;
 	X509_EXTENSION *ex = NULL;
 	ASN1_OBJECT *obj = NULL;
 	int num_of_exts = -1;
