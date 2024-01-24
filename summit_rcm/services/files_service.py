@@ -2,6 +2,7 @@
 Module to interact with files.
 """
 
+import asyncio
 import configparser
 from shutil import copy2, rmtree
 from subprocess import run
@@ -297,6 +298,7 @@ class FilesService(metaclass=Singleton):
     @staticmethod
     def delete_cert_file(name: str):
         """Delete the specified file if present"""
+        name = Path(name).name
         path = Path(NETWORKMANAGER_DIR_FULL, "certs", name)
         if not path.exists():
             raise FileNotFoundError()
@@ -304,7 +306,7 @@ class FilesService(metaclass=Singleton):
         path.unlink()
 
     @staticmethod
-    def export_system_config(password: str) -> Tuple[bool, str, Any]:
+    async def export_system_config(password: str) -> Tuple[bool, str, Any]:
         """
         Handle exporting Summit RCM system configuration as a properly structured and encrypted zip
         archive.
@@ -317,22 +319,20 @@ class FilesService(metaclass=Singleton):
             # handled in pure Python, is "extremely slow", and does not support generating
             # encrypted archives).
             # https://docs.python.org/3/library/zipfile.html
-            proc = run(
-                [
-                    ZIP,
-                    "--symlinks",
-                    "-P",
-                    password,
-                    "-9",
-                    "-r",
-                    CONFIG_TMP_ARCHIVE_FILE,
-                    ".",
-                ],
-                cwd=definition.FILEDIR_DICT.get("config"),
-                capture_output=True,
+            proc = await asyncio.create_subprocess_shell(
+                f"cd {definition.FILEDIR_DICT.get('config')} && "
+                f"{ZIP} --symlinks --password {password} -9 -r {CONFIG_TMP_ARCHIVE_FILE} "
+                f"summit-rcm/* NetworkManager/certs/* NetworkManager/system-connections/*",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
+            stdout, stderr = await proc.communicate()
             if proc.returncode != 0:
-                raise Exception(proc.stderr.decode("utf-8"))
+                raise Exception(
+                    f"err: {stderr.decode('utf-8')}, "
+                    f"out: {stdout.decode('utf-8')}, "
+                    f"returncode: {proc.returncode}"
+                )
 
             if not Path(CONFIG_TMP_ARCHIVE_FILE).exists():
                 raise Exception("archive generation failed")
@@ -357,56 +357,70 @@ class FilesService(metaclass=Singleton):
         result = (False, "Unknown error")
         try:
             # Test that the file is encrypted
-            proc = run(
-                [
-                    UNZIP,
-                    "-P",
-                    "1234",
-                    "-t",
-                    CONFIG_TMP_ARCHIVE_FILE,
-                ],
-                capture_output=True,
-                cwd=definition.FILEDIR_DICT.get("config"),
+            proc = await asyncio.create_subprocess_shell(
+                f"cd {definition.FILEDIR_DICT.get('config')} && "
+                f"{UNZIP} -P 1234 -t {CONFIG_TMP_ARCHIVE_FILE}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            if proc.returncode != 1:
-                raise Exception("archive not encrypted")
+            stdout, stderr = await proc.communicate()
+            if proc.returncode == 0:
+                raise Exception(
+                    "archive not encrypted - "
+                    f"err: {stderr.decode('utf-8')}, "
+                    f"out: {stdout.decode('utf-8')}, "
+                    f"returncode: {proc.returncode}"
+                )
 
             # Test that the password is correct
-            proc = run(
-                [
-                    UNZIP,
-                    "-P",
-                    password,
-                    "-t",
-                    CONFIG_TMP_ARCHIVE_FILE,
-                ],
-                capture_output=True,
-                cwd=definition.FILEDIR_DICT.get("config"),
+            proc = await asyncio.create_subprocess_shell(
+                f"cd {definition.FILEDIR_DICT.get('config')} && "
+                f"{UNZIP} -P {password} -t {CONFIG_TMP_ARCHIVE_FILE}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
+            stdout, stderr = await proc.communicate()
             if proc.returncode != 0:
-                raise Exception("incorrect password")
+                raise Exception(
+                    "incorrect password - "
+                    f"err: {stderr.decode('utf-8')}, "
+                    f"out: {stdout.decode('utf-8')}, "
+                    f"returncode: {proc.returncode}"
+                )
 
             # Remove current config settings
-            rmtree(DATA_SECRET_NETWORKMANAGER_DIR, ignore_errors=True)
-            rmtree(DATA_SECRET_SUMMIT_RCM_DIR, ignore_errors=True)
+            proc = await asyncio.create_subprocess_shell(
+                f"cd {definition.FILEDIR_DICT.get('config')} && "
+                f"rm -fr NetworkManager/system-connections/* NetworkManager/certs/* summit-rcm/*",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise Exception(
+                    "Could not remove current config settings - "
+                    f"err: {stderr.decode('utf-8')}, "
+                    f"out: {stdout.decode('utf-8')}, "
+                    f"returncode: {proc.returncode}"
+                )
 
             # Extract the archive using 'unzip' (the built-in Python zipfile implementation is
             # handled in pure Python, is "extremely slow", and does not support generating
             # encrypted archives).
             # https://docs.python.org/3/library/zipfile.html
-            proc = run(
-                [
-                    UNZIP,
-                    "-P",
-                    password,
-                    "-o",
-                    CONFIG_TMP_ARCHIVE_FILE,
-                ],
-                capture_output=True,
-                cwd=definition.FILEDIR_DICT.get("config"),
+            proc = await asyncio.create_subprocess_shell(
+                f"cd {definition.FILEDIR_DICT.get('config')} && "
+                f"{UNZIP} -P {password} -o {CONFIG_TMP_ARCHIVE_FILE}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
+            stdout, stderr = await proc.communicate()
             if proc.returncode != 0:
-                raise Exception(proc.stdout.decode("utf-8"))
+                raise Exception(
+                    f"err: {stderr.decode('utf-8')}, "
+                    f"out: {stdout.decode('utf-8')}, "
+                    f"returncode: {proc.returncode}"
+                )
 
             # Requst NetworkManager to reload connections
             if not await NetworkManagerService().reload_connections():

@@ -64,11 +64,7 @@ class FilesExportCommand(Command):
                 )
             filetype = params_dict["type"]
             if filetype == Types.FILE_TYPE_CONFIG:
-                if not FilesService.is_encrypted_storage_toolkit_enabled():
-                    raise Exception(
-                        "Config export not supported on non-encrypted file system images"
-                    )
-                success, message, path = FilesService().export_system_config(
+                success, message, path = await FilesService().export_system_config(
                     params_dict["password"]
                 )
             elif filetype == Types.FILE_TYPE_DEBUG:

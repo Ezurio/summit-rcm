@@ -10,7 +10,7 @@ from summit_rcm.services.network_manager_service import (
 SUMMIT_RCM_VERSION = "11.0.0.0"
 
 # TODO - deal with directories for file retrieval (see FIELDIR_DICT and files.py)
-SYSTEM_CONF_DIR = "/data/"
+SYSTEM_CONF_DIR = "/etc"
 
 NETWORKMANAGER_CONF_DIR = "/etc/NetworkManager/"
 # summit-rcm.ini is for server config. It should be updated only by software update.
