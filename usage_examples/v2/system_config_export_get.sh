@@ -1,7 +1,7 @@
 #! /bin/bash
 
 ARCHIVE_PATH="${ARCHIVE_PATH:-"./config.zip"}"
-ARCHIVE_PASSWORD="${ARCHIVE_PASSWORD:-"1234"}"
+ARCHIVE_PASSWORD="${ARCHIVE_PASSWORD:-"test"}"
 
 source ../global_settings
 

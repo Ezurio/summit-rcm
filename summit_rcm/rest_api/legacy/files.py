@@ -2,12 +2,20 @@
 Module to handle legacy files endpoint
 """
 import os
+from pathlib import Path
+import shutil
 from syslog import LOG_ERR, syslog
 import falcon.asgi.multipart
 from summit_rcm.rest_api.services.rest_files_service import (
     RESTFilesService as FilesService,
 )
 from summit_rcm import definition
+from summit_rcm.services.files_service import (
+    CONFIG_TMP_ARCHIVE_FILE,
+    NETWORKMANAGER_DIR_FULL,
+)
+
+UPLOAD_TMP_FILE_PATH = "/tmp/upload.tmp"
 
 
 class FileManage:
@@ -30,105 +38,118 @@ class FileManage:
             resp.media = result
             return
 
+        upload_file_type = None
+        password = None
+        fp = None
+        upload_file_secure_filename = ""
         async for part in form:
             if part.name == "type":
                 try:
-                    type = await part.text
+                    upload_file_type = await part.text
                 except Exception:
-                    type = None
-                break
+                    upload_file_type = None
+            elif part.name == "password":
+                try:
+                    password = await part.text
+                except Exception:
+                    password = None
+            elif part.name == "file":
+                try:
+                    upload_file_secure_filename = part.secure_filename
+                    fp = await FilesService.handle_file_upload_multipart_form_part(
+                        part, UPLOAD_TMP_FILE_PATH
+                    )
+                    if not fp:
+                        raise Exception()
+                except Exception:
+                    syslog("FileManage POST type failure to copy file")
+                    result["InfoMsg"] = "file POST failure to copy file"
+                    resp.media = result
+                    return
 
-        if not type:
+        tmp_file = Path(UPLOAD_TMP_FILE_PATH)
+
+        if not upload_file_type:
             syslog("FileManage POST - no type specified")
             result["InfoMsg"] = "file POST - no type specified"
+            if tmp_file.exists():
+                tmp_file.unlink()
             resp.media = result
             return
 
-        if type not in definition.FILEDIR_DICT:
-            syslog(f"FileManage POST type {type} unknown")
-            result["InfoMsg"] = f"file POST type {type} unknown"  # bad request
+        if upload_file_type not in definition.FILEDIR_DICT:
+            syslog(f"FileManage POST type {upload_file_type} unknown")
+            result[
+                "InfoMsg"
+            ] = f"file POST type {upload_file_type} unknown"  # bad request
+            if tmp_file.exists():
+                tmp_file.unlink()
             resp.media = result
             return
 
-        if type == "timezone":
+        if upload_file_type == "timezone":
             # We don't support uploading timezone data
             syslog("FileManage POST - timezone data upload not supported")
             result["InfoMsg"] = "file POST - timezone data upload not supported"
+            if tmp_file.exists():
+                tmp_file.unlink()
             resp.media = result
             return
 
-        if type == "config":
+        if upload_file_type == "config":
+            if not password:
+                if tmp_file.exists():
+                    tmp_file.unlink()
+                resp.status = falcon.HTTP_400
+                return
+
             try:
-                # System config import is only available when the encrypted storage toolkit is
-                # enabled
-                if not FilesService.is_encrypted_storage_toolkit_enabled():
-                    syslog(
-                        "FileManage POST - "
-                        "config import not available on non-encrypted file system images"
-                    )
-                    resp.status = falcon.HTTP_400
-                    return
+                if not tmp_file.exists():
+                    # The form is missing a 'file' part
+                    syslog("FileManage POST - no filename provided")
+                    raise Exception("No filename provided")
 
-                password = req.params.get("password", "")
-                if not password:
-                    resp.status = falcon.HTTP_400
-                    return
+                shutil.move(UPLOAD_TMP_FILE_PATH, CONFIG_TMP_ARCHIVE_FILE)
 
-                async for part in form:
-                    if part.name == "file":
-                        await FilesService.handle_config_import_file_upload_multipart_form(
-                            part
-                        )
+                success, msg = await FilesService.import_system_config(password)
+                if not success:
+                    raise Exception(msg)
 
-                        success, msg = await FilesService.import_system_config(password)
-                        if not success:
-                            raise Exception(msg)
-
-                        result["SDCERR"] = definition.SUMMIT_RCM_ERRORS[
-                            "SDCERR_SUCCESS"
-                        ]
-                        resp.media = result
-                        return
-
-                # The form is missing a 'file' part
-                syslog("FileManage POST - no filename provided")
-                raise Exception("No filename provided")
+                result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             except Exception as exception:
                 syslog(f"Could not import system configuration - {str(exception)}")
                 result[
                     "InfoMsg"
                 ] = f"Could not import system configuration - {str(exception)}"
+            finally:
+                if tmp_file.exists():
+                    tmp_file.unlink()
             resp.media = result
             return
 
-        async for part in form:
-            if part.name == "file":
-                try:
-                    fp = await FilesService.handle_cert_file_upload_multipart_form(
-                        part, part.secure_filename
+        try:
+            if not tmp_file.exists() or not upload_file_secure_filename:
+                syslog("FileManage POST - no filename provided")
+                raise Exception("No filename provided")
+
+            shutil.move(
+                UPLOAD_TMP_FILE_PATH,
+                str(
+                    Path(
+                        NETWORKMANAGER_DIR_FULL,
+                        "certs",
+                        upload_file_secure_filename,
                     )
-                    if not fp:
-                        syslog("FileManage POST type failure to copy file")
-                        result[
-                            "InfoMsg"
-                        ] = "file POST failure to copy file"  # bad request
-                        resp.media = result
-                        return
+                ),
+            )
 
-                    result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-                    resp.media = result
-                    return
-                except Exception:
-                    syslog("unable to obtain FileManage._lock")
-                    result[
-                        "InfoMsg"
-                    ] = "unable to obtain internal file lock"  # Internal server error
-                    resp.media = result
-                    return
-
-        # The form is missing a 'file' part
-        syslog("FileManage POST - no filename provided")
-        result["InfoMsg"] = "file POST - no filename specified"
+            result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
+        except Exception as exception:
+            syslog(f"Could not upload certificate file - {str(exception)}")
+            result["InfoMsg"] = f"Could not upload certificate file - {str(exception)}"
+        finally:
+            if tmp_file.exists():
+                tmp_file.unlink()
         resp.media = result
 
     async def on_get(self, req, resp):
@@ -148,16 +169,10 @@ class FileManage:
                 resp.status = falcon.HTTP_400
                 return
 
-            if not FilesService.is_encrypted_storage_toolkit_enabled():
-                syslog(
-                    "FileManage GET - "
-                    "config export not available on non-encrypted file system images"
-                )
-                resp.status = falcon.HTTP_400
-                return
-
             try:
-                success, msg, archive = FilesService.export_system_config(password)
+                success, msg, archive = await FilesService.export_system_config(
+                    password
+                )
                 if not success:
                     raise Exception(msg)
 

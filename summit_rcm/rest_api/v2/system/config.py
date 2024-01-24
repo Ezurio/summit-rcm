@@ -23,18 +23,13 @@ class SystemConfigExportResource:
         """
         archive = ""
         try:
-            # System config export is only available when the encrypted storage toolkit is enabled
-            if not FilesService.is_encrypted_storage_toolkit_enabled():
-                resp.status = falcon.HTTP_400
-                return
-
             get_data = await req.get_media()
             password = get_data.get("password", "")
             if not password:
                 resp.status = falcon.HTTP_400
                 return
 
-            success, msg, archive = FilesService.export_system_config(password)
+            success, msg, archive = await FilesService.export_system_config(password)
             if not success:
                 raise Exception(msg)
 
@@ -60,12 +55,6 @@ class SystemConfigImportResource:
         """
         try:
             password = ""
-
-            # System config import is only available when the encrypted storage toolkit is enabled
-            if not FilesService.is_encrypted_storage_toolkit_enabled():
-                resp.status = falcon.HTTP_400
-                return
-
             form = await req.get_media()
             if not isinstance(form, falcon.asgi.multipart.MultipartForm):
                 resp.status = falcon.HTTP_400
