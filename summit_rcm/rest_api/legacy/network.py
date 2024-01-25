@@ -450,7 +450,7 @@ class NetworkInterfaceDriverInfo(object):
         except FileNotFoundError:
             result["InfoMsg"] = "Invalid interface name"
         except Exception as e:
-            result["InfoMsg"] = f"Could not read interface statistics - {str(e)}"
+            result["InfoMsg"] = f"Could not read interface driver info - {str(e)}"
         resp.media = result
 
 
