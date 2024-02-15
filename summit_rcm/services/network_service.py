@@ -13,6 +13,9 @@ from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
+from pyroute2.iwutil import IW
+from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
+from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,
@@ -427,32 +430,37 @@ class NetworkService(metaclass=Singleton):
 
         The return value is a tuple in the form of: (success, rssi)
         """
-        _RSSI_RE = r"signal: (?P<RSSI>.*) dBm"
-
-        if not os.path.exists(IW_PATH):
-            return (False, definition.INVALID_RSSI)
-
+        iw = IW()
         try:
-            proc = run(
-                [IW_PATH, "dev", ifname, "link"],
-                capture_output=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
+            for interface in iw.get_interfaces_dump():
+                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                    continue
 
-            if not proc.returncode:
-                for line in proc.stdout.decode("utf-8").splitlines():
-                    line = line.strip()
-                    match = re.match(_RSSI_RE, line)
-                    if match:
-                        return (True, float(match.group("RSSI")))
-        except TimeoutExpired:
-            syslog(LOG_ERR, f"Call 'iw dev {str(ifname)} link' timeout")
+                msg = nl80211cmd()
+                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_STATION"]
+                msg["attrs"] = [
+                    ["NL80211_ATTR_IFINDEX", interface.get_attr("NL80211_ATTR_IFINDEX")]
+                ]
+
+                res = iw.nlm_request(
+                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
+                )
+                return (
+                    True,
+                    float(
+                        res[0]
+                        .get_attr("NL80211_ATTR_STA_INFO")
+                        .get_attr("NL80211_STA_INFO_SIGNAL")
+                    ),
+                )
+
+            # If not found, raise exception
+            raise Exception("interface not found")
         except Exception as exception:
-            syslog(
-                LOG_ERR, f"Call 'iw dev {str(ifname)} link' failed: {str(exception)}"
-            )
-
-        return (False, definition.INVALID_RSSI)
+            syslog(LOG_ERR, f"Unable to read RSSI value: {str(exception)}")
+            return (False, definition.INVALID_RSSI)
+        finally:
+            iw.close()
 
     @staticmethod
     def get_reg_domain_info() -> str:
