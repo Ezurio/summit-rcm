@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import re
 from struct import pack
-from subprocess import TimeoutExpired, run
 from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
 from typing import List, Optional, Tuple
@@ -38,10 +37,9 @@ from summit_rcm.services.network_manager_service import (
     NM_SETTING_WIRELESS_SECURITY_DEFAULTS,
     NMActiveConnectionState,
 )
-from summit_rcm.settings import ServerConfig, SystemSettingsManage
+from summit_rcm.settings import ServerConfig
 from summit_rcm.utils import Singleton, to_camel_case
 
-IW_PATH = "/usr/sbin/iw"
 RESERVED_NM_CONNECTIONS_DIR = "/usr/lib/NetworkManager/system-connections"
 
 
@@ -465,30 +463,26 @@ class NetworkService(metaclass=Singleton):
     @staticmethod
     def get_reg_domain_info() -> str:
         """
-        Retrieve the radio's regulatory domain using 'iw'
+        Retrieve the radio's regulatory domain using 'netlink' (pyroute2)
         """
-        if not os.path.exists(IW_PATH):
-            return "WW"
-
+        iw = IW()
         try:
-            proc = run(
-                [IW_PATH, "reg", "get"],
-                capture_output=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
+            res = iw.get_regulatory_domain()
 
-            if not proc.returncode:
-                s = re.split("phy#", proc.stdout.decode("utf-8"))
-                # Return regulatory domain of phy#0
-                m = re.search("country [A-Z][A-Z]", s[1] if len(s) > 1 else s[0])
-                if m:
-                    return m.group(0)[8:10]
-        except TimeoutExpired:
-            syslog(LOG_ERR, "Call 'iw reg get' timeout")
+            for phy in res:
+                phy_name = phy.get_attr("NL80211_ATTR_WIPHY")
+                if phy_name is None or phy_name != 0:
+                    continue
+
+                return str(phy.get_attr("NL80211_ATTR_REG_ALPHA2"))
+
+            # If not found, raise exception
+            raise Exception("interface not found")
         except Exception as exception:
-            syslog(LOG_ERR, f"Call 'iw reg get' failed: {str(exception)}")
-
-        return "WW"
+            print(f"Unable to read reg domain: {str(exception)}")
+            return "WW"
+        finally:
+            iw.close()
 
     @staticmethod
     def get_frequency_info(interface: str, frequency: int) -> int:
@@ -496,30 +490,34 @@ class NetworkService(metaclass=Singleton):
         Retrieve the current frequency used by the given 'interface' as an int using 'frequency' as
         a default
         """
-        if not os.path.exists(IW_PATH):
-            return frequency
-
+        iw = IW()
         try:
-            proc = run(
-                [IW_PATH, "dev"],
-                capture_output=True,
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            if not proc.returncode:
-                ifces = re.split("Interface", proc.stdout.decode("utf-8"))
-                for ifce in ifces:
-                    lines = ifce.splitlines()
-                    if (lines[0].strip() != interface) or (len(lines) < 7):
-                        continue
-                    m = re.search("[2|5][0-9]{3}", lines[6])
-                    if m:
-                        return int(m.group(0))
-        except TimeoutExpired:
-            syslog(LOG_ERR, "Call 'iw dev' timeout")
-        except Exception as exception:
-            syslog(LOG_ERR, f"Call 'iw dev' failed: {str(exception)}")
+            for iface in iw.get_interfaces_dump():
+                if str(iface.get_attr("NL80211_ATTR_IFNAME")) != interface:
+                    continue
 
-        return frequency
+                msg = nl80211cmd()
+                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_SCAN"]
+                msg["attrs"] = [
+                    ["NL80211_ATTR_IFINDEX", iface.get_attr("NL80211_ATTR_IFINDEX")]
+                ]
+
+                res = iw.nlm_request(
+                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
+                )
+                return int(
+                    res[0]
+                    .get_attr("NL80211_ATTR_BSS")
+                    .get_attr("NL80211_BSS_FREQUENCY")
+                )
+
+            # If not found, raise exception
+            raise Exception("interface not found")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read frequency value: {str(exception)}")
+            return frequency
+        finally:
+            iw.close()
 
     @staticmethod
     async def get_ap_properties(
@@ -945,54 +943,37 @@ class NetworkService(metaclass=Singleton):
         """
         Add a virtual network interface (wlan1) using 'iw' and return a boolean indicating success.
         This is used when the radio is intended to operate in AP + STA mode. Currently, only 'wlan1'
-        as a 'managed' interface is supported.
+        as a 'managed' (or 'station') interface is supported.
         """
+        iw = IW()
         try:
-            proc = run(
-                [
-                    IW_PATH,
-                    "dev",
-                    "wlan0",
-                    "interface",
-                    "add",
-                    "wlan1",
-                    "type",
-                    "managed",
-                ],
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            if not proc.returncode:
-                return True
-        except TimeoutExpired:
-            syslog(
-                LOG_ERR,
-                "Call 'iw dev wlan0 interface add wlan1 type managed' timeout",
-            )
+            iw.add_interface(ifname="wlan1", iftype="station", phy=0)
+            return True
         except Exception as exception:
-            syslog(
-                LOG_ERR,
-                f"Call 'iw dev wlan0 interface add wlan1 type managed' failed: {str(exception)}",
-            )
-        return False
+            syslog(LOG_ERR, f"Unable to add interface: {str(exception)}")
+            return False
+        finally:
+            iw.close()
 
     @staticmethod
     async def remove_virtual_interface() -> bool:
         """
-        Remove a previously-created virtual network interface (wlan1) using 'iw' and return a
-        boolean indicating success. Currently, only 'wlan1' is supported.
+        Remove a previously-created virtual network interface (wlan1) using 'netlink' (pyroute2) and
+        return a boolean indicating success. Currently, only 'wlan1' is supported.
         """
+        iw = IW()
         try:
-            proc = run(
-                [IW_PATH, "dev", "wlan1", "del"],
-                timeout=SystemSettingsManage.get_user_callback_timeout(),
-            )
-            if not proc.returncode:
+            for interface in iw.get_interfaces_dump():
+                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != "wlan1":
+                    continue
+
+                iw.del_interface(interface.get_attr("NL80211_ATTR_IFINDEX"))
                 return True
-        except TimeoutExpired:
-            syslog(LOG_ERR, "Call 'iw dev wlan1 del' timeout")
         except Exception as exception:
-            syslog(LOG_ERR, f"Call 'iw dev wlan1 del' failed: {str(exception)}")
-        return False
+            syslog(LOG_ERR, f"Unable to del interface: {str(exception)}")
+            return False
+        finally:
+            iw.close()
 
     @staticmethod
     async def get_interface_statistics(
