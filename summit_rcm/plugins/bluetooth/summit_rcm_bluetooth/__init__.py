@@ -1,7 +1,18 @@
 """Init File to setup the Bluetooth Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 import summit_rcm
+
+
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/bluetooth")
+    routes.append("/bluetoothWebsocket/ws")
+    routes.append("/bluetooth/{controller}")
+    routes.append("/bluetooth/{controller}/{device}")
+    return routes
 
 
 async def get_legacy_routes():
@@ -19,9 +30,7 @@ async def get_legacy_routes():
         await Bluetooth().setup(summit_rcm.app)
         if websockets_auth_by_header_token:
             summit_rcm.SessionCheckingMiddleware().paths.append("bluetoothWebsocket/ws")
-            Bluetooth().add_ws_route(
-                ws_route="/bluetoothWebsocket/ws", is_legacy=True
-            )
+            Bluetooth().add_ws_route(ws_route="/bluetoothWebsocket/ws", is_legacy=True)
         summit_rcm.SessionCheckingMiddleware().paths.append("bluetooth")
         routes["/bluetooth"] = BluetoothLegacyResource()
         routes["/bluetooth/{controller}"] = BluetoothControllerLegacyResource()
@@ -30,6 +39,16 @@ async def get_legacy_routes():
         pass
     except Exception as exception:
         syslog(LOG_ERR, f"Error Importing bluetooth legacy routes: {str(exception)}")
+    return routes
+
+
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/bluetooth")
+    routes.append("/api/v2/bluetooth/ws")
+    routes.append("/api/v2/bluetooth/{controller}")
+    routes.append("/api/v2/bluetooth/{controller}/{device}")
     return routes
 
 
@@ -48,9 +67,7 @@ async def get_v2_routes():
         await Bluetooth().setup(summit_rcm.app)
         if websockets_auth_by_header_token:
             summit_rcm.SessionCheckingMiddleware().paths.append("/api/v2/bluetooth/ws")
-            Bluetooth().add_ws_route(
-                ws_route="/api/v2/bluetooth/ws", is_legacy=False
-            )
+            Bluetooth().add_ws_route(ws_route="/api/v2/bluetooth/ws", is_legacy=False)
         summit_rcm.SessionCheckingMiddleware().paths.append("/api/v2/bluetooth")
         routes["/api/v2/bluetooth"] = BluetoothV2Resource()
         routes["/api/v2/bluetooth/{controller}"] = BluetoothControllerV2Resource()

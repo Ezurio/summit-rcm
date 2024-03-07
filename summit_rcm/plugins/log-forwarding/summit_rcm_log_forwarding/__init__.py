@@ -1,4 +1,5 @@
 """Init File to setup the Log Forwarding Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 import summit_rcm
@@ -20,6 +21,13 @@ def get_at_commands():
     return at_commands
 
 
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/logForwarding")
+    return routes
+
+
 async def get_legacy_routes():
     """Function to import and return Log Forwarding API Routes"""
     routes = {}
@@ -36,7 +44,16 @@ async def get_legacy_routes():
     except ImportError:
         pass
     except Exception as exception:
-        syslog(LOG_ERR, f"Error Importing log forwarding legacy routes: {str(exception)}")
+        syslog(
+            LOG_ERR, f"Error Importing log forwarding legacy routes: {str(exception)}"
+        )
+    return routes
+
+
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/system/logs/forwarding")
     return routes
 
 

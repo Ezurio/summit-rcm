@@ -247,6 +247,7 @@ CONFIG_FILE_TEMP_PATH = "/tmp/dev.cnf"
 
 
 class SSLModes(IntEnum):
+    """Enumeration of valid SSL modes for the server"""
     DISABLED = -1
     NO_AUTH = 0
     SERVER_VERIFY_CLIENT = 1
@@ -291,3 +292,11 @@ class PowerStateEnum(str, Enum):
     OFF = "off"
     SUSPEND = "suspend"
     REBOOT = "reboot"
+
+
+class RouteAdd():
+    """Class to hold route add information"""
+
+    def __init__(self, route):
+        self.route = route
+        self.awaited = False

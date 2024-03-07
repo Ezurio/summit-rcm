@@ -1,4 +1,5 @@
 """Init File to setup the Chrony Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 
@@ -22,6 +23,14 @@ def get_at_commands():
     return at_commands
 
 
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/ntp")
+    routes.append("/ntp/{command}")
+    return routes
+
+
 async def get_legacy_routes():
     """Function to import and return Chrony API Routes"""
     routes = {}
@@ -35,6 +44,14 @@ async def get_legacy_routes():
         pass
     except Exception as exception:
         syslog(LOG_ERR, f"Error Importing chrony legacy routes: {str(exception)}")
+    return routes
+
+
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/system/datetime/ntp")
+    routes.append("/api/v2/system/datetime/ntp/{address}")
     return routes
 
 

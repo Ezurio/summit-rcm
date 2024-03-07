@@ -1,7 +1,15 @@
 """Init File to setup the Bluetooth Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 import summit_rcm
+
+
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/allowUnauthenticatedResetReboot")
+    return routes
 
 
 async def get_legacy_routes():
@@ -15,9 +23,9 @@ async def get_legacy_routes():
             UnauthenticatedService,
         )
 
-        routes[
-            "/allowUnauthenticatedResetReboot"
-        ] = AllowUnauthenticatedResourceLegacy()
+        routes["/allowUnauthenticatedResetReboot"] = (
+            AllowUnauthenticatedResourceLegacy()
+        )
         unauthenticated = UnauthenticatedService().get_allow_unauthenticated_enabled()
         if "reboot" in summit_rcm.summit_rcm_plugins and unauthenticated:
             summit_rcm.summit_rcm_plugins.remove("reboot")
@@ -32,6 +40,13 @@ async def get_legacy_routes():
     return routes
 
 
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/system/allowUnauthenticatedResetReboot")
+    return routes
+
+
 async def get_v2_routes():
     """Function to import and return bluetooth API Routes"""
     routes = {}
@@ -43,9 +58,9 @@ async def get_v2_routes():
             UnauthenticatedService,
         )
 
-        routes[
-            "/api/v2/system/allowUnauthenticatedResetReboot"
-        ] = AllowUnauthenticatedResource()
+        routes["/api/v2/system/allowUnauthenticatedResetReboot"] = (
+            AllowUnauthenticatedResource()
+        )
         unauthenticated = UnauthenticatedService().get_allow_unauthenticated_enabled()
         restricted_paths = summit_rcm.SessionCheckingMiddleware().paths
         if "/api/v2/system/power" in restricted_paths and unauthenticated:

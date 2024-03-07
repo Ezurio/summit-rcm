@@ -1,7 +1,15 @@
 """Init File to setup the Stunnel Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 import summit_rcm
+
+
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/stunnel")
+    return routes
 
 
 async def get_legacy_routes():
@@ -16,6 +24,13 @@ async def get_legacy_routes():
         pass
     except Exception as exception:
         syslog(LOG_ERR, f"Error Importing stunnel legacy routes: {str(exception)}")
+    return routes
+
+
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/network/stunnel")
     return routes
 
 

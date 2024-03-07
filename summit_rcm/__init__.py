@@ -21,6 +21,7 @@ from summit_rcm.utils import Singleton
 from summit_rcm.services.date_time_service import DateTimeService
 from summit_rcm.rest_api.services.spectree_service import SpectreeService
 from summit_rcm.settings import ServerConfig
+from summit_rcm.definition import RouteAdd
 
 
 try:
@@ -64,15 +65,6 @@ try:
             )
             # Add Strict-Transport headers
             resp.set_header("Strict-Transport-Security", "max-age=600")  # ten minutes
-
-    class LifespanMiddleware:
-        """Middleware that handles ASGI lifespan events"""
-
-        async def process_startup(self, scope, event):
-            """Add logic to run at the startup event"""
-
-            # Load the routes
-            await add_routes()
 
     class SessionCheckingMiddleware(metaclass=Singleton):
         """Middleware that handles enforcing checking for a valid session"""
@@ -598,10 +590,96 @@ try:
                 syslog(LOG_ERR, f"Could not load login endpoints - {str(exception)}")
                 raise exception
 
+    class LazyLoadRoutesMiddleware:
+        """Middleware that lazy-loads routes"""
+        legacy_network_routes = RouteAdd(add_network_legacy())
+        legacy_users_routes = RouteAdd(add_users_legacy())
+        legacy_advanced_routes = RouteAdd(add_advanced_legacy())
+        legacy_files_routes = RouteAdd(add_files_legacy())
+        legacy_logs_routes = RouteAdd(add_logs_legacy())
+
+        routes_dict = {
+            "/api/v2/network": RouteAdd(add_network_v2()),
+            "/api/v2/system": RouteAdd(add_system_v2()),
+            "/api/v2/login": RouteAdd(add_login_v2()),
+            "/networkStatus": legacy_network_routes,
+            "/connection": legacy_network_routes,
+            "/connections": legacy_network_routes,
+            "/accesspoints": legacy_network_routes,
+            "/wifiEnable": legacy_network_routes,
+            "/firmware": RouteAdd(add_firmware_legacy()),
+            "/definitions": RouteAdd(add_definitions_legacy()),
+            "/login": legacy_users_routes,
+            "/users": legacy_users_routes,
+            "/version": RouteAdd(add_version_legacy()),
+            "/poweroff": legacy_advanced_routes,
+            "/suspend": legacy_advanced_routes,
+            "/reboot": legacy_advanced_routes,
+            "/factoryReset": legacy_advanced_routes,
+            "/fips": legacy_advanced_routes,
+            "/files": legacy_files_routes,
+            "/file": legacy_files_routes,
+            "/certificates": RouteAdd(add_certificates_legacy()),
+            "/logData": legacy_logs_routes,
+            "/logSetting": legacy_logs_routes,
+            "/datetime": RouteAdd(add_date_time_legacy()),
+        }
+
+        async def process_request(self, req, resp):
+            """Load the routes when the first request is received"""
+            global discovered_plugins
+
+            # Check if the requested path is already loaded
+            if app._router.find(req.path):
+                return True
+
+            # Check if the requested path is a known route and load it
+            for route, route_add in self.routes_dict.items():
+                if req.path.startswith(route):
+                    if route_add.awaited:
+                        break
+                    await route_add.route
+                    route_add.awaited = True
+                    if app._router.find(req.path):
+                        return True
+                    break
+
+            # Check if the requested path is a plugin route and load it
+            for name, module in discovered_plugins.items():
+                # If optional method for supported routes is implemented, use it
+                if hasattr(module, "get_legacy_supported_routes") and hasattr(
+                    module, "get_v2_supported_routes"
+                ):
+                    legacy_module_routes = await module.get_legacy_supported_routes()
+                    v2_module_routes = await module.get_v2_supported_routes()
+                else:
+                    legacy_module_routes = await module.get_legacy_routes()
+                    v2_module_routes = await module.get_v2_routes()
+
+                for route in v2_module_routes:
+                    if route == req.path:
+                        if isinstance(v2_module_routes, list):
+                            v2_module_routes_dict = await module.get_v2_routes()
+                        else:
+                            v2_module_routes_dict = v2_module_routes
+                        for route in v2_module_routes_dict:
+                            add_route(route, v2_module_routes_dict[route])
+                            summit_rcm_plugins.append(route[1:])
+                        return True
+
+                for route in legacy_module_routes:
+                    if route == req.path:
+                        if isinstance(legacy_module_routes, list):
+                            legacy_module_routes_dict = await module.get_legacy_routes()
+                        else:
+                            legacy_module_routes_dict = legacy_module_routes
+                        for route in legacy_module_routes_dict:
+                            add_route(route, legacy_module_routes_dict[route])
+                            summit_rcm_plugins.append(route[1:])
+                        return True
+
     def add_default_middleware() -> None:
         """Add middleware to the ASGI application"""
-        # Add ASGI lifespan middleware
-        app.add_middleware(LifespanMiddleware())
 
         # Add middleware to force session checking if enabled
         if ServerConfig().sessions_enabled:
@@ -613,53 +691,8 @@ try:
         # Add middleware to inject secure headers
         app.add_middleware(SecureHeadersMiddleware())
 
-    async def add_plugins():
-        """
-        Add all plugin routes for legacy and v2
-        """
-        global discovered_plugins
-
-        for name, module in discovered_plugins.items():
-            try:
-                routes = await module.get_legacy_routes()
-                if routes:
-                    for route in routes:
-                        add_route(route, routes[route])
-                        summit_rcm_plugins.append(route[1:])
-            except Exception as exception:
-                syslog(
-                    LOG_ERR, f"Error importing legacy plugin {name}: {str(exception)}"
-                )
-            try:
-                routes = await module.get_v2_routes()
-                if routes:
-                    for route in routes:
-                        add_route(route, routes[route])
-                        summit_rcm_plugins.append(route[1:])
-            except Exception as exception:
-                syslog(LOG_ERR, f"Error importing v2 plugin {name}: {str(exception)}")
-
-    async def add_routes() -> None:
-        """Add routes to the ASGI application"""
-        await asyncio.gather(
-            # v2 routes
-            add_network_v2(),
-            add_system_v2(),
-            add_login_v2(),
-            # legacy routes
-            add_network_legacy(),
-            add_firmware_legacy(),
-            add_definitions_legacy(),
-            add_users_legacy(),
-            add_version_legacy(),
-            add_advanced_legacy(),
-            add_files_legacy(),
-            add_certificates_legacy(),
-            add_logs_legacy(),
-            add_date_time_legacy(),
-            # plugin routes
-            add_plugins(),
-        )
+        # Add middleware to lazy-load routes
+        app.add_middleware(LazyLoadRoutesMiddleware())
 
         if ServerConfig().rest_api_docs_enabled:
             SpectreeService().register(app)

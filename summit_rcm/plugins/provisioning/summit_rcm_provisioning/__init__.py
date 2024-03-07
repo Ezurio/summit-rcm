@@ -1,4 +1,5 @@
 """Init File to setup the Provisioning Plugin"""
+
 from syslog import syslog, LOG_ERR
 import ssl
 from typing import Optional
@@ -7,6 +8,13 @@ from summit_rcm_provisioning.services.provisioning_service import (
     ProvisioningState,
 )
 from summit_rcm.settings import ServerConfig
+
+
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/certificateProvisioning")
+    return routes
 
 
 async def get_legacy_routes():
@@ -28,6 +36,13 @@ async def get_legacy_routes():
     return routes
 
 
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/system/certificateProvisioning")
+    return routes
+
+
 async def get_v2_routes():
     """Function to import and return Provisioning API Routes"""
     routes = {}
@@ -36,9 +51,9 @@ async def get_v2_routes():
             CertificateProvisioningResource,
         )
 
-        routes[
-            "/api/v2/system/certificateProvisioning"
-        ] = CertificateProvisioningResource()
+        routes["/api/v2/system/certificateProvisioning"] = (
+            CertificateProvisioningResource()
+        )
     except ImportError:
         pass
     except Exception as exception:
