@@ -1,7 +1,16 @@
 """Init File to setup the Firewall Plugin"""
+
 from syslog import syslog, LOG_ERR
 from typing import Optional
 import summit_rcm
+
+
+async def get_legacy_supported_routes():
+    """Optional Function to return supported legacy routes"""
+    routes = []
+    routes.append("/firewall")
+    routes.append("/firewall/{command}")
+    return routes
 
 
 async def get_legacy_routes():
@@ -24,6 +33,14 @@ async def get_legacy_routes():
     return routes
 
 
+async def get_v2_supported_routes():
+    """Optional Function to return supported v2 routes"""
+    routes = []
+    routes.append("/api/v2/network/firewall")
+    routes.append("/api/v2/network/firewall/forwardedPorts")
+    return routes
+
+
 async def get_v2_routes():
     """Function to import and return Firewall API Routes"""
     routes = {}
@@ -36,7 +53,9 @@ async def get_v2_routes():
         )
 
         summit_rcm.SessionCheckingMiddleware().paths.append("/api/v2/network/firewall")
-        routes["/api/v2/network/firewall/forwardedPorts"] = FirewallForwardedPortsResource()
+        routes["/api/v2/network/firewall/forwardedPorts"] = (
+            FirewallForwardedPortsResource()
+        )
     except ImportError:
         pass
     except Exception as exception:
