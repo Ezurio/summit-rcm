@@ -489,9 +489,20 @@ class VspConnection:
         Callback fired when a client connects to the server socket.
         """
 
-        # Log the connection
+        # If there's already a client connected, close it and switch to the new one
         addr = writer.get_extra_info("peername")
-        syslog(f"VSP: TCP client connected: {addr!r}")
+        if self.reader or self.writer:
+            syslog(
+                f"VSP: TCP client connected {addr!r}, but a connection is already active, "
+                "closing existing connection first"
+            )
+            self.writer.close()
+            await self.writer.wait_closed()
+            self.writer = None
+            self.reader = None
+        else:
+            # Log the connection
+            syslog(f"VSP: TCP client connected: {addr!r}")
 
         # Expose the reader and writer to the rest of the class instance
         self.reader = reader
@@ -535,7 +546,6 @@ class VspConnection:
         # Perform any cleanup
         writer.close()
         await writer.wait_closed()
-        await self.vsp_close()
         self.writer = None
         self.reader = None
 
