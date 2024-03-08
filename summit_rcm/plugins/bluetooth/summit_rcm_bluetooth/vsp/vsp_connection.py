@@ -114,7 +114,7 @@ class VspConnection:
         if (
             self.auth_failure_unpair
             and "DisconnectReason" in changed_props
-            and changed_props["DisconnectReason"] == "auth failure"
+            and variant_to_python(changed_props["DisconnectReason"]) == "auth failure"
         ):
             try:
                 syslog(
