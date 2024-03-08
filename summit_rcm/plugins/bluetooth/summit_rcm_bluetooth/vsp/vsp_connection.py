@@ -49,6 +49,7 @@ class VspConnection:
         self.vsp_read_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
         self.vsp_read_chr_uuid = None
         self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
+        self.dev_props_iface: Optional[ProxyInterface] = None
         self.vsp_write_chr_uuid = None
         self.vsp_write_chr_type: str = ""
         self.socket_rx_type: VSPSocketRxTypeEnum = (
@@ -356,12 +357,12 @@ class VspConnection:
             backlog=1,
         )
 
-        dev_props_iface = bus.get_proxy_object(
+        self.dev_props_iface = bus.get_proxy_object(
             BLUEZ_SERVICE_NAME,
             self.device_interface.path,
             await bus.introspect(BLUEZ_SERVICE_NAME, self.device_interface.path),
         ).get_interface(DBUS_PROP_IFACE)
-        dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
+        self.dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
 
         try:
             asyncio.create_task(self.server.serve_forever())
@@ -373,13 +374,8 @@ class VspConnection:
     async def gatt_only_disconnect(self):
         self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
         try:
-            bus = await DBusManager().get_bus()
-            dev_props_iface = bus.get_proxy_object(
-                BLUEZ_SERVICE_NAME,
-                self.device_interface.path,
-                await bus.introspect(BLUEZ_SERVICE_NAME, self.device_interface.path),
-            ).get_interface(DBUS_PROP_IFACE)
-            dev_props_iface.off_properties_changed(self.device_prop_changed_cb)
+            self.dev_props_iface.off_properties_changed(self.device_prop_changed_cb)
+            self.dev_props_iface = None
         except Exception as exception:
             syslog(LOG_ERR, "gatt_only_disconnect: " + str(exception))
         await self.stop_client()
@@ -406,12 +402,12 @@ class VspConnection:
             await bus.introspect(BLUEZ_SERVICE_NAME, dev_obj_path),
         ).get_interface(DEVICE_IFACE)
 
-        dev_props_iface = bus.get_proxy_object(
+        self.dev_props_iface = bus.get_proxy_object(
             BLUEZ_SERVICE_NAME,
             dev_obj_path,
             await bus.introspect(BLUEZ_SERVICE_NAME, dev_obj_path),
         ).get_interface(DBUS_PROP_IFACE)
-        dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
+        self.dev_props_iface.on_properties_changed(self.device_prop_changed_cb)
 
         services_resolved = device_props.get("ServicesResolved")
 
