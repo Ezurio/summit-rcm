@@ -496,8 +496,12 @@ class VspConnection:
                 f"VSP: TCP client connected {addr!r}, but a connection is already active, "
                 "closing existing connection first"
             )
-            self.writer.close()
-            await self.writer.wait_closed()
+            self.connected = False
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
             self.writer = None
             self.reader = None
         else:
@@ -542,10 +546,14 @@ class VspConnection:
                     writer.write('{"Error": "Transmit failed"}\n'.encode())
         except Exception as exception:
             syslog(f"VSP: server_socket_event_handler error - {str(exception)}")
+            self.connected = False
 
         # Perform any cleanup
-        writer.close()
-        await writer.wait_closed()
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
         self.writer = None
         self.reader = None
 
