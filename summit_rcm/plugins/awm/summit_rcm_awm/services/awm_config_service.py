@@ -6,13 +6,6 @@ import os
 from syslog import syslog
 from threading import Lock
 import configparser
-
-try:
-    import libconf
-except ImportError as error:
-    # Ignore the error if the libconf module is not available if generating documentation
-    if os.environ.get("DOCS_GENERATION") != "True":
-        raise error
 from summit_rcm.utils import Singleton
 
 
@@ -60,12 +53,17 @@ class AWMConfigService(metaclass=Singleton):
         f = self.get_awm_cfg()
 
         with self._lock:
+            config = {}
             with open(f, "r", encoding="utf-8") as fp:
-                config = libconf.load(fp)
-            if "scan_attempts" in config:
-                return config["scan_attempts"]
+                for line in fp.readlines():
+                    line_split = line.strip().split("=")
+                    if len(line_split) == 2:
+                        config[line_split[0]] = line_split[1]
 
-        raise ConfigFileNotFoundError("Not found")
+            try:
+                return int(config["scan_attempts"])
+            except KeyError:
+                raise ConfigFileNotFoundError("Not found")
 
     def set_scan_attempts(self, geolocation_scanning_enable: int):
         """
@@ -80,11 +78,12 @@ class AWMConfigService(metaclass=Singleton):
         os.makedirs(os.path.dirname(f), exist_ok=True)
 
         with self._lock:
-            try:
-                with open(f, "r", encoding="utf-8") as fp:
-                    config = libconf.load(fp)
-            except Exception:
-                config = {}
+            config = {}
+            with open(f, "r", encoding="utf-8") as fp:
+                for line in fp.readlines():
+                    line_split = line.strip().split("=")
+                    if len(line_split) == 2:
+                        config[line_split[0]] = line_split[1]
 
             need_store = False
             if geolocation_scanning_enable:
@@ -97,7 +96,8 @@ class AWMConfigService(metaclass=Singleton):
 
             if need_store:
                 with open(f, "w", encoding="utf-8") as fp:
-                    libconf.dump(config, fp)
+                    for key, value in config.items():
+                        fp.write(f"{key}={value}\n")
 
     @staticmethod
     def get_lite_mode_enabled() -> bool:
