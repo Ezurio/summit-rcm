@@ -245,7 +245,7 @@ class ServerConfig(object, metaclass=Singleton):
             self.parser.read(definition.SUMMIT_RCM_SERVER_CONF_FILE)
 
             self._sessions_enabled = self.parser.getboolean(
-                section="/", option="tools.session.on", fallback=True
+                section="/", option="tools.sessions.on", fallback=True
             )
             self._validate_request = self.parser.getboolean(
                 section="summit-rcm", option="rest_api_validate_request", fallback=False
