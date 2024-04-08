@@ -6,6 +6,8 @@ from re import sub
 from typing import Any
 from pathlib import Path
 import os
+import subprocess
+import asyncio
 
 try:
     from dbus_fast import Variant
@@ -78,6 +80,26 @@ def get_current_side():
         raise ValueError(
             "get_current_side: could not determine boot side from kernel cmdline"
         )
+
+
+async def get_next_side() -> str:
+    """
+    Return the next bootside
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "fw_printenv",
+            "-n",
+            "bootside",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise Exception(stderr.decode("utf-8").strip())
+        return stdout.decode("utf-8").strip().strip("'")
+    except Exception as exception:
+        raise ValueError(f"Unable to read next bootside: {str(exception)}")
 
 
 def convert_dict_to_base64_string(json_dict: dict) -> str:

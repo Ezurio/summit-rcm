@@ -20,7 +20,7 @@ from summit_rcm.services.network_manager_service import (
 )
 from summit_rcm import definition
 from summit_rcm.settings import SystemSettingsManage
-from summit_rcm.utils import Singleton
+from summit_rcm.utils import Singleton, get_current_side, get_next_side
 
 
 class VersionService(metaclass=Singleton):
@@ -70,6 +70,11 @@ class VersionService(metaclass=Singleton):
                 except Exception:
                     self._version["bluez"] = "n/a"
                 self._version["uBoot"] = await self.get_uboot_version()
+                try:
+                    self._version["currentSide"] = get_current_side()
+                except ValueError:
+                    self._version["currentSide"] = "sd"
+                self._version["nextSide"] = await get_next_side()
 
             if is_legacy:
                 # Adjust property names for legacy support
@@ -79,6 +84,8 @@ class VersionService(metaclass=Singleton):
                 version_legacy["summit_rcm"] = version_legacy.pop("summitRcm")
                 version_legacy["radio_stack"] = version_legacy.pop("radioStack")
                 version_legacy["kernel_vermagic"] = version_legacy.pop("kernelVermagic")
+                version_legacy["current_side"] = version_legacy.pop("currentSide")
+                version_legacy["next_side"] = version_legacy.pop("nextSide")
                 return version_legacy
 
             return self._version
