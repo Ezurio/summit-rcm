@@ -74,7 +74,9 @@ class VersionService(metaclass=Singleton):
                     self._version["currentSide"] = get_current_side()
                 except ValueError:
                     self._version["currentSide"] = "sd"
-                self._version["nextSide"] = await get_next_side()
+            self._version["nextSide"] = (
+                "sd" if self._version["currentSide"] == "sd" else await get_next_side()
+            )
 
             if is_legacy:
                 # Adjust property names for legacy support
