@@ -590,7 +590,7 @@ class NM80211ApSecurityFlags(IntFlag):
 
     NM_802_11_AP_SEC_KEY_MGMT_SUITE_B_192 = NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192
     """
-    Same as NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192 Laird addition for backwards compatibility
+    Same as NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192 addition for backwards compatibility
     """
 
     NM_802_11_AP_SEC_PAIR_CCMP_256 = 0x00010000

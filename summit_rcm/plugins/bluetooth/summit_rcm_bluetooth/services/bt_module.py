@@ -1,7 +1,7 @@
 """
 bt_module.py
 
-Bluetooth API for Laird Sentrius IG devices
+Bluetooth API for Sentrius IG devices
 """
 
 import threading

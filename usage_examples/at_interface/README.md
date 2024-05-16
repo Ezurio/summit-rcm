@@ -659,7 +659,7 @@ All scripts can be run by opening a terminal in the at_interface usage examples 
     OK
 
     AT+CERTGET=ca.crt
-    +CERTGET: {"version":1,"serial_number":"92926636221347987888259568196595107023764099625","subject":"/C=US/ST=OH/L=Akron/O=LairdConnectivity/OU=IT/CN=www.lairdconnect.com/emailAddress=info@lairdconnect.com","issuer":"/C=US/ST=OH/L=Akron/O=LairdConnectivity/OU=IT/CN=www.lairdconnect.com/emailAddress=info@lairdconnect.com","not_before":"Feb 18 13:28:23 2021 GMT","not_after":"Feb 16 13:28:23 2031 GMT","extensions":[]}
+    +CERTGET: {"version":1,"serial_number":"92926636221347987888259568196595107023764099625","subject":"/C=US/ST=OH/L=Akron/O=Ezurio/OU=IT/CN=www.ezurio.com/emailAddress=info@ezurio.com","issuer":"/C=US/ST=OH/L=Akron/O=LairdConnectivity/OU=IT/CN=www.ezurio.com/emailAddress=info@ezurio.com","not_before":"Feb 18 13:28:23 2021 GMT","not_after":"Feb 16 13:28:23 2031 GMT","extensions":[]}
     OK
 
     AT+FILESUP=0,11,potato.crt

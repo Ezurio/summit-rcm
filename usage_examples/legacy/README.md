@@ -2157,8 +2157,8 @@ this will create all the example connections in this package:
           {
             "Address": "C0:EE:40:43:B1:A7",
             "AddressType": "public",
-            "Name": "Laird DVK SOM60x2 (43:B1:A4)",
-            "Alias": "Laird DVK SOM60x2 (43:B1:A4)",
+            "Name": "DVK SOM60x2 (43:B1:A4)",
+            "Alias": "DVK SOM60x2 (43:B1:A4)",
             "Paired": 1,
             "Trusted": 1,
             "Blocked": 0,
