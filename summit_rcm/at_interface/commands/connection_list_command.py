@@ -1,6 +1,7 @@
 """
 File that consists of the ConnectionList Command Functionality
 """
+
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from summit_rcm.at_interface.commands.command import Command
@@ -26,7 +27,6 @@ class ConnectionListCommand(Command):
             connections_str = ""
             connections_list = await NetworkService().get_all_connection_profiles()
             for connection in connections_list:
-                connection["activated"] = 1 if connection["activated"] else 0
                 connections_str += f"+CONNLIST: {connection['uuid']}:{connection['id']},{connection['activated']}\r\n"
             return (True, f"{connections_str}OK")
         except Exception as exception:
