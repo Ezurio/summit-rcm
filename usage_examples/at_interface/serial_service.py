@@ -11,6 +11,8 @@ import asyncio
 from re import search
 from typing import Tuple, Optional
 import serial_asyncio
+import at_interface_settings as settings
+
 
 try:
     import aiofiles
@@ -162,19 +164,42 @@ class ATSession(object):
         self.validate_response = True
         return data
 
-    async def send_file(self, file: str):
+    async def send_file(self, file: str, fileupcommand: Optional[Tuple]):
         """
         Send a file through the serial port
         """
+        length_sent = 0
+        total_length_sent = 0
+        total_length_left = int(fileupcommand[0].split(",")[1])
         async with aiofiles.open(file, "rb") as temp_file:
             while True:
-                data = await temp_file.read(1024 * 64)
+                next_length = (
+                    total_length_left
+                    if total_length_left < settings.MAX_FILE_CHUNK_SIZE
+                    else settings.MAX_FILE_CHUNK_SIZE
+                )
+                if length_sent >= settings.MAX_FILE_CHUNK_SIZE or length_sent == 0:
+                    length_sent = 0
+                    command = fileupcommand[0].split(",")
+                    command[1] = str(next_length)
+                    fileupcommand = (",".join(command), *fileupcommand[1:])
+                    while self.transport.get_write_buffer_size() > 0:
+                        await asyncio.sleep(0.05)
+                    await self.execute_command(*("AT\r", r".*OK.*", 3))
+                    print(fileupcommand)
+                    print(
+                        f"length_sent: {total_length_sent}, total_length_left: {total_length_left}"
+                    )
+                    await self.execute_command(*fileupcommand)
+                data = await temp_file.read(settings.MAX_FILE_CHUNK_SIZE)
+                length_sent += len(data)
+                total_length_sent += len(data)
+                total_length_left -= len(data)
                 if not data:
                     break
-                self.transport.write(data)
-                while self.transport.get_write_buffer_size() > (1024 * 60):
+                while self.transport.get_write_buffer_size() > 0:
                     await asyncio.sleep(0.05)
-        await asyncio.sleep(5)
+                self.transport.write(data)
         try:
             data = self.protocol.data_buffer.decode("utf-8")
         except Exception:

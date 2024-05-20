@@ -20,7 +20,8 @@ except ImportError as error:
     # Ignore the error if the swclient module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
-from summit_rcm.utils import Singleton, get_current_side
+from summit_rcm.utils import Singleton, get_current_side, get_running_on_sd
+from summit_rcm.services.files_service import FWUPDATE_FILE_PATH
 
 
 FW_UPDATE_SCRIPT = "fw_update"
@@ -96,12 +97,14 @@ class FirmwareUpdateService(metaclass=Singleton):
         """Retrieve the proper running mode to pass to swupdate based on the kernel command line"""
 
         try:
-            running_mode = image + "-b" if await get_current_side() == "a" else image + "-a"
+            if await get_running_on_sd():
+                self.image = "complete"
+                return "complete"
+
+            return image + "-b" if await get_current_side() == "a" else image + "-a"
         except Exception as exception:
             syslog(LOG_ERR, str(exception))
             raise exception
-
-        return running_mode
 
     def get_update_status(self) -> Tuple[int, str]:
         """Retrieve the current update status"""
@@ -144,6 +147,8 @@ class FirmwareUpdateService(metaclass=Singleton):
             raise CouldNotOpenIPCError(
                 "Could not open IPC channel with swupdate", return_code
             )
+        if await get_running_on_sd() and self.url == "":
+            self.url = FWUPDATE_FILE_PATH
 
         if self.url:
             # A URL is provided, so pass it and the target 'image' to the fw_update helper script
@@ -207,10 +212,11 @@ class FirmwareUpdateService(metaclass=Singleton):
     def stop_progress_monitor(self):
         """Stop monitoring the update progress"""
 
-        self.update_in_progress = False
-        swclient.end_fw_update(self.swclient_fd)
-        self.loop.remove_reader(self.msg_fd)
-        self.close_ipc()
+        if self.update_in_progress:
+            self.update_in_progress = False
+            swclient.end_fw_update(self.swclient_fd)
+            self.loop.remove_reader(self.msg_fd)
+            self.close_ipc()
         self.swclient_fd = -1
         self.url = ""
         self.image = ""

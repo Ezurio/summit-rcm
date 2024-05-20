@@ -127,16 +127,26 @@ class FirmwareUpdateStatusResource:
         However, it is only possible to request a <code>status</code> of <code>2</code> (Not
         updating) or <code>5</code> (Updating).
 
-        To initiate an update, populate the request body with a <code>status</code> value of
-        <code>5</code> (Updating), as well as the <code>url</code> and <code>image</code> fields
-        with appropriate values. The optional <code>url</code> field should contain the URL of the
-        update (if pulling the update from a remote location), and the optional <code>image</code>
-        field should contain the desired software update image (e.g., "main", "complete", etc.) to
-        use (the default is "main" if omitted).
+        To initiate an update while running from NAND/eMMC, populate the request body with a
+        <code>status</code> value of <code>5</code> (Updating), as well as the <code>url</code>
+        and <code>image</code> fields with appropriate values. The optional <code>url</code> field
+        should contain the URL of the update (if pulling the update from a remote location), and
+        the optional <code>image</code> field should contain the desired software update image
+        (e.g., "main", "complete", etc.) to use (the default is "main" if omitted).
 
         Once the update is initiated, POST the software update file itself to the
         <a href="#tag/system/post/api/v2/system/update/updateFile"><code>updateFile</code></a>
         endpoint.
+
+        To initiate an update while running from SD card, POST the software update file itself to
+        the <a href="#tag/system/post/api/v2/system/update/updateFile"><code>updateFile</code></a>
+        endpoint. This will save the update file to the SD card.
+
+        Once the update file is saved to the SD card, populate the request body
+        with a <code>status</code> value of <code>5</code> (Updating), as well as the
+        <code>image</code> field with the desired software update image (only "complete" is
+        supported when running from SD). The <code>url</code> field should be omitted as the
+        only supported method for updating from SD is to use the update file saved to the SD card.
 
         To cancel an in-progress update, populate the request body with a <code>status</code> value
         of <code>2</code> (Not updating).

@@ -13,6 +13,17 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 
 . ${SCRIPTPATH}/../global_settings
 
+echo "========================="
+echo "Cancel any in-progress update"
+echo "========================="
+echo
+
+${CURL_APP} -s -S \
+    --request DELETE \
+    ${AUTH_OPT} \
+    ${URL}/firmware | ${JQ_APP}
+
+wait
 
 echo -e "\n\n========================="
 echo "Firmware update"
@@ -25,7 +36,6 @@ ${CURL_APP} -s --header "Content-Type: application/json" \
     ${AUTH_OPT} \
     ${URL}/firmware
 
-SUCCESS=false
 echo
 echo
 while true; do
@@ -33,17 +43,15 @@ while true; do
     ${CURL_APP} -s --request GET ${URL}/firmware ${AUTH_OPT} | tee status | ${JQ_APP}
     echo
     if grep -q Updated status; then
-        SUCCESS=true
+        echo "Update completed successfully"
         break
     fi
     if grep -q Failed status; then
+        echo "Update failed"
         break
     fi
     sleep 1
 done
-
-echo
-${SUCCESS} && . $SCRIPTPATH/reboot_put.sh
 
 
 echo ""

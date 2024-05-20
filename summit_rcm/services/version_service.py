@@ -32,6 +32,7 @@ from summit_rcm.utils import (
     get_current_side,
     get_next_side,
     get_base_hw_part_number,
+    get_running_on_sd,
 )
 
 SDCSUPP_VERSION_REG_EXP = r"sdcsupp\s+v(?P<VERSION>.*)"
@@ -79,10 +80,13 @@ class VersionService(metaclass=Singleton):
                 except Exception:
                     self._version_info["bluez"] = "n/a"
                 self._version_info["uBoot"] = await self.get_uboot_version()
-                try:
-                    self._version_info["currentSide"] = await get_current_side()
-                except ValueError:
+                if await get_running_on_sd():
                     self._version_info["currentSide"] = "sd"
+                else:
+                    try:
+                        self._version_info["currentSide"] = await get_current_side()
+                    except ValueError:
+                        self._version_info["currentSide"] = "unknown"
                 self._version_info["baseHwPartNumber"] = await get_base_hw_part_number()
             self._version_info["nextSide"] = (
                 "sd"

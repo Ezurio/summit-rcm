@@ -3,6 +3,7 @@
 # Copyright (C) 2024 Ezurio LLC.
 #
 """File that contains the AT Interface global settings"""
+
 DEVICE = "COM6"
 BAUD_RATE = 3000000
 DEFAULT_TIMEOUT = 10
@@ -16,5 +17,6 @@ HTTP_HOST = "www.google.com"
 HTTP_PORT = "80"
 HTTP_METHOD = "1"
 HTTP_ROUTE = "/"
-FW_UPDATE_FILE = ""
-FW_UPDATE_SIZE = 0
+FILE_UPLOAD_NAME = ""
+FILE_UPLOAD_SIZE = 0
+MAX_FILE_CHUNK_SIZE = 1024 * 640
