@@ -1116,7 +1116,7 @@ class NetworkService(metaclass=Singleton):
                     else ""
                 )
                 if active_connection_connection_obj_path == conn:
-                    entry["activated"] = 1
+                    entry["activated"] = active_connection_props.get("State", 0)
                     break
             entry["id"] = (
                 connection_settings_connection["id"].value
@@ -1170,7 +1170,7 @@ class NetworkService(metaclass=Singleton):
                     "id": entry.get("id", ""),
                     "uuid": uuid,
                     "type": entry.get("type", ""),
-                    "activated": entry.get("activated", 0) == 1,
+                    "activated": entry.get("activated", 0),
                 }
             )
         return new_result
