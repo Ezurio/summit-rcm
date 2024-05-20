@@ -603,6 +603,8 @@ try:
             "/api/v2/system": RouteAdd(add_system_v2()),
             "/api/v2/login": RouteAdd(add_login_v2()),
             "/networkStatus": legacy_network_routes,
+            "/networkInterface": legacy_network_routes,
+            "/networkInterfaces": legacy_network_routes,
             "/connection": legacy_network_routes,
             "/connections": legacy_network_routes,
             "/accesspoints": legacy_network_routes,
