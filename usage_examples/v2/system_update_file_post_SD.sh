@@ -1,27 +1,30 @@
 #! /bin/bash
 ##
 ## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
-## Copyright (C) 2024 Ezurio LLC.
+## Copyright (C) 2025 Ezurio LLC.
 ##
 
-FIRMWARE="${1}"
+source ../global_settings
 
-if [ -z "${FIRMWARE}" ]; then
-    echo usage: ${0} firmware url, e.g. http://192.168.1.123:8080/som60.swu
-    exit
-fi
-SCRIPT=$(readlink -f "$0")
-SCRIPTPATH=$(dirname "$SCRIPT")
-
-. ${SCRIPTPATH}/../global_settings
-
-IMAGE="${IMAGE:-"full"}"
+FILE_PATH="${FILE_PATH:-"som60.swu"}"
 
 echo "========================="
-echo "System update (server pull)"
+echo "Software update (file post)"
 echo "========================="
 echo
+echo -n "Status Code: "
 
+curl -s --location \
+    -w "%{http_code}\nResponse:\n" \
+    --request POST ${URL}/api/v2/system/update/updateFile \
+    --header "Content-Type: application/octet-stream" \
+    ${AUTH_OPT} \
+    --data-binary @${FILE_PATH} \
+    -o >(${JQ_APP})
+
+wait
+
+echo
 echo "========================="
 echo "Cancel any in-progress update"
 echo "========================="
@@ -43,13 +46,14 @@ curl -s --location \
 
 wait
 
+IMAGE="${IMAGE:-"full"}"
+
 echo
 echo "========================="
 echo "Initiate update"
 echo "========================="
 echo
 
-echo "Firmware URL: ${FIRMWARE}"
 echo "Image: ${IMAGE}"
 echo -n "Status Code: "
 
@@ -60,7 +64,6 @@ curl -s --location \
     ${AUTH_OPT} \
     --data '{
         "status": 5,
-        "url": "'"${FIRMWARE}"'",
         "image": "'"${IMAGE}"'"
     }' \
     -o >(${JQ_APP})
@@ -79,20 +82,20 @@ while true; do
         -w "%{http_code}\nResponse:\n" \
         --request GET ${URL}/api/v2/system/update \
         ${AUTH_OPT} \
-        -o >(${JQ_APP}) | tee status | ${JQ_APP}
+        -o >(${JQ_APP}) | tee status
 
     wait
 
     if grep -q "\"status\": 0" status; then
-        echo "Update completed successfully"
+        echo "Update completed successfully."
         break
     fi
     if grep -q "\"status\": 1" status; then
-        echo "Update failed"
+        echo "Update failed."
         break
     fi
     sleep 1
 done
 
-echo ""
+echo
 echo "Done"

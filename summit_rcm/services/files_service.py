@@ -46,6 +46,7 @@ SUMMIT_RCM_DIR = "/etc/summit-rcm/"
 SUMMIT_RCM_CLIENT_SSL_DIR = "/etc/summit-rcm/client-ssl/"
 DATA_SECRET_NETWORKMANAGER_DIR = "/data/secret/NetworkManager"
 DATA_SECRET_SUMMIT_RCM_DIR = "/data/secret/summit-rcm"
+FWUPDATE_FILE_PATH = "/tmp/summit-rcm-update.swu"
 PERSISTENT_LOG_PATH = "/var/log/journal/"
 VOLATILE_LOG_PATH = "/run/log/journal/"
 
@@ -134,6 +135,15 @@ class FilesService(metaclass=Singleton):
         ssl_file_path.mkdir(parents=True, exist_ok=True)
         return await FilesService.handle_file_upload_bytes(
             incoming_data, str(Path(SUMMIT_RCM_CLIENT_SSL_DIR, name)), mode
+        )
+
+    @staticmethod
+    async def handle_swupdate_file_upload_bytes(incoming_data: bytes, mode: str = "wb"):
+        """
+        Handle when a client uploads a software update file
+        """
+        return await FilesService.handle_file_upload_bytes(
+            incoming_data, FWUPDATE_FILE_PATH, mode
         )
 
     @staticmethod

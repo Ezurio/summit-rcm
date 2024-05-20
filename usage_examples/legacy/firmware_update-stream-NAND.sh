@@ -27,15 +27,24 @@ ${CURL_APP} -s -S \
     ${AUTH_OPT} \
     ${URL}/firmware | ${JQ_APP}
 
+echo
+echo "========================="
+echo "Start update process"
+echo "========================="
+
 ${CURL_APP} -s -S --header "Content-Type: application/json" \
     --request POST   --data \
-    '{"image":"main"}' \
+    '{"image":"full"}' \
     ${AUTH_OPT} \
     ${URL}/firmware | ${JQ_APP}
 
+echo
+echo "========================="
+echo "Send update file"
+echo "========================="
+
 ${CURL_APP} --request PUT ${URL}/firmware --header "Content-type: application/octet-stream" ${AUTH_OPT} --data-binary @${FIRMWARE}
 
-SUCCESS=false
 echo
 echo
 while true; do
@@ -43,17 +52,15 @@ while true; do
     ${CURL_APP} -s --request GET ${URL}/firmware ${AUTH_OPT} | tee status | ${JQ_APP}
     echo
     if grep -q Updated status; then
-        SUCCESS=true
+        echo "Update completed successfully"
         break
     fi
     if grep -q Failed status; then
+        echo "Update failed"
         break
     fi
     sleep 1
 done
-
-echo
-${SUCCESS} && . $SCRIPTPATH/reboot_put.sh
 
 
 echo ""
