@@ -5,12 +5,14 @@
 """
 File that consists of the FilesUpload Command Functionality
 """
+
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.services.files_service import FilesService
 from summit_rcm.at_interface.services.at_files_service import ATFilesService
+from summit_rcm.utils import get_running_on_sd
 import summit_rcm.at_interface.fsm as fsm
 
 
@@ -19,6 +21,7 @@ class Types(IntEnum):
     FILE_TYPE_CONNECTION = 1
     FILE_TYPE_CONFIG = 2
     FILE_TYPE_SSL = 3
+    FILE_TYPE_SWUPDATE = 4
 
 
 class Modes(IntEnum):
@@ -79,9 +82,15 @@ class FilesUploadCommand(Command):
                 )
                 if not success:
                     raise Exception(message)
-            else:
+            elif file_type == Types.FILE_TYPE_SSL:
                 await FilesService.handle_ssl_file_upload_bytes(
                     body, params_dict["name"], MODES_DICT[params_dict["mode"]]
+                )
+            else:
+                if not await get_running_on_sd():
+                    raise Exception("Cannot upload update file while running from NAND/eMMC")
+                await FilesService.handle_swupdate_file_upload_bytes(
+                    body, MODES_DICT[params_dict["mode"]]
                 )
             return (True, "OK")
         except Exception as exception:

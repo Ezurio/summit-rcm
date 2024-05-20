@@ -90,8 +90,6 @@ curl -s --location \
 
 wait
 
-SUCCESS=false
-
 while true; do
     echo
     echo "========================="
@@ -109,17 +107,15 @@ while true; do
     wait
 
     if grep -q "\"status\": 0" status; then
-        SUCCESS=true
+        echo "Update completed successfully"
         break
     fi
     if grep -q "\"status\": 1" status; then
+        echo "Update failed"
         break
     fi
     sleep 1
 done
-
-echo
-${SUCCESS} && . $SCRIPTPATH/system_power_reboot.sh
 
 echo
 echo "Done"

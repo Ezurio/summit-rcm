@@ -5,6 +5,7 @@
 """
 File that consists of the FilesExport Command Functionality
 """
+
 from typing import List, Tuple
 from syslog import LOG_ERR, syslog
 from enum import IntEnum
@@ -105,7 +106,10 @@ class FilesExportCommand(Command):
             params_dict["type"] = Types(int(params_list[1]))
             params_dict["password"] = params_list[2]
             params_dict["chunk size"] = int(params_list[3]) if params_list[3] else ""
-            if params_dict["chunk size"] > MAX_FILE_CHUNK_SIZE:
+            if (
+                params_dict["chunk size"]
+                and params_dict["chunk size"] > MAX_FILE_CHUNK_SIZE
+            ):
                 raise ValueError
             params_dict["offset"] = int(params_list[4]) if params_list[4] else ""
             params_dict["path"] = PATHS[params_dict["type"]]

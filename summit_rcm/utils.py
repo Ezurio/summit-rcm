@@ -67,7 +67,27 @@ def variant_to_python(data: Any) -> Any:
     return data
 
 
-async def get_current_side():
+async def get_root_dev_type() -> str:
+    """
+    Return the current root device type
+    """
+    command = shlex.split("/bin/sh -c '. boot-rootfs.sh && echo $rootDevType'")
+    proc = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    root_dev_type = stdout.decode("utf-8").strip()
+
+    if root_dev_type not in ["SD", "MMC", "ubi"]:
+        raise ValueError(
+            f"get_root_dev_type: could not determine root device type: {root_dev_type}"
+        )
+    return root_dev_type
+
+
+async def get_current_side() -> str:
     """
     Return the current bootside
     """
@@ -117,6 +137,14 @@ async def get_base_hw_part_number() -> str:
     base_hw_part_number = stdout.decode("utf-8").strip()
 
     return base_hw_part_number
+
+
+async def get_running_on_sd() -> bool:
+    """Retrieve whether the system is running on the SD card"""
+    try:
+        return await get_root_dev_type() == "SD"
+    except ValueError:
+        return False
 
 
 def convert_dict_to_base64_string(json_dict: dict) -> str:
