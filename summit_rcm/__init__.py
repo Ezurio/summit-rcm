@@ -47,6 +47,12 @@ try:
 
     discovered_plugins: dict[str, ModuleType] = {}
 
+    log_routes_loaded = (
+        ServerConfig()
+        .get_parser()
+        .getboolean(section="summit-rcm", option="log_routes_loaded", fallback=False)
+    )
+
     class SecureHeadersMiddleware:
         """Middleware that enables the use of secure headers"""
 
@@ -592,6 +598,7 @@ try:
 
     class LazyLoadRoutesMiddleware:
         """Middleware that lazy-loads routes"""
+
         legacy_network_routes = RouteAdd(add_network_legacy())
         legacy_users_routes = RouteAdd(add_users_legacy())
         legacy_advanced_routes = RouteAdd(add_advanced_legacy())
@@ -702,7 +709,8 @@ try:
     def add_route(route_path: str, resource: Any, **kwargs):
         """Add a route to the app and log it"""
         app.add_route(uri_template=route_path, resource=resource, kwargs=kwargs)
-        syslog(f"route loaded: {str(route_path)}")
+        if log_routes_loaded:
+            syslog(f"route loaded: {str(route_path)}")
 
     def discover_plugins(path: Optional[Iterable[str]] = None):
         """Discover all plugins"""
