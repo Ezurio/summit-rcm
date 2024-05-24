@@ -6,7 +6,10 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, get_type_hints
 from falcon import HTTP_400, HTTP_415, HTTPError
 from falcon.routing.compiled import _FIELD_PATTERN as FALCON_FIELD_PATTERN
 
-from pydantic import ValidationError
+try:
+    from pydantic.v1 import ValidationError
+except ImportError:
+    from pydantic import ValidationError
 from spectree._types import ModelType
 from spectree.response import Response
 from spectree.plugins.base import BasePlugin, validate_response

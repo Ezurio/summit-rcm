@@ -1,7 +1,10 @@
 """Module to hold SpecTree Models"""
 
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 from spectree import BaseFile
 
 from summit_rcm.definition import (

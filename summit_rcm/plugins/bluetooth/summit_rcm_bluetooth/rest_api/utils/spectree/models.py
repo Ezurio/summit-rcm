@@ -2,7 +2,10 @@
 
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
 from summit_rcm_bluetooth.services.ble import (
     BLEWriteCharacteristicType,
