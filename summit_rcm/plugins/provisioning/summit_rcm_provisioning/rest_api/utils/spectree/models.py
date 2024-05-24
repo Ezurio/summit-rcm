@@ -1,7 +1,10 @@
 """Module to hold SpecTree Models"""
 
 from typing import Optional
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 from spectree import BaseFile
 from summit_rcm_provisioning.services.provisioning_service import (
     ProvisioningState,

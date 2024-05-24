@@ -1,7 +1,10 @@
 """Module to hold SpecTree Models"""
 
 from typing import Optional
-from pydantic import BaseModel
+try:
+    from pydantic.v1 import BaseModel
+except ImportError:
+    from pydantic import BaseModel
 from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
 from summit_rcm.systemd_unit import SystemdActiveStateEnum
 
