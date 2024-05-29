@@ -291,6 +291,10 @@ try:
         if NetworkStatusResource:
             try:
                 add_route("/api/v2/network/status", NetworkStatusResource())
+                if ServerConfig().get_parser().getboolean(
+                    section="summit-rcm", option="network_status_restricted", fallback=False
+                ):
+                    SessionCheckingMiddleware().paths.append("/api/v2/network/status")
                 add_route("/api/v2/network/interfaces", NetworkInterfacesResource())
                 add_route(
                     "/api/v2/network/interfaces/{name}", NetworkInterfaceResource()
@@ -362,6 +366,10 @@ try:
         if NetworkInterfaces:
             try:
                 add_route("/networkStatus", NetworkStatus())
+                if ServerConfig().get_parser().getboolean(
+                    section="summit-rcm", option="network_status_restricted", fallback=False
+                ):
+                    SessionCheckingMiddleware().paths.append("networkStatus")
                 add_route("/networkInterface", NetworkInterface())
                 add_route("/networkInterfaces", NetworkInterfaces())
                 add_route("/networkInterfaceStatistics", NetworkInterfaceStatistics())
@@ -690,18 +698,18 @@ try:
     def add_default_middleware() -> None:
         """Add middleware to the ASGI application"""
 
+        # Add middleware to inject secure headers
+        app.add_middleware(SecureHeadersMiddleware())
+
+        # Add middleware to lazy-load routes
+        app.add_middleware(LazyLoadRoutesMiddleware())
+
         # Add middleware to force session checking if enabled
         if ServerConfig().sessions_enabled:
             from summit_rcm.sessions_middleware import SessionsMiddleware
 
             app.add_middleware(SessionsMiddleware())
             app.add_middleware(SessionCheckingMiddleware())
-
-        # Add middleware to inject secure headers
-        app.add_middleware(SecureHeadersMiddleware())
-
-        # Add middleware to lazy-load routes
-        app.add_middleware(LazyLoadRoutesMiddleware())
 
         if ServerConfig().rest_api_docs_enabled:
             SpectreeService().register(app)
