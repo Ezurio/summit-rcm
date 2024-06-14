@@ -243,7 +243,7 @@ class VspConnection:
                     await self.vsp_write_chrc[1].call_write_value(
                         bytearray(data),
                         (
-                            {"type": self.vsp_write_chr_type}
+                            {"type": dbus_fast.Variant("s", self.vsp_write_chr_type)}
                             if self.vsp_write_chr_type
                             else {}
                         ),
