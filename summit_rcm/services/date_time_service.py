@@ -146,6 +146,21 @@ class DateTimeService(metaclass=Singleton):
         See below for more info:
         https://www.freedesktop.org/software/systemd/man/org.freedesktop.timedate1.html
         """
+        try:
+            dt_int = int(dt)
+        except ValueError:
+            # Could not convert the provided timestamp to an integer - try to parse it as a
+            # datetime string.
+            try:
+                dt_int = int(
+                    datetime.strptime(dt, SUMMIT_RCM_TIME_FORMAT)
+                    .replace(tzinfo=timezone.utc)
+                    .timestamp()
+                    * 1_000_000
+                )
+            except Exception:
+                raise Exception("Unable to parse datetime")
+
         bus = await DBusManager().get_bus()
 
         reply = await bus.call(
@@ -155,9 +170,9 @@ class DateTimeService(metaclass=Singleton):
                 interface=TIMEDATE1_BUS_NAME,
                 member="SetTime",
                 signature="xbb",
-                body=[int(dt), False, False],
+                body=[dt_int, False, False],
             )
         )
 
         if reply.message_type == MessageType.ERROR:
-            raise Exception(reply.body[0])
+            raise Exception("Error calling SetTime")
