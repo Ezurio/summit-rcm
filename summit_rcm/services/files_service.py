@@ -42,6 +42,8 @@ SUMMIT_RCM_DIR = "/etc/summit-rcm/"
 SUMMIT_RCM_CLIENT_SSL_DIR = "/etc/summit-rcm/client-ssl/"
 DATA_SECRET_NETWORKMANAGER_DIR = "/data/secret/NetworkManager"
 DATA_SECRET_SUMMIT_RCM_DIR = "/data/secret/summit-rcm"
+PERSISTENT_LOG_PATH = "/var/log/journal/"
+VOLATILE_LOG_PATH = "/run/log/journal/"
 
 
 class FilesService(metaclass=Singleton):
@@ -52,13 +54,16 @@ class FilesService(metaclass=Singleton):
     @staticmethod
     def get_log_path() -> str:
         """Retrieve the path to where system logs are stored"""
-        # Logs will be saved in /var/run/log/journal/ for volatile mode, or /var/log/journal/ for
-        # persistent mode. If "/var/run/log/journal/" exists, it should be in volatile mode.
-        return (
-            "/var/run/log/journal/"
-            if FilesService.is_encrypted_storage_toolkit_enabled()
-            else "/var/log/journal/"
-        )
+        # Log will be saved in "/run/log/journal/" for volatile mode  or "/var/log/journal/" for
+        # persistent mode. If "/var/log/journal/" exists and "/run/log/journal" is non-empty, the
+        # journal should be operating in volatile mode.
+        # https://www.freedesktop.org/software/systemd/man/journald.conf.html#Storage=
+        if not os.path.exists(PERSISTENT_LOG_PATH) or (
+            os.path.exists(VOLATILE_LOG_PATH) and len(os.listdir(VOLATILE_LOG_PATH)) > 0
+        ):
+            return VOLATILE_LOG_PATH
+
+        return PERSISTENT_LOG_PATH
 
     @staticmethod
     async def handle_file_upload_bytes(data: bytes, path: str, mode: str = "wb") -> str:
