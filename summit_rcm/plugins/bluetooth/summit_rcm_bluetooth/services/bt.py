@@ -672,21 +672,12 @@ class Bluetooth(metaclass=Singleton):
             processed = True
 
             try:
-                reply = await bus.call(
-                    Message(
-                        destination=BLUEZ_SERVICE_NAME,
-                        path=device_interface.path,
-                        interface=DEVICE_IFACE,
-                        member="GetConnInfo",
+                if not await device_interface.get_connected():
+                    error_message = "Device not found"
+                else:
+                    result["rssi"], result["tx_power"], result["max_tx_power"] = (
+                        await device_interface.call_get_conn_info()
                     )
-                )
-
-                if reply.message_type == MessageType.ERROR:
-                    raise Exception(reply.body[0])
-
-                result["rssi"] = reply.body[0]
-                result["tx_power"] = reply.body[1]
-                result["max_tx_power"] = reply.body[2]
             except Exception as exception:
                 self.log_exception(exception)
                 error_message = "Unable to get connection info"
