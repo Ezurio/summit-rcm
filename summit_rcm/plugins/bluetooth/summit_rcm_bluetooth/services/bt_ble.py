@@ -299,7 +299,7 @@ class BluetoothBlePlugin(BluetoothPlugin):
         topic
         """
         # Convert the changed value to hex
-        temp = data["value"]
+        temp = variant_to_python(data["value"])
         data["value"] = "".join("{:02x}".format(x) for x in temp)
         data["timestamp"] = int(time())
         data = {"char": data}
