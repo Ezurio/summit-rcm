@@ -9,6 +9,7 @@ from syslog import syslog
 import threading
 from time import time
 from typing import Optional, Tuple, List
+from dbus_fast import Variant
 from dbus_fast.aio.proxy_object import ProxyInterface
 import falcon.asgi
 from summit_rcm_bluetooth.services.bt_module import (
@@ -299,7 +300,7 @@ class BluetoothBlePlugin(BluetoothPlugin):
         topic
         """
         # Convert the changed value to hex
-        temp = variant_to_python(data["value"])
+        temp = data["value"].value if isinstance(data["value"], Variant) else data["value"]
         data["value"] = "".join("{:02x}".format(x) for x in temp)
         data["timestamp"] = int(time())
         data = {"char": data}
