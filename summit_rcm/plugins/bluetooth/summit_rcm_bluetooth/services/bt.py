@@ -673,7 +673,7 @@ class Bluetooth(metaclass=Singleton):
 
             try:
                 if not await device_interface.get_connected():
-                    error_message = "Device not found"
+                    error_message = "Device not connected"
                 else:
                     result["rssi"], result["tx_power"], result["max_tx_power"] = (
                         await device_interface.call_get_conn_info()
