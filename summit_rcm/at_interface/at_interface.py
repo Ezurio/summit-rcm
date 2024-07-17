@@ -1,8 +1,10 @@
 """
 Main AT Interface Module
 """
+
 from syslog import LOG_ERR, syslog
 import asyncio
+import signal
 import serial_asyncio
 from summit_rcm.at_interface.fsm import ATInterfaceFSM
 from summit_rcm.services.date_time_service import DateTimeService
@@ -27,6 +29,10 @@ class ATInterface:
 
     def __init__(self) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+
+    def signal_handler(self, _signal, _frame):
+        """Handles the signals"""
+        ATInterfaceFSM().quit = True
 
     async def start(self):
         """Starts the AT Interface"""
@@ -57,12 +63,19 @@ class ATInterface:
         ATInterfaceFSM()._transport = transport
         ATInterfaceFSM()._protocol = protocol
         await DateTimeService().populate_time_zone_list()
+
+        # Configure signal handlers
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+
         ATInterfaceFSM().at_output("READY")
         self.loop.call_later(0.1, self.repeat)
 
     def repeat(self):
         """Continues running the AT Interface"""
         ATInterfaceFSM().check_escape()
-        self.loop.call_later(0.1, self.repeat)
         if ATInterfaceFSM().quit:
-            self.loop.stop()
+            ATInterfaceFSM()._transport.close()
+            return
+
+        self.loop.call_later(0.1, self.repeat)
