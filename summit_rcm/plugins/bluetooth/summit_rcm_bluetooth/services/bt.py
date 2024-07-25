@@ -672,7 +672,9 @@ class Bluetooth(metaclass=Singleton):
             processed = True
 
             try:
-                if not await device_interface.get_connected():
+                if not device_interface:
+                    error_message = "Device not found"
+                elif not await device_interface.get_connected():
                     error_message = "Device not connected"
                 else:
                     result["rssi"], result["tx_power"], result["max_tx_power"] = (
