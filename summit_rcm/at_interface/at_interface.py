@@ -29,10 +29,14 @@ class ATInterface:
 
     def __init__(self) -> None:
         self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+        self.stop_requested: bool = False
+        self.state_machine: ATInterfaceFSM = ATInterfaceFSM()
 
     def signal_handler(self, _signal, _frame):
         """Handles the signals"""
-        ATInterfaceFSM().quit = True
+        self.stop_requested = True
+        if self.state_machine._transport is not None:
+            self.state_machine._transport.close()
 
     async def start(self):
         """Starts the AT Interface"""
@@ -60,22 +64,12 @@ class ATInterface:
             baud_rate,
             rtscts=True,
         )
-        ATInterfaceFSM()._transport = transport
-        ATInterfaceFSM()._protocol = protocol
+        self.state_machine._transport = transport
+        self.state_machine._protocol = protocol
         await DateTimeService().populate_time_zone_list()
 
         # Configure signal handlers
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
 
-        ATInterfaceFSM().at_output("READY")
-        self.loop.call_later(0.1, self.repeat)
-
-    def repeat(self):
-        """Continues running the AT Interface"""
-        ATInterfaceFSM().check_escape()
-        if ATInterfaceFSM().quit:
-            ATInterfaceFSM()._transport.close()
-            return
-
-        self.loop.call_later(0.1, self.repeat)
+        self.state_machine.at_output("READY")

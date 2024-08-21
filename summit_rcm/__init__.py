@@ -19,7 +19,6 @@ except ImportError as error:
 
 from summit_rcm.utils import Singleton
 from summit_rcm.services.date_time_service import DateTimeService
-from summit_rcm.rest_api.services.spectree_service import SpectreeService
 from summit_rcm.settings import ServerConfig
 from summit_rcm.definition import RouteAdd
 
@@ -28,6 +27,7 @@ try:
     import falcon.asgi
 
     try:
+        from summit_rcm.rest_api.services.spectree_service import SpectreeService
         import uvicorn.config
     except ImportError as error:
         # Ignore the error if the uvicorn module is not available if generating documentation
@@ -871,12 +871,14 @@ try:
     async def start_at_interface():
         """Start the AT interface"""
         syslog("Starting AT interface")
-        await ATInterface().start()
+        at = ATInterface()
+        await at.start()
 
         if not REST_ENABLED:
-            # If just the AT interface is running, we need to await a Future in order to prevent the
-            # event loop from exiting
-            await asyncio.get_event_loop().create_future()
+            # If just the AT interface is running, we need to loop in order to keep the application
+            # from exiting
+            while not at.stop_requested:
+                await asyncio.sleep(0.1)
 
 except ImportError:
     ATInterface = None
