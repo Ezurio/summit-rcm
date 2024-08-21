@@ -211,7 +211,6 @@ class ATInterfaceFSM(metaclass=Singleton):
             source="process_command",
             dest="idle",
         )
-        self.quit = False
 
     async def on_input_received(self, message: bytes | str):
         if isinstance(message, str):
@@ -327,9 +326,6 @@ class ATInterfaceFSM(metaclass=Singleton):
                 if command_lower == at_command.signature():
                     return (at_command, "", print_usage)
         return (None, "", False)
-
-    def check_escape(self):
-        pass
 
     def at_output(
         self,
