@@ -1,4 +1,8 @@
 #!/bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 if [ ! -z "$1" ]
 then
     export IPADDR=$1

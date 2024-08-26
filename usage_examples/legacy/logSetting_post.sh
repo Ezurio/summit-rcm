@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 SUPP_LEVEL="${SUPP_LEVEL:-"none"}"
 DRIVER_LEVEL="${DRIVER_LEVEL:-0}"
 

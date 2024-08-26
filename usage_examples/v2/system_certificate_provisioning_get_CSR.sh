@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 CONFIG_FILE="${CONFIG_FILE:-"certificate_provisioning_CSR.cnf"}"
 OPENSSL_KEY_GEN_ARGS="${OPENSSL_KEY_GEN_ARGS:-""}"

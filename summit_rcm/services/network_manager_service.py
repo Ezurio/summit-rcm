@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
 from typing import Any, Dict, List

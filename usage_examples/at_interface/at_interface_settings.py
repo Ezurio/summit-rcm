@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """File that contains the AT Interface global settings"""
 DEVICE = "COM6"
 BAUD_RATE = 3000000

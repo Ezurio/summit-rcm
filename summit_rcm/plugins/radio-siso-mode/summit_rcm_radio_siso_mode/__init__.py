@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """Init File to setup the Radio SISO Mode Plugin"""
 
 from syslog import syslog, LOG_ERR

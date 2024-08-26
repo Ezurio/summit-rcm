@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 TZ="${TZ:-"America/Los_Angeles"}"
 
 source ../global_settings

@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 UUID="${UUID:-"no-UUID-provided"}"
 
 source ../global_settings

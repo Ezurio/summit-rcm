@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """Module to support legacy Bluetooth requests"""
 
 from summit_rcm.settings import ServerConfig

@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 CONNECTION_NAME="${CONNECTION_NAME:-"connection-id"}"
 ACTIVATED="${ACTIVATED:-true}"

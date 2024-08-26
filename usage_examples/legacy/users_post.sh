@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 USR="${USR:-"test"}"
 PASSWORD="${PASSWORD:-12345678}"
 PERMISSIONS="${PERMISSIONS:-"status_networking networking_connections networking_edit networking_activate networking_ap_activate networking_delete networking_scan networking_certs logging help_version system_datetime system_swupdate system_password system_advanced system_positioning system_reboot "}"

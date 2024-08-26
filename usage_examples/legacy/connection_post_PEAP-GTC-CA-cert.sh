@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 CONNECTION_NAME=PEAP_GTC_CA_CERT
 
 source ../global_settings

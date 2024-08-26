@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 CONNECTION_NAME=EAP_TLS_NO_CA_CERT
 source ../global_settings
 

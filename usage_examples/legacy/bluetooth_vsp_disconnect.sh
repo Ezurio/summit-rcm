@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 source ../global_settings
 
 VSP_TCP_PORT="${VSP_TCP_PORT:-1025}"

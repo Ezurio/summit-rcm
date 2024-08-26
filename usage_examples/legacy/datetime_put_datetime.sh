@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 DATETIME_NOW=$(($(date +%s%N)/1000))
 DATETIME="${DATETIME:-$DATETIME_NOW}"
 

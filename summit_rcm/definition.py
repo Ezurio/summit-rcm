@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 import os
 from enum import Enum, IntEnum
 from summit_rcm.services.network_manager_service import (

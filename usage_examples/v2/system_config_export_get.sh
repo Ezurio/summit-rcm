@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 ARCHIVE_PATH="${ARCHIVE_PATH:-"./config.zip"}"
 ARCHIVE_PASSWORD="${ARCHIVE_PASSWORD:-"test"}"
