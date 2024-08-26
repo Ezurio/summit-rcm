@@ -1,3 +1,8 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
+
 #FILE=user2.pem
 
 source ../global_settings

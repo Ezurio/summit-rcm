@@ -1,3 +1,7 @@
+<!--
+SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+Copyright (C) 2024 Ezurio LLC.
+-->
 This is a set up scripts which can be used for testing/verification and examples of usage for the various restful APIs.
 
 These scripts and testing are verified on Ubuntu 20.04 but the curl commands should work on other platforms.  The global_settings will likely only work on Linux variants without modifications.

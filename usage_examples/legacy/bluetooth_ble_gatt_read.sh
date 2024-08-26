@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 source ../global_settings
 
 # Example UUIDs taken from Nordic nRF Connect SDK peripheral uart example project

@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """
 Module to support a Virtual Serial Port (VSP) between Bluetooth GATT Rx/Tx characteristics and
 a TCP socket connection.

@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """Module to handle login session management"""
 
 import base64

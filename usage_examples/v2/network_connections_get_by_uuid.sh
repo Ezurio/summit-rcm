@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 UUID="${UUID:-"a760e87e-e23a-4ea6-81f9-c4e29052db27"}"
 

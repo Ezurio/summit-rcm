@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """
 Module to provide an interface to perform networking tasks (interfaces, connection profiles, etc.).
 """

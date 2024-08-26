@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 source ../global_settings
 
 CONFIG_FILE="${CONFIG_FILE:-"certificate_provisioning_CSR.cnf"}"

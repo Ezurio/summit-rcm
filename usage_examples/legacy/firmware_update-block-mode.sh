@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 FIRMWARE="${1}"
 
 if [ -z "${FIRMWARE}" ]; then

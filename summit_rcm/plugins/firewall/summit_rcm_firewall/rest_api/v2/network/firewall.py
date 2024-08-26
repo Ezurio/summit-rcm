@@ -1,3 +1,7 @@
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
 """
 Module to support iptables firewall configuration for v2 routes.
 """

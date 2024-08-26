@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 DESIRED_STATE="${DESIRED_STATE:-"unset"}"
 

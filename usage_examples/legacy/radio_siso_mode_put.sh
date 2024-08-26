@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 source ../global_settings
 SISO_MODE="${SISO_MODE:-"-1"}"
 

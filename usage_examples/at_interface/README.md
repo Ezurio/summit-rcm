@@ -1,3 +1,7 @@
+<!--
+SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+Copyright (C) 2024 Ezurio LLC.
+-->
 This is a set of scripts which can be used for testing/verification and examples of usage for the various AT interface commands.
 
 The at_interface_settings define the global settings for all AT scripts with certain defaults set automatically. The network connection ID and password is blank by default and must be set to the appropriate values based on the network you're trying to connect to. The firmware update file name and size are also blank by default and must be set before running the firmware updates script. The device will need to be changed to the proper port and use the dependent Windows/Linux naming convention. Any other changes in settings must be made manually as well by editing the settings file. 

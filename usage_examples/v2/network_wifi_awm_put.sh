@@ -1,4 +1,8 @@
 #! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 
 SCANNING_ENABLED="${SCANNING_ENABLED:-1}"
 

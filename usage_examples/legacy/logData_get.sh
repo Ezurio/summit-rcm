@@ -1,3 +1,7 @@
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
 LOGTYPE="${LOGTYPE:-"All"}"
 PRIORITY="${PRIORITY:-6}"
 DAYS="${DAYS:--1}"
