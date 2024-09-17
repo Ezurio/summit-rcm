@@ -155,7 +155,7 @@ class SWUpdate(object):
         image = post_data.get("image", "main")
 
         try:
-            FirmwareUpdateService().start_update(url, image)
+            await FirmwareUpdateService().start_update(url, image)
             result["InfoMsg"] = ""
             result["SDCERR"] = 0
         except Exception as exception:

@@ -7,8 +7,8 @@
 import base64
 import json
 from re import sub
+import shlex
 from typing import Any
-from pathlib import Path
 import os
 import subprocess
 import asyncio
@@ -19,10 +19,6 @@ except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
-
-
-CMDLINE_BOOTSIDE_A = "ubi.block=0,1"
-CMDLINE_BOOTSIDE_B = "ubi.block=0,4"
 
 
 class Singleton(type):
@@ -71,39 +67,40 @@ def variant_to_python(data: Any) -> Any:
     return data
 
 
-def get_current_side():
+async def get_current_side():
     """
     Return the current bootside
     """
-    cmdline = Path("/proc/cmdline").read_text()
-    if CMDLINE_BOOTSIDE_B in cmdline:
-        return "b"
-    elif CMDLINE_BOOTSIDE_A in cmdline:
-        return "a"
-    else:
-        raise ValueError(
-            "get_current_side: could not determine boot side from kernel cmdline"
-        )
+    command = shlex.split("/bin/sh -c '. boot-rootfs.sh && getSide && echo $bootside'")
+    proc = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    bootside = stdout.decode("utf-8").strip()
+
+    if bootside not in ["a", "b"]:
+        raise ValueError(f"get_current_side: could not determine boot side: {bootside}")
+    return bootside
 
 
 async def get_next_side() -> str:
     """
     Return the next bootside
     """
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "fw_printenv",
-            "-n",
-            "bootside",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise Exception(stderr.decode("utf-8").strip())
-        return stdout.decode("utf-8").strip().strip("'")
-    except Exception as exception:
-        raise ValueError(f"Unable to read next bootside: {str(exception)}")
+    command = shlex.split("/bin/sh -c '. boot-rootfs.sh && nextSide'")
+    proc = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    next_side = stdout.decode("utf-8").strip()
+
+    if next_side not in ["a", "b"]:
+        raise ValueError(f"get_next_side: could not determine next boot side: {next_side}")
+    return next_side
 
 
 def convert_dict_to_base64_string(json_dict: dict) -> str:

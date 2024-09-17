@@ -162,7 +162,7 @@ class FirmwareUpdateStatusResource:
             image = str(put_data.get("image", "main"))
 
             if desired_status == SummitRCMUpdateStatus.UPDATING:
-                FirmwareUpdateService().start_update(url=url, image=image)
+                await FirmwareUpdateService().start_update(url=url, image=image)
             elif desired_status == SummitRCMUpdateStatus.NOT_UPDATING:
                 try:
                     FirmwareUpdateService().cancel_update()
