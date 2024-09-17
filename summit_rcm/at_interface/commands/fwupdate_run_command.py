@@ -43,7 +43,7 @@ class FWUpdateRunCommand(Command):
             if params_dict["mode"] == Modes.FWUPDATE_STOP:
                 FirmwareUpdateService().cancel_update()
                 return (True, "OK")
-            FirmwareUpdateService().start_update(
+            await FirmwareUpdateService().start_update(
                 params_dict["url"], params_dict["image"]
             )
             return (True, "OK")
