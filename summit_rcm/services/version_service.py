@@ -75,7 +75,7 @@ class VersionService(metaclass=Singleton):
                     self._version["bluez"] = "n/a"
                 self._version["uBoot"] = await self.get_uboot_version()
                 try:
-                    self._version["currentSide"] = get_current_side()
+                    self._version["currentSide"] = await get_current_side()
                 except ValueError:
                     self._version["currentSide"] = "sd"
             self._version["nextSide"] = (

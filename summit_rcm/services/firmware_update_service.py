@@ -89,11 +89,11 @@ class FirmwareUpdateService(metaclass=Singleton):
         self.msg_fd = -1
         self.loop = asyncio.get_event_loop()
 
-    def get_running_mode_for_update(self, image):
+    async def get_running_mode_for_update(self, image):
         """Retrieve the proper running mode to pass to swupdate based on the kernel command line"""
 
         try:
-            running_mode = image + "-b" if get_current_side() == "a" else image + "-a"
+            running_mode = image + "-b" if await get_current_side() == "a" else image + "-a"
         except Exception as exception:
             syslog(LOG_ERR, str(exception))
             raise exception
@@ -119,7 +119,7 @@ class FirmwareUpdateService(metaclass=Singleton):
             syslog(LOG_ERR, str(exception))
             return SummitRCMUpdateStatus.FAIL, f"Error: {str(exception)}"
 
-    def start_update(self, url: Optional[str], image: Optional[str]):
+    async def start_update(self, url: Optional[str], image: Optional[str]):
         """Initiate the firmware update process"""
 
         if url:
@@ -132,7 +132,7 @@ class FirmwareUpdateService(metaclass=Singleton):
             self.image = ""
             raise ValueError("invalid 'image' parameter")
 
-        running_mode = self.get_running_mode_for_update(self.image)
+        running_mode = await self.get_running_mode_for_update(self.image)
 
         return_code = self.open_ipc()
         if return_code < 0:
