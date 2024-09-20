@@ -10,7 +10,7 @@ import asyncio
 from enum import IntEnum, unique
 import logging
 from subprocess import Popen
-from syslog import syslog, LOG_ERR
+from syslog import syslog, LOG_ERR, LOG_WARNING
 from typing import Tuple, Optional
 import os
 
@@ -71,7 +71,10 @@ class SwupdateStatus(IntEnum):
     SUBPROCESS = 7
     """Subprocess"""
 
-    BAD_CMD = 8
+    PROGRESS = 8
+    """Progress"""
+
+    BAD_CMD = 9
     """Bad command"""
 
 
@@ -179,7 +182,7 @@ class FirmwareUpdateService(metaclass=Singleton):
         """Open the IPC channel with swupdate and return the file descriptor (fd)"""
 
         if self.msg_fd < 0:
-            self.msg_fd = swclient.open_progress_ipc()
+            self.msg_fd = swclient.open_progress_ipc(True)
             if self.msg_fd < 0:
                 syslog(
                     LOG_ERR, "initiate_swupdate: error opening progress IPC connection"
@@ -228,7 +231,15 @@ class FirmwareUpdateService(metaclass=Singleton):
             # - info
             status, _, _, _, _, _ = swclient.read_progress_ipc(self.msg_fd)
 
-            if status is None:
+            if status is None or status == -1:
+                syslog(
+                    LOG_WARNING,
+                    "Received empty progress update message, re-opening IPC",
+                )
+                self.loop.remove_reader(self.msg_fd)
+                self.close_ipc()
+                self.open_ipc()
+                self.loop.add_reader(self.msg_fd, self.progress_event_handler)
                 return
 
             if status in [SwupdateStatus.SUCCESS, SwupdateStatus.FAILURE]:
