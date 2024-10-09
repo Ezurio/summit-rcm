@@ -40,7 +40,7 @@ curl -s --location \
             "hidden": 0,
             "mode": "infrastructure",
             "ssid": "'"${SSID}"'",
-            "bgscan": "laird:5:-64:30"
+            "bgscan": "summit:5:-64:30"
         },
         "802-11-wireless-security": {
             "key-mgmt": "wpa-psk",

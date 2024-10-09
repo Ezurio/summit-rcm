@@ -30,7 +30,7 @@ GATT_MANAGER_IFACE = "org.bluez.GattManager1"
 ADAPTER_IFACE = "org.bluez.Adapter1"
 DEVICE_IFACE = "org.bluez.Device1"
 BLUEZ_PATH_PREPEND = "/org/bluez/"
-AGENT_PATH = "/com/lairdconnectivity/agent"
+AGENT_PATH = "/com/summit/agent"
 
 
 def controller_pretty_name(name: str):
