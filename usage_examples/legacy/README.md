@@ -430,7 +430,7 @@ this will create all the example connections in this package:
           "zone": "trusted"
         },
         "802-11-wireless": {
-          "bgscan": "laird:5:-64:30",
+          "bgscan": "summit:5:-64:30",
           "mac-address-blacklist": [],
           "mode": "infrastructure",
           "security": "802-11-wireless-security",
@@ -496,7 +496,7 @@ this will create all the example connections in this package:
           "zone": "trusted"
         },
         "802-11-wireless": {
-          "bgscan": "laird:5:-64:30",
+          "bgscan": "summit:5:-64:30",
           "mac-address-blacklist": [],
           "mode": "infrastructure",
           "security": "802-11-wireless-security",

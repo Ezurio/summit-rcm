@@ -29,7 +29,7 @@ ${CURL_APP} -s --header "Content-Type: application/json" \
             "hidden": 0,
             "mode": "infrastructure",
             "ssid": "'"${SSID}"'",
-            "bgscan": "laird:5:-64:30"
+            "bgscan": "summit:5:-64:30"
         },
         "802-11-wireless-security": {
             "key-mgmt": "wpa-eap-suite-b-192",

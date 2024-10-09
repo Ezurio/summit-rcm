@@ -12,7 +12,7 @@ proxy = bus.get_object(NM_IFACE, NM_OBJ)
 
 print(
     "Build: "
-    + subprocess.check_output(["cat", "/etc/laird-release"]).decode("ascii").rstrip()
+    + subprocess.check_output(["cat", "/etc/os-release"]).decode("ascii").rstrip()
 )
 
 # For org.freedesktop.NetworkManager
