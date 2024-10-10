@@ -1,3 +1,9 @@
+#!/usr/bin/python
+#
+# SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+# Copyright (C) 2024 Ezurio LLC.
+#
+
 import dbus
 
 NM_OBJ = "/org/freedesktop/NetworkManager"
