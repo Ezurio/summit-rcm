@@ -15,11 +15,6 @@ from summit_rcm.settings import (
 )
 from summit_rcm.utils import Singleton
 
-MAX_SESSION_AGE_S = 60 * 10
-"""
-Maximum session age in seconds (10 minutes)
-"""
-
 
 class Session:
     """Data class to hold info about a session"""
@@ -168,7 +163,7 @@ class LoginService(metaclass=Singleton):
         now = int(round(datetime.utcnow().timestamp()))
         for session in self._valid_sessions:
             if session.id == session_id:
-                session.expiry = now + MAX_SESSION_AGE_S
+                session.expiry = now + (SystemSettingsManage.get_session_timeout() * 60)
                 return
 
     def session_is_valid(self, session_id: str) -> bool:
