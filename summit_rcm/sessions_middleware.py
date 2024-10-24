@@ -9,7 +9,8 @@ Module for handling 'sessions' as a Falcon middleware
 from syslog import syslog
 from typing import Any
 import falcon.asgi
-from summit_rcm.services.login_service import MAX_SESSION_AGE_S, LoginService
+from summit_rcm.services.login_service import LoginService
+from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.utils import (
     convert_base64_string_to_dict,
     convert_dict_to_base64_string,
@@ -113,7 +114,7 @@ class SessionsMiddleware:
                     self._session_cookie,
                     convert_dict_to_base64_string(req.context._session),
                     path="/",
-                    max_age=MAX_SESSION_AGE_S,
+                    max_age=SystemSettingsManage.get_session_timeout() * 60,
                 )
                 return
 
@@ -123,7 +124,7 @@ class SessionsMiddleware:
                     self._session_cookie,
                     convert_dict_to_base64_string(resp.context._session),
                     path="/",
-                    max_age=MAX_SESSION_AGE_S,
+                    max_age=SystemSettingsManage.get_session_timeout() * 60,
                 )
                 return
         except Exception as exception:

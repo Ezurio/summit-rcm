@@ -9,13 +9,13 @@ import json
 from syslog import LOG_ERR, syslog
 from datetime import datetime
 import falcon.asgi
-from summit_rcm.settings import ServerConfig
+from summit_rcm.settings import ServerConfig, SystemSettingsManage
 from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
     SpectreeService,
 )
 from summit_rcm.definition import USER_PERMISSION_TYPES
-from summit_rcm.services.login_service import LoginService, MAX_SESSION_AGE_S, Session
+from summit_rcm.services.login_service import LoginService, Session
 from summit_rcm.services.user_service import UserService
 
 try:
@@ -145,7 +145,8 @@ class LoginResource:
             LoginService().add_new_valid_session(
                 Session(
                     id=session_base64,
-                    expiry=int(resp.context._session.get("iat", 0)) + MAX_SESSION_AGE_S,
+                    expiry=int(resp.context._session.get("iat", 0))
+                    + (SystemSettingsManage.get_session_timeout() * 60),
                     username=resp.context._session.get("USERNAME", ""),
                 )
             )

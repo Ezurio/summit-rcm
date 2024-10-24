@@ -18,7 +18,7 @@ from summit_rcm.rest_api.services.spectree_service import (
 )
 from summit_rcm.definition import SUMMIT_RCM_ERRORS, USER_PERMISSION_TYPES
 from summit_rcm.services.user_service import UserService
-from summit_rcm.services.login_service import MAX_SESSION_AGE_S, LoginService, Session
+from summit_rcm.services.login_service import LoginService, Session
 
 try:
     if not ServerConfig().rest_api_docs_enabled:
@@ -377,7 +377,8 @@ class LoginManage:
             LoginService().add_new_valid_session(
                 Session(
                     id=session_base64,
-                    expiry=int(resp.context._session.get("iat", 0)) + MAX_SESSION_AGE_S,
+                    expiry=int(resp.context._session.get("iat", 0))
+                    + (SystemSettingsManage.get_session_timeout() * 60),
                     username=resp.context._session.get("USERNAME", ""),
                 )
             )
