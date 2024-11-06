@@ -24,7 +24,12 @@ from summit_rcm.services.network_manager_service import (
 )
 from summit_rcm import definition
 from summit_rcm.settings import SystemSettingsManage
-from summit_rcm.utils import Singleton, get_current_side, get_next_side
+from summit_rcm.utils import (
+    Singleton,
+    get_current_side,
+    get_next_side,
+    get_base_hw_part_number,
+)
 
 
 class VersionService(metaclass=Singleton):
@@ -78,6 +83,7 @@ class VersionService(metaclass=Singleton):
                     self._version["currentSide"] = await get_current_side()
                 except ValueError:
                     self._version["currentSide"] = "sd"
+                self._version["baseHwPartNumber"] = await get_base_hw_part_number()
             self._version["nextSide"] = (
                 "sd" if self._version["currentSide"] == "sd" else await get_next_side()
             )
@@ -92,6 +98,9 @@ class VersionService(metaclass=Singleton):
                 version_legacy["kernel_vermagic"] = version_legacy.pop("kernelVermagic")
                 version_legacy["current_side"] = version_legacy.pop("currentSide")
                 version_legacy["next_side"] = version_legacy.pop("nextSide")
+                version_legacy["base_hw_part_number"] = version_legacy.pop(
+                    "baseHwPartNumber"
+                )
                 return version_legacy
 
             return self._version
