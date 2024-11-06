@@ -347,6 +347,9 @@ class VersionInfo(BaseModel):
     kernelVermagic: str
     bluez: str
     uBoot: str
+    currentSide: str
+    nextSide: str
+    baseHwPartNumber: str
 
 
 class VersionInfoLegacy(DefaultResponseModelLegacy):
@@ -361,6 +364,9 @@ class VersionInfoLegacy(DefaultResponseModelLegacy):
     kernel_vermagic: str
     bluez: str
     uboot: str = Field(alias="u-boot")
+    current_side: str
+    next_side: str
+    base_hw_part_number: str
 
 
 class AccessPoint(BaseModel):

@@ -103,6 +103,22 @@ async def get_next_side() -> str:
     return next_side
 
 
+async def get_base_hw_part_number() -> str:
+    """
+    Retrieve the base hardware part number of the currently-running device
+    """
+    command = shlex.split("/bin/sh -c '. boot-rootfs.sh && getBaseHwPartNumber'")
+    proc = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    base_hw_part_number = stdout.decode("utf-8").strip()
+
+    return base_hw_part_number
+
+
 def convert_dict_to_base64_string(json_dict: dict) -> str:
     """Convert the provided JSON object (dictionary) to a base64-encoded string"""
     if not isinstance(json_dict, dict):
