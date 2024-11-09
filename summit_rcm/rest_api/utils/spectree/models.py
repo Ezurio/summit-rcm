@@ -432,12 +432,19 @@ class AccessPointsResponseModelLegacy(DefaultResponseModelLegacy):
 
     count: int
     accesspoints: List[AccessPointLegacy]
+    secondsSinceLastScan: int
 
 
 class AccessPointScanRequestReponseModel(BaseModel):
     """Model for the response to a request for an access point scan"""
 
     scanRequested: bool
+
+
+class AccessPointSecondsSinceLastScanResponseModel(BaseModel):
+    """Model for the seconds since the last access point scan"""
+
+    secondsSinceLastScan: int
 
 
 class CertificateFiles(BaseModel):
@@ -1049,6 +1056,7 @@ class NetworkInterfaceWirelessProperties(BaseModel):
     mode: int
     regDomain: str
     hwAddress: str
+    lastScan: int
 
 
 class NetworkInterfaceWirelessPropertiesLegacy(BaseModel):
@@ -1059,6 +1067,7 @@ class NetworkInterfaceWirelessPropertiesLegacy(BaseModel):
     Mode: int
     RegDomain: str
     HwAddress: str
+    LastScan: int
 
 
 class NetworkInterfaceWiredProperties(BaseModel):

@@ -14,6 +14,7 @@ import re
 from struct import pack
 from syslog import LOG_ERR, syslog
 from socket import AF_INET, inet_ntop, AF_INET6
+import time
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -428,6 +429,9 @@ class NetworkService(metaclass=Singleton):
         wireless[
             "RegDomain" if is_legacy else "regDomain"
         ] = NetworkService.get_reg_domain_info()
+        wireless["LastScan" if is_legacy else "lastScan"] = int(
+            wireless_properties.get("LastScan", -1)
+        )
         return wireless
 
     @staticmethod
@@ -2463,6 +2467,35 @@ class NetworkService(metaclass=Singleton):
             keymgmt = "none"
 
         return security_string.rstrip(" "), keymgmt.rstrip(" ")
+
+    @staticmethod
+    async def get_seconds_since_last_scan() -> int:
+        """
+        Retrieve the number of seconds since the last Wi-Fi scan was performed or -1 if no Wi-Fi
+        devices were found or no scans have been performed yet.
+        """
+        dev_obj_paths = await NetworkManagerService().get_all_devices()
+        for dev_obj_path in dev_obj_paths:
+            dev_properties = await NetworkManagerService().get_obj_properties(
+                dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
+            )
+            if (
+                dev_properties.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
+                == NMDeviceType.NM_DEVICE_TYPE_WIFI
+            ):
+                wireless_properties = await NetworkManagerService().get_obj_properties(
+                    dev_obj_path,
+                    NetworkManagerService().NM_DEVICE_WIRELESS_IFACE,
+                )
+                last_scan = wireless_properties.get("LastScan", -1)
+                return (
+                    int(time.clock_gettime(time.CLOCK_BOOTTIME) - (last_scan / 1000))
+                    if last_scan != -1
+                    else -1
+                )
+
+        # No Wi-Fi devices found, return -1
+        return -1
 
     @staticmethod
     async def get_access_points(is_legacy: bool = False) -> list:
