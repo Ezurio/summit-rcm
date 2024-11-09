@@ -22,6 +22,7 @@ try:
     from spectree import Response
     from summit_rcm.rest_api.utils.spectree.models import (
         AccessPointScanRequestReponseModel,
+        AccessPointSecondsSinceLastScanResponseModel,
         AccessPoints,
         InternalServerErrorResponseModel,
         UnauthorizedErrorResponseModel,
@@ -31,6 +32,7 @@ except (ImportError, DocsNotEnabledException):
     from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
 
     AccessPointScanRequestReponseModel = None
+    AccessPointSecondsSinceLastScanResponseModel = None
     AccessPoints = None
     InternalServerErrorResponseModel = None
     UnauthorizedErrorResponseModel = None
@@ -99,5 +101,33 @@ class AccessPointsScanResource:
                 f"Unable to initiate access point scan: {str(exception)}",
             )
             resp.media = {"scanRequested": False}
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_500
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=AccessPointSecondsSinceLastScanResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=AccessPointScanRequestReponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+    )
+    async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
+        """
+        Retrieve the seconds since the Wi-Fi last scan
+        """
+        try:
+            resp.media = {
+                "secondsSinceLastScan": await NetworkService.get_seconds_since_last_scan()
+            }
+            resp.status = falcon.HTTP_200
+            resp.content_type = falcon.MEDIA_JSON
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                f"Unable to retrieve seconds since last scan: {str(exception)}",
+            )
+            resp.media = {"secondsSinceLastScan": -1}
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_500

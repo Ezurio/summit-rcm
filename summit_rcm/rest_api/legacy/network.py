@@ -393,6 +393,7 @@ class NetworkAccessPoints:
             "InfoMsg": "",
             "count": 0,
             "accesspoints": [],
+            "secondsSinceLastScan": -1,
         }
 
         try:
@@ -403,6 +404,9 @@ class NetworkAccessPoints:
             if len(result["accesspoints"]) > 0:
                 result["SDCERR"] = 0
                 result["count"] = len(result["accesspoints"])
+                result["secondsSinceLastScan"] = (
+                    await NetworkService.get_seconds_since_last_scan()
+                )
             else:
                 result["InfoMsg"] = "No access points found"
 
