@@ -31,7 +31,7 @@ async def get_legacy_supported_routes():
     """Optional Function to return supported legacy routes"""
     routes = []
     routes.append("/ntp")
-    routes.append("/ntp/{command}")
+    routes.append("/ntp/")
     return routes
 
 
@@ -55,7 +55,7 @@ async def get_v2_supported_routes():
     """Optional Function to return supported v2 routes"""
     routes = []
     routes.append("/api/v2/system/datetime/ntp")
-    routes.append("/api/v2/system/datetime/ntp/{address}")
+    routes.append("/api/v2/system/datetime/ntp/")
     return routes
 
 
