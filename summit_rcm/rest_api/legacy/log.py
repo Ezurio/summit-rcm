@@ -6,8 +6,17 @@
 Module to handle log configuration for legacy routes
 """
 
+import os
 from syslog import LOG_ERR, syslog
 import falcon.asgi
+
+try:
+    from uvicorn.config import LOG_LEVELS
+except ImportError as error:
+    # Ignore the error if the ssl module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+    LOG_LEVELS = {}
 from summit_rcm.settings import ServerConfig
 from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
@@ -20,7 +29,9 @@ from summit_rcm.definition import (
 )
 from summit_rcm.services.logs_service import (
     JournalctlError,
-    LogsService,
+)
+from summit_rcm.rest_api.services.rest_logs_service import (
+    RESTLogsService as LogsService,
 )
 
 try:
@@ -35,6 +46,8 @@ try:
         LogsDataResponseModelLegacy,
         LogVerbosity,
         LogVerbosityResponseModelLegacy,
+        WebserverLogLevel,
+        WebserverLogLevelResponseModelLegacy,
     )
     from summit_rcm.rest_api.utils.spectree.tags import system_tag
 except (ImportError, DocsNotEnabledException):
@@ -46,6 +59,8 @@ except (ImportError, DocsNotEnabledException):
     LogsDataResponseModelLegacy = None
     LogVerbosity = None
     LogVerbosityResponseModelLegacy = None
+    WebserverLogLevel = None
+    WebserverLogLevelResponseModelLegacy = None
     system_tag = None
 
 
@@ -232,5 +247,96 @@ class LogSetting:
                     "Unable to determine supplicant nor driver debug level"
                 )
             result["SDCERR"] = 1
+
+        resp.media = result
+
+
+class LogsWebserverResourceLegacy:
+    """
+    Resource to handle queries and requests for configuring the webserver log level (legacy)
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=WebserverLogLevelResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
+    async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
+        """
+        Retrieve current webserver log level (legacy)
+
+        Possible webserverLogLevel options:
+        - "critical"
+        - "error" (default)
+        - "warning"
+        - "info"
+        - "debug"
+        - "trace"
+        """
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {"SDCERR": 0, "InfoMsg": "", "webserverLogLevel": ""}
+
+        try:
+            result["webserverLogLevel"] = LogsService.get_webserver_log_level()
+        except Exception as exception:
+            result["SDCERR"] = 1
+            result["InfoMsg"] = "Could not retrieve webserver log level"
+            syslog(f"Could not retrieve webserver log level - {str(exception)}")
+
+        resp.media = result
+
+    @spec.validate(
+        json=WebserverLogLevel,
+        resp=Response(
+            HTTP_200=WebserverLogLevelResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+        deprecated=True,
+    )
+    async def on_put(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
+        """
+        Set the current webserver log level (legacy)
+
+        Possible webserverLogLevel options:
+        - "critical"
+        - "error" (default)
+        - "warning"
+        - "info"
+        - "debug"
+        - "trace"
+        """
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {"SDCERR": 0, "InfoMsg": "", "webserverLogLevel": ""}
+
+        try:
+            put_data = await req.get_media()
+
+            # Read in and validate the input data
+            webserver_log_level = put_data.get("webserverLogLevel", "")
+            if not webserver_log_level or webserver_log_level not in LOG_LEVELS:
+                raise ValueError()
+
+            # Configure new log level
+            LogsService.set_webserver_log_level(str(webserver_log_level))
+
+            # Return newly-set current configuration
+            result["webserverLogLevel"] = LogsService.get_webserver_log_level()
+        except (ValueError, TypeError):
+            result["SDCERR"] = 1
+            result["InfoMsg"] = "Invalid webserver log level"
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not set webserver log level - {str(exception)}")
+            result["SDCERR"] = 1
+            result["InfoMsg"] = "Could not set webserver log level"
 
         resp.media = result

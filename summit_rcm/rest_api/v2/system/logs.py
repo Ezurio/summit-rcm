@@ -9,6 +9,14 @@ Module to interact with system logs
 import os
 from syslog import syslog
 import falcon.asgi
+
+try:
+    from uvicorn.config import LOG_LEVELS
+except ImportError as error:
+    # Ignore the error if the ssl module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+    LOG_LEVELS = {}
 from summit_rcm.settings import ServerConfig
 from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
@@ -22,7 +30,9 @@ from summit_rcm.definition import (
 from summit_rcm.services.files_service import FilesService
 from summit_rcm.services.logs_service import (
     JournalctlError,
-    LogsService,
+)
+from summit_rcm.rest_api.services.rest_logs_service import (
+    RESTLogsService as LogsService,
 )
 
 try:
@@ -38,6 +48,7 @@ try:
         LogsDataResponseModel,
         LogsExportRequestModel,
         UnauthorizedErrorResponseModel,
+        WebserverLogLevel,
     )
     from summit_rcm.rest_api.utils.spectree.tags import system_tag
 except (ImportError, DocsNotEnabledException):
@@ -50,6 +61,7 @@ except (ImportError, DocsNotEnabledException):
     LogsDataResponseModel = None
     LogsExportRequestModel = None
     UnauthorizedErrorResponseModel = None
+    WebserverLogLevel = None
     system_tag = None
 
 
@@ -223,4 +235,86 @@ class LogsConfigResource:
             resp.status = falcon.HTTP_400
         except Exception as exception:
             syslog(f"Could not set log configuration - {str(exception)}")
+            resp.status = falcon.HTTP_500
+
+
+class LogsWebserverResource:
+    """
+    Resource to handle queries and requests for configuring the webserver log level
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=WebserverLogLevel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
+    async def on_get(self, _: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
+        """
+        Retrieve current webserver log level
+
+        Possible webserverLogLevel options:
+        - "critical"
+        - "error" (default)
+        - "warning"
+        - "info"
+        - "debug"
+        - "trace"
+        """
+        try:
+            resp.media = {"webserverLogLevel": LogsService.get_webserver_log_level()}
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except Exception as exception:
+            syslog(f"Could not retrieve webserver log level - {str(exception)}")
+            resp.status = falcon.HTTP_500
+
+    @spec.validate(
+        json=WebserverLogLevel,
+        resp=Response(
+            HTTP_200=WebserverLogLevel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[system_tag],
+    )
+    async def on_put(
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response
+    ) -> None:
+        """
+        Set the current webserver log level
+
+        Possible webserverLogLevel options:
+        - "critical"
+        - "error" (default)
+        - "warning"
+        - "info"
+        - "debug"
+        - "trace"
+        """
+        try:
+            put_data = await req.get_media()
+
+            # Read in and validate the input data
+            webserver_log_level = put_data.get("webserverLogLevel", "")
+            if not webserver_log_level or webserver_log_level not in LOG_LEVELS:
+                raise ValueError()
+
+            # Configure new log level
+            LogsService.set_webserver_log_level(str(webserver_log_level))
+
+            # Return newly-set current configuration
+            resp.media = {"webserverLogLevel": LogsService.get_webserver_log_level()}
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except (ValueError, TypeError):
+            syslog(f"Invalid webserver log level: {webserver_log_level}")
+            resp.status = falcon.HTTP_400
+        except Exception as exception:
+            syslog(f"Could not set webserver log level - {str(exception)}")
             resp.status = falcon.HTTP_500

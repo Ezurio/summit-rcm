@@ -7,3 +7,4 @@ login_retry_window = 600
 tamper_protection_timeout = 600
 session_timeout = 10
 max_web_clients = 1
+uvicorn_log_level = error

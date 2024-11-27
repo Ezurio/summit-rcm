@@ -23,7 +23,7 @@ except ImportError as error:
 
 from summit_rcm.utils import Singleton
 from summit_rcm.services.date_time_service import DateTimeService
-from summit_rcm.settings import ServerConfig
+from summit_rcm.settings import ServerConfig, SystemSettingsManage
 from summit_rcm.definition import RouteAdd
 
 
@@ -91,6 +91,7 @@ try:
                 "firmware",
                 "logData",
                 "logSetting",
+                "logWebserver",
                 "poweroff",
                 "suspend",
                 "files",
@@ -474,9 +475,14 @@ try:
         Add the following legacy routes, if enabled:
         - /logData
         - /logSetting
+        - /logWebserver
         """
         try:
-            from summit_rcm.rest_api.legacy.log import LogData, LogSetting
+            from summit_rcm.rest_api.legacy.log import (
+                LogData,
+                LogSetting,
+                LogsWebserverResourceLegacy,
+            )
         except ImportError:
             LogData = None
 
@@ -484,6 +490,7 @@ try:
             try:
                 add_route("/logData", LogData())
                 add_route("/logSetting", LogSetting())
+                add_route("/logWebserver", LogsWebserverResourceLegacy())
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load logging endpoints - {str(exception)}")
                 raise exception
@@ -536,6 +543,7 @@ try:
         - /api/v2/system/logs/config
         - /api/v2/system/logs/forwarding
         - /api/v2/system/logs/export
+        - /api/v2/system/logs/webserver
         - /api/v2/system/debug/export
         - /api/v2/system/version
         """
@@ -556,6 +564,7 @@ try:
                 LogsDataResource,
                 LogsConfigResource,
                 LogsExportResource,
+                LogsWebserverResource,
             )
             from summit_rcm.rest_api.v2.system.debug import DebugExportResource
             from summit_rcm.rest_api.v2.system.version import VersionResource
@@ -579,6 +588,7 @@ try:
                 add_route("/api/v2/system/logs/data", LogsDataResource())
                 add_route("/api/v2/system/logs/config", LogsConfigResource())
                 add_route("/api/v2/system/logs/export", LogsExportResource())
+                add_route("/api/v2/system/logs/webserver", LogsWebserverResource())
                 add_route("/api/v2/system/debug/export", DebugExportResource())
                 add_route("/api/v2/system/version", VersionResource())
             except Exception as exception:
@@ -643,6 +653,7 @@ try:
             "/certificates": RouteAdd(add_certificates_legacy()),
             "/logData": legacy_logs_routes,
             "/logSetting": legacy_logs_routes,
+            "/logWebserver": legacy_logs_routes,
             "/datetime": RouteAdd(add_date_time_legacy()),
         }
 
@@ -789,7 +800,7 @@ try:
             lifespan="on",
             http="auto",
             loop="asyncio",
-            log_level="error",
+            log_level=SystemSettingsManage.get_uvicorn_log_level(),
             ws=websockets_config,
         )
 
@@ -847,6 +858,9 @@ try:
             syslog("SSL client authentication enabled")
 
         server = uvicorn.Server(config)
+
+        # Save off a reference to the uvicorn server for later use
+        ServerConfig().uvicorn_server = server
 
         # Add any middleware
         add_default_middleware()

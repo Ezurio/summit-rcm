@@ -301,6 +301,18 @@ class LogVerbosityResponseModelLegacy(DefaultResponseModelLegacy):
     Errormsg: Optional[str]
 
 
+class WebserverLogLevel(BaseModel):
+    """Model for a webserver log level request/response"""
+
+    webserverLogLevel: str
+
+
+class WebserverLogLevelResponseModelLegacy(DefaultResponseModelLegacy):
+    """Model for a webserver log level response (legacy)"""
+
+    webserverLogLevel: str
+
+
 class ChronyNTPSource(BaseModel):
     """Model for a chrony NTP source"""
 
