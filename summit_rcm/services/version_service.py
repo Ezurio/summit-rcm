@@ -6,10 +6,11 @@
 Module to retrieve version info
 """
 
+import asyncio
 import os
 import re
 from syslog import LOG_ERR, syslog
-from subprocess import run, TimeoutExpired, check_output
+from subprocess import run, TimeoutExpired
 
 try:
     import aiofiles
@@ -31,6 +32,9 @@ from summit_rcm.utils import (
     get_base_hw_part_number,
 )
 
+SDCSUPP_VERSION_REG_EXP = r"sdcsupp\s+v(?P<VERSION>.*)"
+NMCLI_VERSION_REG_EXP = r"nmcli.*version\s+(?P<VERSION>.*)"
+
 
 class VersionService(metaclass=Singleton):
     """Service to retrieve version info"""
@@ -41,23 +45,16 @@ class VersionService(metaclass=Singleton):
         """Retrieve the system version info"""
         try:
             if not self._version:
-                network_manager_props = (
-                    await NetworkManagerService().get_obj_properties(
-                        NetworkManagerService().NM_CONNECTION_MANAGER_OBJ_PATH,
-                        NetworkManagerService().NM_CONNECTION_MANAGER_IFACE,
-                    )
-                )
-                nm_version = (
-                    network_manager_props["Version"]
-                    if network_manager_props.get("Version", None) is not None
-                    else ""
-                )
-                self._version["nmVersion"] = str(nm_version)
+                # Note: The NetworkManager version is retrieved from the nmcli tool instead of the
+                # D-Bus API because the D-Bus API "Version" property does not provide the radio
+                # stack version (it's derived from "VERSION" instead of "NM_DIST_VERSION" in the
+                # NetworkManager sources).
+                nm_version = await self.get_nmcli_version()
+
+                self._version["nmVersion"] = nm_version
                 self._version["summitRcm"] = definition.SUMMIT_RCM_VERSION
                 self._version["build"] = await self.get_os_release_version()
-                self._version["supplicant"] = (
-                    check_output(["sdcsupp", "-v"]).decode("ascii").rstrip()
-                )
+                self._version["supplicant"] = await self.get_supplicant_version()
                 self._version["radioStack"] = str(nm_version).partition("-")[0]
                 for dev_obj_path in await NetworkManagerService().get_all_devices():
                     dev_props = await NetworkManagerService().get_obj_properties(
@@ -171,3 +168,39 @@ class VersionService(metaclass=Singleton):
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read uboot version: {str(exception)}")
             return ""
+
+    @staticmethod
+    async def get_supplicant_version() -> str:
+        """
+        Retrieve the supplicant version
+
+        Example 'sdcsupp -v' output: "sdcsupp v12.0.0.113-40.3.25.3"
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *["sdcsupp", "-v"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        match = re.search(SDCSUPP_VERSION_REG_EXP, stdout.decode("utf-8").strip())
+        if match:
+            return match.group("VERSION")
+
+        return ""
+
+    @staticmethod
+    async def get_nmcli_version() -> str:
+        """
+        Retrieve the nmcli version
+
+        Example 'nmcli --version' output: "nmcli tool, version 12.0.0.113-1.46.2"
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *["nmcli", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        match = re.search(NMCLI_VERSION_REG_EXP, stdout.decode("utf-8").strip())
+        if match:
+            return match.group("VERSION")
