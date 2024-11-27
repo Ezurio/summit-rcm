@@ -246,10 +246,15 @@ def generate_docs():
         pass
 
     try:
-        from summit_rcm.rest_api.legacy.log import LogData, LogSetting
+        from summit_rcm.rest_api.legacy.log import (
+            LogData,
+            LogSetting,
+            LogsWebserverResourceLegacy,
+        )
 
         routes["/logData"] = LogData
         routes["/logSetting"] = LogSetting
+        routes["/logWebserver"] = LogsWebserverResourceLegacy
     except ImportError:
         pass
 
@@ -284,6 +289,7 @@ def generate_docs():
             LogsDataResource,
             LogsConfigResource,
             LogsExportResource,
+            LogsWebserverResource,
         )
         from summit_rcm.rest_api.v2.system.debug import DebugExportResource
         from summit_rcm.rest_api.v2.system.version import VersionResource
@@ -299,6 +305,7 @@ def generate_docs():
         routes["/api/v2/system/logs/data"] = LogsDataResource
         routes["/api/v2/system/logs/config"] = LogsConfigResource
         routes["/api/v2/system/logs/export"] = LogsExportResource
+        routes["/api/v2/system/logs/webserver"] = LogsWebserverResource
         routes["/api/v2/system/debug/export"] = DebugExportResource
         routes["/api/v2/system/version"] = VersionResource
     except ImportError:

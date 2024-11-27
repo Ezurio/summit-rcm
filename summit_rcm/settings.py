@@ -6,10 +6,20 @@ import os
 import configparser
 from syslog import LOG_ERR, syslog
 from typing import Optional
+from threading import Lock
+
+try:
+    from uvicorn import Server
+    from uvicorn.config import LOG_LEVELS
+except ImportError as error:
+    # Ignore the error if the ssl module is not available if generating documentation
+    if os.environ.get("DOCS_GENERATION") != "True":
+        raise error
+    Server = None
+    LOG_LEVELS = {}
 
 from summit_rcm.utils import Singleton
 from summit_rcm import definition
-from threading import Lock
 
 
 """
@@ -241,6 +251,19 @@ class SystemSettingsManage(object):
             "/etc/summit-rcm/ssl/server.crt",
         )
 
+    @classmethod
+    def get_uvicorn_log_level(cls):
+        log_level = str(
+            SummitRCMConfigManage.get_key_from_section(
+                cls.section, "uvicorn_log_level", "error"
+            )
+        )
+
+        if log_level not in LOG_LEVELS:
+            log_level = "error"
+
+        return log_level
+
 
 class ServerConfig(object, metaclass=Singleton):
     def __init__(self):
@@ -269,6 +292,7 @@ class ServerConfig(object, metaclass=Singleton):
             self._validate_request = False
             self._validate_response = False
             self._rest_api_docs_enabled = False
+        self._uvicorn_server: Optional[Server] = None
 
     def get_parser(self) -> Optional[configparser.ConfigParser]:
         return self.parser
@@ -292,3 +316,13 @@ class ServerConfig(object, metaclass=Singleton):
     def validate_response(self) -> bool:
         """Determine whether or not response validation is enabled"""
         return self._validate_response
+
+    @property
+    def uvicorn_server(self) -> Optional[Server]:
+        """Get the Uvicorn server (if set)"""
+        return self._uvicorn_server
+
+    @uvicorn_server.setter
+    def uvicorn_server(self, value: Server):
+        """Set the Uvicorn server"""
+        self._uvicorn_server = value
