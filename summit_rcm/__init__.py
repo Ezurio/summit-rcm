@@ -689,7 +689,7 @@ try:
                     v2_module_routes = await module.get_v2_routes()
 
                 for route in v2_module_routes:
-                    if route == req.path:
+                    if req.path.startswith(route):
                         if isinstance(v2_module_routes, list):
                             v2_module_routes_dict = await module.get_v2_routes()
                         else:
@@ -700,7 +700,7 @@ try:
                         return True
 
                 for route in legacy_module_routes:
-                    if route == req.path:
+                    if req.path.startswith(route):
                         if isinstance(legacy_module_routes, list):
                             legacy_module_routes_dict = await module.get_legacy_routes()
                         else:

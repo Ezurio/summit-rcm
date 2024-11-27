@@ -14,8 +14,7 @@ async def get_legacy_supported_routes():
     routes = []
     routes.append("/bluetooth")
     routes.append("/bluetoothWebsocket/ws")
-    routes.append("/bluetooth/{controller}")
-    routes.append("/bluetooth/{controller}/{device}")
+    routes.append("/bluetooth/")
     return routes
 
 
@@ -51,8 +50,7 @@ async def get_v2_supported_routes():
     routes = []
     routes.append("/api/v2/bluetooth")
     routes.append("/api/v2/bluetooth/ws")
-    routes.append("/api/v2/bluetooth/{controller}")
-    routes.append("/api/v2/bluetooth/{controller}/{device}")
+    routes.append("/api/v2/bluetooth/")
     return routes
 
 

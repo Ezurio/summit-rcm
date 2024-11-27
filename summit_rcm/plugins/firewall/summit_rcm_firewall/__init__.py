@@ -13,7 +13,7 @@ async def get_legacy_supported_routes():
     """Optional Function to return supported legacy routes"""
     routes = []
     routes.append("/firewall")
-    routes.append("/firewall/{command}")
+    routes.append("/firewall/")
     return routes
 
 
