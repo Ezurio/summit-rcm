@@ -70,6 +70,7 @@ class VspConnection:
         self.writer: Optional[asyncio.StreamWriter] = None
         self.connected: bool = False
         self.port: int = 0
+        self.vsp_read_prop_iface: Optional[ProxyInterface] = None
 
     def log_exception(self, exception, message: str = ""):
         self._logger.exception(exception)
@@ -99,11 +100,14 @@ class VspConnection:
     async def device_prop_changed_cb(self, iface, changed_props, invalidated_props):
         if "Connected" in changed_props:
             try:
+                connected = variant_to_python(changed_props["Connected"])
                 syslog(
                     LOG_INFO,
                     f"VSP device_prop_changed_cb: Connected: "
-                    f"{variant_to_python(changed_props['Connected'])}",
+                    f"{connected}",
                 )
+                if not connected:
+                    await self.stop_client(False)
                 if (
                     self.writer
                     and self.socket_rx_type
@@ -111,7 +115,7 @@ class VspConnection:
                 ):
                     self.writer.write(
                         '{"Connected": '
-                        f"{variant_to_python(changed_props['Connected'])}}}\n".encode()
+                        f"{connected}}}\n".encode()
                     )
             except Exception as exception:
                 self.log_exception(exception)
@@ -139,6 +143,7 @@ class VspConnection:
                     f"{variant_to_python(changed_props['ServicesResolved'])}",
                 )
                 if variant_to_python(changed_props["ServicesResolved"]):
+                    await self.start_client()
                     if self._waiting_for_services_resolved:
                         self._waiting_for_services_resolved = False
                         await self.gatt_only_connected()
@@ -172,7 +177,6 @@ class VspConnection:
             syslog("gatt_vsp_read_val_cb:" + str(error))
 
     def generic_val_error_cb(self, error):
-        syslog("generic_val_error_cb: D-Bus call failed: " + str(error))
         if "Not connected" in error.args:
             if (
                 self.connected
@@ -181,6 +185,8 @@ class VspConnection:
                 == VSPSocketRxTypeEnum.BLE_VSP_SOCKET_RX_TYPE_JSON
             ):
                 self.writer.write('{"Connected": 0}\n'.encode())
+        else:
+            syslog("generic_val_error_cb: D-Bus call failed: " + str(error))
 
     def gatt_vsp_write_val_error_cb(self, error):
         if (
@@ -208,8 +214,9 @@ class VspConnection:
         # Listen to PropertiesChanged signals from the Read Value
         # Characteristic.
         try:
-            vsp_read_prop_iface = self.vsp_read_chrc[0].get_interface(DBUS_PROP_IFACE)
-            vsp_read_prop_iface.on_properties_changed(self.vsp_read_prop_changed_cb)
+            if not self.vsp_read_prop_iface:
+                self.vsp_read_prop_iface = self.vsp_read_chrc[0].get_interface(DBUS_PROP_IFACE)
+                self.vsp_read_prop_iface.on_properties_changed(self.vsp_read_prop_changed_cb)
         except Exception as exception:
             syslog(
                 f"VSP: start_client, could not subscribe to read prop changes: {str(exception)}"
@@ -217,26 +224,23 @@ class VspConnection:
 
         return True
 
-    async def stop_client(self):
+    async def stop_client(self, stop_notify=True):
         # Stop client suppresses all errors, because it can be invoked during a failed startup,
         # in which case we want to focus attention on the startup error, not errors in
         # subsequently attempting to tear down.
         syslog("VSP: stop_client")
-        vsp_read_prop_iface = None
-        if self.vsp_read_chrc and len(self.vsp_read_chrc):
+        if stop_notify and self.vsp_read_chrc and len(self.vsp_read_chrc):
             try:
-                vsp_read_prop_iface = self.vsp_read_chrc[0].get_interface(
-                    DBUS_PROP_IFACE
-                )
                 await self.vsp_read_chrc[1].call_stop_notify()
             except Exception as exception:
                 syslog(LOG_ERR, "stop_client: " + str(exception))
             self.vsp_read_chrc = None
-        if vsp_read_prop_iface:
+        if self.vsp_read_prop_iface:
             try:
-                vsp_read_prop_iface.off_properties_changed(
+                self.vsp_read_prop_iface.off_properties_changed(
                     self.vsp_read_prop_changed_cb
                 )
+                self.vsp_read_prop_iface = None
             except Exception as exception:
                 syslog(LOG_ERR, "stop_client: " + str(exception))
 
