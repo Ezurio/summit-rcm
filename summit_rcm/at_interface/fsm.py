@@ -176,6 +176,8 @@ class ATInterfaceFSM(metaclass=Singleton):
     _transport: Optional[Transport] = None
     _protocol: Optional[Protocol] = None
 
+    _closing: bool = False
+
     def __init__(self):
         self.machine = AsyncMachine(model=self, states=self.states, initial="idle")
         self.machine.add_transition(
@@ -215,6 +217,12 @@ class ATInterfaceFSM(metaclass=Singleton):
             source="process_command",
             dest="idle",
         )
+
+    def close(self):
+        """Close the state machine"""
+        self._closing = True
+        if self._transport:
+            self._transport.close()
 
     async def on_input_received(self, message: bytes | str):
         if isinstance(message, str):
@@ -344,7 +352,8 @@ class ATInterfaceFSM(metaclass=Singleton):
                 c = bytes("\r\n", "utf-8") + c
             if print_trailing_line_break:
                 c = c + bytes("\r\n", "utf-8")
-            self._transport.write(c)
+            if not self._closing:
+                self._transport.write(c)
 
     def log_debug(self, msg):
         if self.debug:
