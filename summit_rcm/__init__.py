@@ -9,6 +9,7 @@ Summit RCM main module
 import asyncio
 import importlib
 import pkgutil
+import signal
 from syslog import LOG_ERR, syslog, openlog
 from types import ModuleType
 from typing import Any, Iterable, List, Optional
@@ -889,8 +890,9 @@ try:
     async def start_at_interface():
         """Start the AT interface"""
         syslog("Starting AT interface")
+        global at
         at = ATInterface()
-        await at.start()
+        asyncio.ensure_future(at.start())
 
         if not REST_ENABLED:
             # If just the AT interface is running, we need to loop in order to keep the application
@@ -902,6 +904,20 @@ except ImportError:
     ATInterface = None
 
 
+def signal_handler(_signal, _frame):
+    """Handles the signals"""
+    global at
+
+    try:
+        if at:
+            at.close()
+    except NameError:
+        pass
+
+    if REST_ENABLED and ServerConfig().uvicorn_server:
+        ServerConfig().uvicorn_server.should_exit = True
+
+
 async def start():
     """Configure logging and start the application"""
     openlog("summit-rcm")
@@ -909,6 +925,9 @@ async def start():
     if not ATInterface and not REST_ENABLED:
         syslog(LOG_ERR, "Invalid configuration!")
         exit(1)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     tasks = []
 
