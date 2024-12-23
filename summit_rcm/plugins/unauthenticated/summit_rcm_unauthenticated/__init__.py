@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 # Copyright (C) 2024 Ezurio LLC.
 #
-"""Init File to setup the Bluetooth Plugin"""
+"""
+Init file to setup the plugin to allow unauthenticated access to the reset and reboot endpoints
+"""
 
 from syslog import syslog, LOG_ERR
 from typing import Optional
@@ -17,7 +19,10 @@ async def get_legacy_supported_routes():
 
 
 async def get_legacy_routes():
-    """Function to import and return bluetooth API Routes"""
+    """
+    Function to import and return the API Routes to allow unauthenticated access to the reset and
+    reboot endpoints
+    """
     routes = {}
     try:
         from summit_rcm_unauthenticated.rest_api.legacy.unauthenticated import (
@@ -27,6 +32,9 @@ async def get_legacy_routes():
             UnauthenticatedService,
         )
 
+        summit_rcm.SessionCheckingMiddleware().paths.append(
+            "/allowUnauthenticatedResetReboot"
+        )
         routes["/allowUnauthenticatedResetReboot"] = (
             AllowUnauthenticatedResourceLegacy()
         )
@@ -52,7 +60,10 @@ async def get_v2_supported_routes():
 
 
 async def get_v2_routes():
-    """Function to import and return bluetooth API Routes"""
+    """
+    Function to import and return the API Routes to allow unauthenticated access to the reset and
+    reboot endpoints
+    """
     routes = {}
     try:
         from summit_rcm_unauthenticated.rest_api.v2.system.unauthenticated import (
@@ -62,6 +73,9 @@ async def get_v2_routes():
             UnauthenticatedService,
         )
 
+        summit_rcm.SessionCheckingMiddleware().paths.append(
+            "/api/v2/system/allowUnauthenticatedResetReboot"
+        )
         routes["/api/v2/system/allowUnauthenticatedResetReboot"] = (
             AllowUnauthenticatedResource()
         )
