@@ -49,7 +49,7 @@ class LogGetCommand(Command):
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
         try:
-            logs_list = LogsService.get_journal_log_data(
+            logs_list = await LogsService.get_journal_log_data(
                 JournalctlLogTypesEnum(params_dict["type"]),
                 params_dict["priority"],
                 params_dict["days"],
