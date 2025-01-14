@@ -151,7 +151,7 @@ class LogsService(metaclass=Singleton):
 
         with open(WIFI_DRIVER_DEBUG_PARAM, "r") as driver_debug_file:
             if driver_debug_file.mode == "r":
-                return DriverLogLevelEnum(driver_debug_file.read(1))
+                return DriverLogLevelEnum(int(driver_debug_file.read(1)))
 
     @staticmethod
     def set_wifi_driver_debug_level(drv_level: DriverLogLevelEnum):
