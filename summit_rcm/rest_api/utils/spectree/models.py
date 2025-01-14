@@ -297,7 +297,7 @@ class LogVerbosityResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for a log verbosity response (legacy)"""
 
     suppDebugLevel: Optional[str]
-    driverDebugLevel: Optional[int]
+    driverDebugLevel: Optional[str]
     Errormsg: Optional[str]
 
 
