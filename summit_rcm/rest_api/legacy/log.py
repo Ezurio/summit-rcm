@@ -117,7 +117,7 @@ class LogData:
             return
 
         try:
-            logs = LogsService.get_journal_log_data(
+            logs = await LogsService.get_journal_log_data(
                 log_type=typ, priority=priority, days=days
             )
             result["InfoMsg"] = f"type: {typ}; days: {days}; Priority: {priority}"

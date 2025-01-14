@@ -8,7 +8,7 @@ Module to handle interfacing with logs
 
 import time
 from datetime import datetime
-from subprocess import run
+import asyncio
 import json
 import os
 
@@ -20,7 +20,6 @@ except ImportError as error:
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
 from summit_rcm.utils import Singleton, variant_to_python
-from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.definition import (
     WPA_IFACE,
     WPA_OBJ,
@@ -46,7 +45,7 @@ class LogsService(metaclass=Singleton):
         )
 
     @staticmethod
-    def get_journal_log_data(
+    async def get_journal_log_data(
         log_type: JournalctlLogTypesEnum, priority: int, days: int
     ) -> list:
         """Retrieve journal log data using the given parameters as a list"""
@@ -73,16 +72,17 @@ class LogsService(metaclass=Singleton):
                 f"--since={LogsService.format_days_since_for_journalctl(days)}"
             )
 
-        proc = run(
-            journalctl_args,
-            capture_output=True,
-            timeout=SystemSettingsManage.get_user_callback_timeout(),
+        proc = await asyncio.create_subprocess_exec(
+            *journalctl_args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
-            raise JournalctlError(proc.returncode, proc.stderr.decode("utf-8"))
+            raise JournalctlError(proc.returncode, stderr.decode("utf-8"))
 
         logs = []
-        for line in str(proc.stdout.decode("utf-8")).split("\n"):
+        for line in str(stdout.decode("utf-8")).split("\n"):
             if line.strip() == "":
                 # The last line is empty, so break if we see it
                 break
