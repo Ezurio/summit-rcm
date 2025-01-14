@@ -142,7 +142,7 @@ class LogsDataResource:
             days = int(req.params.get("days", 1))
             log_type = JournalctlLogTypesEnum(req.params.get("type", "All"))
 
-            resp.media = LogsService.get_journal_log_data(
+            resp.media = await LogsService.get_journal_log_data(
                 log_type=log_type, priority=priority, days=days
             )
             resp.content_type = falcon.MEDIA_JSON
