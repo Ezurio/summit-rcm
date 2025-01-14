@@ -1103,7 +1103,7 @@ class NetworkService(metaclass=Singleton):
                 continue
 
             entry = {}
-            entry["activated"] = 0
+            entry["activated"] = False
             for active_connection in active_connection_obj_paths:
                 try:
                     active_connection_props = (
@@ -1124,8 +1124,14 @@ class NetworkService(metaclass=Singleton):
                     else ""
                 )
                 if active_connection_connection_obj_path == conn:
-                    entry["activated"] = active_connection_props.get("State", 0)
+                    entry["activated"] = (
+                        active_connection_props.get("State", 0)
+                        == NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_ACTIVATED
+                    )
                     break
+            if is_legacy:
+                # Legacy endpoints return 0 or 1 for activated
+                entry["activated"] = 1 if entry["activated"] else 0
             entry["id"] = (
                 connection_settings_connection["id"].value
                 if connection_settings_connection.get("id", None) is not None
