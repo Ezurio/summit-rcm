@@ -4,8 +4,10 @@
 #
 """Module to support Bluetooth REST requests"""
 
+from syslog import syslog, LOG_WARNING
 from typing import Optional, List
 import falcon.asgi
+from dbus_fast import DBusError
 from summit_rcm import definition
 from summit_rcm_bluetooth.services.ble import (
     ADAPTER_IFACE,
@@ -25,6 +27,10 @@ from summit_rcm_bluetooth.services.bt import (
     lower_camel_case,
 )
 from summit_rcm.dbus_manager import DBusManager
+
+NO_STACK_DUMP_ERRORS = {"Authentication Canceled", "Authentication Rejected",
+                        "Authentication Timeout", "Not paired"}
+""" BlueZ may return these during the normal course of operation """
 
 
 class BluetoothRESTService:
@@ -324,9 +330,23 @@ class BluetoothRESTService:
                     )
                 )
 
+        except DBusError as e:
+            result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
+            if e.text in NO_STACK_DUMP_ERRORS:
+                syslog(LOG_WARNING, f"bluetooth: {device if device else ''}"
+                                    f"{post_data} failed with {e.text}")
+            else:
+                Bluetooth().log_exception(e)
+            result["InfoMsg"] = f"Error: {e.text}"
+        except TimeoutError:
+            result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
+            syslog(LOG_WARNING, f"bluetooth: {device if device else ''}"
+                                f"{post_data} failed with TimeoutError")
+            result["InfoMsg"] = "Error: TimeoutError"
         except Exception as exception:
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
             Bluetooth().log_exception(exception)
-            result["InfoMsg"] = f"Error: {str(exception)}"
+            result["InfoMsg"] = (f"Error: "
+                                 f"{str(exception) if str(exception) else str(type(exception))}")
 
         resp.media = BluetoothRESTService.prepare_response_media(result, is_legacy)
