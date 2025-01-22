@@ -257,6 +257,7 @@ try:
         - /api/v2/network/interfaces/{name}
         - /api/v2/network/interfaces/{name}/stats
         - /api/v2/network/interfaces/{name}/driverInfo
+        - /api/v2/network/interfaces/{name}/stationDump
         - /api/v2/network/connections
         - /api/v2/network/connections/uuid/{uuid}
         - /api/v2/network/connections/id/{id}
@@ -275,6 +276,7 @@ try:
                 NetworkInterfaceResource,
                 NetworkInterfaceStatsResource,
                 NetworkInterfaceDriverInfoResource,
+                NetworkInterfaceStationDumpResource,
             )
             from summit_rcm.rest_api.v2.network.connections import (
                 NetworkConnectionsResource,
@@ -313,6 +315,10 @@ try:
                     "/api/v2/network/interfaces/{name}/driverInfo",
                     NetworkInterfaceDriverInfoResource(),
                 )
+                add_route(
+                    "/api/v2/network/interfaces/{name}/stationDump",
+                    NetworkInterfaceStationDumpResource(),
+                )
                 add_route("/api/v2/network/connections", NetworkConnectionsResource())
                 add_route(
                     "/api/v2/network/connections/uuid/{uuid}",
@@ -349,6 +355,7 @@ try:
         - /networkInterfaces
         - /networkInterfaceStatistics
         - /networkInterfaceDriverInfo
+        - /networkInterfaceStationDump
         - /connections
         - /connection
         - /accesspoints
@@ -360,6 +367,7 @@ try:
                 NetworkInterface,
                 NetworkInterfaceStatistics,
                 NetworkInterfaceDriverInfo,
+                NetworkInterfaceStationDump,
                 NetworkConnections,
                 NetworkConnection,
                 NetworkAccessPoints,
@@ -380,6 +388,7 @@ try:
                 add_route("/networkInterfaces", NetworkInterfaces())
                 add_route("/networkInterfaceStatistics", NetworkInterfaceStatistics())
                 add_route("/networkInterfaceDriverInfo", NetworkInterfaceDriverInfo())
+                add_route("/networkInterfaceStationDump", NetworkInterfaceStationDump())
                 add_route("/connections", NetworkConnections())
                 add_route("/connection", NetworkConnection())
                 add_route("/accesspoints", NetworkAccessPoints())
