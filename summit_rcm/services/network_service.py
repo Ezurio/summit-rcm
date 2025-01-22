@@ -575,9 +575,8 @@ class NetworkService(metaclass=Singleton):
             ap_properties["Rsnflags" if is_legacy else "rsnFlags"] = ap_props.get(
                 "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
             )
-            # Use iw dev to get channel/frequency/rssi info for AP mode
-            mode = ap_props.get(
-                "Mode" if is_legacy else "mode", NM80211Mode.NM_802_11_MODE_UNKNOWN
+            mode = int(
+                wireless_properties.get("Mode", NM80211Mode.NM_802_11_MODE_UNKNOWN)
             )
             if mode == NM80211Mode.NM_802_11_MODE_AP:
                 ap_properties["Strength" if is_legacy else "strength"] = 100
