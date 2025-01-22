@@ -1313,6 +1313,70 @@ class NetworkInterfaceDriverInfoResponseModelLegacy(DefaultResponseModelLegacy):
     driverInfo: NetworkInterfaceDriverInfoResponseModel
 
 
+class StationRateInfo(BaseModel):
+    """Station dump rate information"""
+
+    rate: int | None = Field(description="The rate in kbps")
+    channelWidth: int | None = Field(description="The channel width in MHz")
+
+
+class Station(BaseModel):
+    """Station dump information"""
+
+    signal: int | None = Field(description="The signal strength in dBm")
+    inactive: int | None = Field(
+        description="The time in milliseconds since the station was last active"
+    )
+    connectedTime: int | None = Field(
+        description="The time in seconds that the station has been connected"
+    )
+    rxPackets: int | None = Field(description="The number of received packets")
+    txPackets: int | None = Field(description="The number of transmitted packets")
+    beaconRx: int | None = Field(
+        description="The number of beacons received from this peer"
+    )
+    rxRate: StationRateInfo | None
+    txRate: StationRateInfo | None
+    rxBytes: int | None = Field(description="The number of received bytes")
+    txBytes: int | None = Field(description="The number of transmitted bytes")
+    rxDuration: int | None = Field(
+        description=(
+            "Aggregate PPDU duration for all frames received from the station in "
+            "microseconds"
+        )
+    )
+    txRetries: int | None = Field(
+        description="The number of transmitted packets that required retries"
+    )
+    txFailed: int | None = Field(
+        description="The number of transmitted packets that failed"
+    )
+    beaconLoss: int | None = Field(
+        description="The count of times beacon loss was detected"
+    )
+    rxDropMisc: int | None = Field(
+        description="The number of received packets dropped for unspecified reasons"
+    )
+    dtimPeriod: int | None = Field(
+        description="The Delivery Traffic Indication Message (DTIM) period for beaconing"
+    )
+    beaconInterval: int | None = Field(
+        description="The beacon interval in milliseconds"
+    )
+
+
+class NetworkInterfaceStationDumpResponseModel(BaseModel):
+    """Dictionary of station dump information indexed by MAC address"""
+
+    __root__: Dict[str, Station]
+
+
+class NetworkInterfaceStationDumpResponseModelLegacy(DefaultResponseModelLegacy):
+    """Dictionary of station dump information indexed by MAC address (legacy)"""
+
+    stations: NetworkInterfaceStationDumpResponseModel
+
+
 class AddNetworkInterfaceRequestModelLegacy(BaseModel):
     """Model for a request to add a network interface (legacy)"""
 

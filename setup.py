@@ -141,6 +141,7 @@ def generate_docs():
             NetworkInterfaceResource,
             NetworkInterfaceStatsResource,
             NetworkInterfaceDriverInfoResource,
+            NetworkInterfaceStationDumpResource,
         )
         from summit_rcm.rest_api.v2.network.connections import (
             NetworkConnectionsResource,
@@ -166,6 +167,9 @@ def generate_docs():
         routes["/api/v2/network/interfaces/{name}/driverInfo"] = (
             NetworkInterfaceDriverInfoResource
         )
+        routes["/api/v2/network/interfaces/{name}/stationDump"] = (
+            NetworkInterfaceStationDumpResource
+        )
         routes["/api/v2/network/connections"] = NetworkConnectionsResource
         routes["/api/v2/network/connections/uuid/{uuid}"] = (
             NetworkConnectionResourceByUuid
@@ -187,6 +191,7 @@ def generate_docs():
             NetworkInterface,
             NetworkInterfaceStatistics,
             NetworkInterfaceDriverInfo,
+            NetworkInterfaceStationDump,
             NetworkConnections,
             NetworkConnection,
             NetworkAccessPoints,
@@ -199,6 +204,7 @@ def generate_docs():
         routes["/networkInterfaces"] = NetworkInterfaces
         routes["/networkInterfaceStatistics"] = NetworkInterfaceStatistics
         routes["/networkInterfaceDriverInfo"] = NetworkInterfaceDriverInfo
+        routes["/networkInterfaceStationDump"] = NetworkInterfaceStationDump
         routes["/connections"] = NetworkConnections
         routes["/connection"] = NetworkConnection
         routes["/accesspoints"] = NetworkAccessPoints
@@ -340,7 +346,7 @@ def run_setup(CYTHON):
         version="1.0",
         packages=packages,
         scripts=["summit-rcm"],
-        ext_modules=ext_modules,
+        ext_modules=ext_modules if os.environ.get("DOCS_GENERATION", "False") != "True" else [],
     )
 
 
