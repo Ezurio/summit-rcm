@@ -24,6 +24,7 @@ try:
         BadRequestErrorResponseModel,
         InternalServerErrorResponseModel,
         NetworkInterfaceDriverInfoResponseModel,
+        NetworkInterfaceStationDumpResponseModel,
         NetworkInterfaceResponseModel,
         NetworkInterfaceStatsResponseModel,
         NetworkInterfacesResponseModel,
@@ -37,6 +38,7 @@ except (ImportError, DocsNotEnabledException):
     BadRequestErrorResponseModel = None
     InternalServerErrorResponseModel = None
     NetworkInterfaceDriverInfoResponseModel = None
+    NetworkInterfaceStationDumpResponseModel = None
     NetworkInterfaceResponseModel = None
     NetworkInterfaceStatsResponseModel = None
     NetworkInterfacesResponseModel = None
@@ -295,4 +297,41 @@ class NetworkInterfaceDriverInfoResource(object):
             resp.status = falcon.HTTP_400
         except Exception as e:
             syslog(LOG_ERR, f"Unable to read interface driver info: {str(e)}")
+            resp.status = falcon.HTTP_500
+
+
+class NetworkInterfaceStationDumpResource(object):
+    """
+    Resource to handle queries and requests for a station dump for a network interface
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=NetworkInterfaceStationDumpResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
+    async def on_get(self, _, resp: falcon.asgi.Response, name: str) -> None:
+        """
+        Retrieve station dump info for the requested interface
+
+        The return value is a dictionary of stations indexed by MAC address containing station dump
+        information.
+        """
+        try:
+            if not name:
+                resp.status = falcon.HTTP_400
+                return
+
+            resp.media = NetworkService.get_station_dump(ifname=name)
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except Exception as exception:
+            syslog(
+                LOG_ERR, f"Unable to retrieve interface station dump: {str(exception)}"
+            )
             resp.status = falcon.HTTP_500

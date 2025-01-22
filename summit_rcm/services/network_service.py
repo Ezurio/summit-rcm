@@ -26,6 +26,20 @@ except ImportError as error:
     # Ignore the error if the pyroute2 module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
+
+    class nl80211cmd:
+        """Dummy nl80211cmd class for documentation generation"""
+
+        class STAInfo:
+            """Dummy STAInfo class for documentation generation"""
+
+            class rate_info:
+                """Dummy rate_info class for documentation generation"""
+
+            class bss_param:
+                """Dummy bss_param class for documentation generation"""
+
+
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     NM80211ApFlags,
@@ -433,6 +447,148 @@ class NetworkService(metaclass=Singleton):
             wireless_properties.get("LastScan", -1)
         )
         return wireless
+
+    @staticmethod
+    def parse_rateinfo(
+        rate_info: Optional[nl80211cmd.STAInfo.rate_info],
+    ) -> dict | None:
+        """
+        Parse the rate info and return a dictionary of the parsed values
+        """
+        if rate_info is None:
+            return None
+
+        rate_info_dict = {
+            "rate": None,
+            "channelWidth": None,
+        }
+
+        if rate_info.get_attr("NL80211_RATE_INFO_BITRATE32") is not None:
+            rate_info_dict["rate"] = (
+                rate_info.get_attr("NL80211_RATE_INFO_BITRATE32") * 100
+            )
+        elif rate_info.get_attr("NL80211_RATE_INFO_BITRATE") is not None:
+            rate_info_dict["rate"] = (
+                rate_info.get_attr("NL80211_RATE_INFO_BITRATE") * 100
+            )
+
+        if rate_info.get_attr("NL80211_RATE_INFO_5_MHZ_WIDTH") is not None:
+            rate_info_dict["channelWidth"] = 5
+        elif rate_info.get_attr("NL80211_RATE_INFO_10_MHZ_WIDTH") is not None:
+            rate_info_dict["channelWidth"] = 10
+        elif rate_info.get_attr("NL80211_RATE_INFO_40_MHZ_WIDTH") is not None:
+            rate_info_dict["channelWidth"] = 40
+        elif rate_info.get_attr("NL80211_RATE_INFO_80_MHZ_WIDTH") is not None:
+            rate_info_dict["channelWidth"] = 80
+        elif (
+            rate_info.get_attr("NL80211_RATE_INFO_80P80_MHZ_WIDTH") is not None
+            or rate_info.get_attr("NL80211_RATE_INFO_160_MHZ_WIDTH") is not None
+        ):
+            rate_info_dict["channelWidth"] = 160
+        else:
+            rate_info_dict["channelWidth"] = 20
+
+        return rate_info_dict
+
+    @staticmethod
+    def parse_bss_param(
+        bss_param: Optional[nl80211cmd.STAInfo.bss_param],
+    ) -> dict | None:
+        """
+        Parse the BSS parameter info and return a dictionary of the parsed values
+        """
+        if bss_param is None:
+            return None
+
+        bss_param_dict = {
+            "beaconInterval": None,
+            "dtimPeriod": None,
+        }
+
+        if bss_param.get_attr("NL80211_STA_BSS_PARAM_BEACON_INTERVAL") is not None:
+            bss_param_dict["beaconInterval"] = bss_param.get_attr(
+                "NL80211_STA_BSS_PARAM_BEACON_INTERVAL"
+            )
+        if bss_param.get_attr("NL80211_STA_BSS_PARAM_DTIM_PERIOD") is not None:
+            bss_param_dict["dtimPeriod"] = bss_param.get_attr(
+                "NL80211_STA_BSS_PARAM_DTIM_PERIOD"
+            )
+
+        return bss_param_dict
+
+    @staticmethod
+    def get_station_dump(ifname: Optional[str] = "wlan0") -> dict:
+        """
+        Retrieve station dump info for the specified interface (default is wlan0)
+        """
+        iw = IW()
+        try:
+            for interface in iw.get_interfaces_dump():
+                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                    continue
+
+                # Found the correct interface, get the station dump
+                stations = {}
+                resp = iw.get_stations(interface.get_attr("NL80211_ATTR_IFINDEX"))
+
+                for station in resp:
+                    station_info = station.get_attr("NL80211_ATTR_STA_INFO")
+                    bss_params = NetworkService().parse_bss_param(
+                        station_info.get_attr("NL80211_STA_INFO_BSS_PARAM")
+                    )
+
+                    stations[station.get_attr("NL80211_ATTR_MAC")] = {
+                        "signal": station_info.get_attr("NL80211_STA_INFO_SIGNAL"),
+                        "inactive": station_info.get_attr(
+                            "NL80211_STA_INFO_INACTIVE_TIME"
+                        ),
+                        "connectedTime": station_info.get_attr(
+                            "NL80211_STA_INFO_CONNECTED_TIME"
+                        ),
+                        "rxPackets": station_info.get_attr(
+                            "NL80211_STA_INFO_RX_PACKETS"
+                        ),
+                        "txPackets": station_info.get_attr(
+                            "NL80211_STA_INFO_TX_PACKETS"
+                        ),
+                        "beaconRx": station_info.get_attr("NL80211_STA_INFO_BEACON_RX"),
+                        "rxRate": NetworkService().parse_rateinfo(
+                            station_info.get_attr("NL80211_STA_INFO_RX_BITRATE")
+                        ),
+                        "txRate": NetworkService().parse_rateinfo(
+                            station_info.get_attr("NL80211_STA_INFO_TX_BITRATE")
+                        ),
+                        "rxBytes": station_info.get_attr("NL80211_STA_INFO_RX_BYTES64"),
+                        "txBytes": station_info.get_attr("NL80211_STA_INFO_TX_BYTES64"),
+                        "rxDuration": station_info.get_attr(
+                            "NL80211_STA_INFO_RX_DURATION"
+                        ),
+                        "txRetries": station_info.get_attr(
+                            "NL80211_STA_INFO_TX_RETRIES"
+                        ),
+                        "txFailed": station_info.get_attr("NL80211_STA_INFO_TX_FAILED"),
+                        "beaconLoss": station_info.get_attr(
+                            "NL80211_STA_INFO_BEACON_LOSS"
+                        ),
+                        "rxDropMisc": station_info.get_attr(
+                            "NL80211_STA_INFO_RX_DROP_MISC"
+                        ),
+                        "dtimPeriod": bss_params["dtimPeriod"] if bss_params else None,
+                        "beaconInterval": (
+                            bss_params["beaconInterval"] if bss_params else None
+                        ),
+                    }
+
+                return stations
+
+            # If not found, raise exception
+            raise Exception("interface not found")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to get station dump: {str(exception)}")
+        finally:
+            iw.close()
+
+        return {}
 
     @staticmethod
     def get_active_ap_rssi(ifname: Optional[str] = "wlan0") -> Tuple[bool, float]:

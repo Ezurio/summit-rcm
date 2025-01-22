@@ -33,6 +33,7 @@ try:
         InternalServerErrorResponseModel,
         AddNetworkInterfaceRequestModelLegacy,
         NetworkInterfaceDriverInfoResponseModelLegacy,
+        NetworkInterfaceStationDumpResponseModelLegacy,
         NetworkInterfaceInfoRequestModelLegacy,
         NetworkInterfaceResponseModelLegacy,
         NetworkInterfaceStatsResponseModelLegacy,
@@ -58,6 +59,7 @@ except (ImportError, DocsNotEnabledException):
     InternalServerErrorResponseModel = None
     AddNetworkInterfaceRequestModelLegacy = None
     NetworkInterfaceDriverInfoResponseModelLegacy = None
+    NetworkInterfaceStationDumpResponseModelLegacy = None
     NetworkInterfaceInfoRequestModelLegacy = None
     NetworkInterfaceResponseModelLegacy = None
     NetworkInterfaceStatsResponseModelLegacy = None
@@ -685,6 +687,48 @@ class NetworkInterfaceDriverInfo(object):
             result["InfoMsg"] = "Invalid interface name"
         except Exception as e:
             result["InfoMsg"] = f"Could not read interface driver info - {str(e)}"
+        resp.media = result
+
+
+class NetworkInterfaceStationDump(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceStationDumpResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
+    async def on_get(self, req, resp):
+        """
+        Retrieve station dump info for the requested interface (legacy)
+
+        The return value is a dictionary of stations indexed by MAC address containing station dump
+        information.
+        """
+
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {
+            "SDCERR": 1,
+            "InfoMsg": "",
+            "stations": {},
+        }
+
+        try:
+            name = req.params.get("name", None)
+            if not name:
+                result["InfoMsg"] = "Invalid interface name"
+                resp.media = result
+                return
+
+            result["stations"] = NetworkService.get_station_dump(ifname=name)
+            result["SDCERR"] = 0
+        except Exception as e:
+            result["InfoMsg"] = f"Could not retrieve interface station dump - {str(e)}"
         resp.media = result
 
 
