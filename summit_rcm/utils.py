@@ -133,3 +133,28 @@ def convert_base64_string_to_dict(base64_string: str) -> dict:
         raise ValueError(f"Expected 'str' not '{type(base64_string)}'")
 
     return json.loads(base64.urlsafe_b64decode(base64_string.encode()).decode())
+
+
+def frequency_to_channel(freq: int) -> int:
+    """
+    Convert an IEEE 802.11 frequency (in MHz) to a channel number.
+
+    See ieee80211_freq_khz_to_channel() in the Linux kernel's net/wireless/util.c for more
+    information.
+    """
+    if freq == 2484:
+        return 14
+    elif freq < 2484:
+        return int((freq - 2407) / 5)
+    elif freq >= 4910 and freq <= 4980:
+        return int((freq - 4000) / 5)
+    elif freq < 5925:
+        return int((freq - 5000) / 5)
+    elif freq == 5935:
+        return 2
+    elif freq <= 45000:
+        return int((freq - 5950) / 5)
+    elif freq >= 58320 and freq <= 70200:
+        return int((freq - 56160) / 2160)
+    else:
+        return 0

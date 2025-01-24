@@ -25,6 +25,7 @@ try:
         InternalServerErrorResponseModel,
         NetworkInterfaceDriverInfoResponseModel,
         NetworkInterfaceStationDumpResponseModel,
+        NetworkInterfaceAvailableApChannelsResponseModel,
         NetworkInterfaceResponseModel,
         NetworkInterfaceStatsResponseModel,
         NetworkInterfacesResponseModel,
@@ -39,6 +40,7 @@ except (ImportError, DocsNotEnabledException):
     InternalServerErrorResponseModel = None
     NetworkInterfaceDriverInfoResponseModel = None
     NetworkInterfaceStationDumpResponseModel = None
+    NetworkInterfaceAvailableApChannelsResponseModel = None
     NetworkInterfaceResponseModel = None
     NetworkInterfaceStatsResponseModel = None
     NetworkInterfacesResponseModel = None
@@ -336,4 +338,36 @@ class NetworkInterfaceStationDumpResource(object):
             syslog(
                 LOG_ERR, f"Unable to retrieve interface station dump: {str(exception)}"
             )
+            resp.status = falcon.HTTP_500
+
+
+class NetworkInterfaceAvailableApChannelsResource(object):
+    """
+    Resource to handle queries and requests for the available AP channels for a network interface
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=NetworkInterfaceAvailableApChannelsResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
+    async def on_get(self, _, resp: falcon.asgi.Response, name: str) -> None:
+        """Retrieve available AP channels for a network interface"""
+        try:
+            if not name:
+                resp.status = falcon.HTTP_400
+                return
+
+            resp.media = NetworkService.get_interface_available_ap_channels(
+                ifname=name
+            )
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read available AP channels: {str(exception)}")
             resp.status = falcon.HTTP_500
