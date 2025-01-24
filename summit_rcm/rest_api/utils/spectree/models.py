@@ -1184,6 +1184,27 @@ class DhcpConfigModelLegacy(BaseModel):
     Options: Optional[Dict[str, str]]
 
 
+class AvailableApChannel(BaseModel):
+    """A WLAN channel available for use in access point (AP) mode"""
+
+    frequency: int
+    channel: int
+
+
+class NetworkInterfaceAvailableApChannelsResponseModel(BaseModel):
+    """List of available AP channels"""
+
+    __root__: List[AvailableApChannel]
+
+
+class NetworkInterfaceAvailableApChannelsResponseModelLegacy(
+    DefaultResponseModelLegacy
+):
+    """List of available AP channels (legacy)"""
+
+    channels: List[AvailableApChannel]
+
+
 class NetworkInterfaceResponseModel(BaseModel):
     """Model for response to request for a specific network interface"""
 

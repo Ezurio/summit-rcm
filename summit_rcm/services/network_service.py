@@ -63,9 +63,14 @@ from summit_rcm.services.network_manager_service import (
     NMActiveConnectionState,
 )
 from summit_rcm.settings import ServerConfig
-from summit_rcm.utils import Singleton, to_camel_case
+from summit_rcm.utils import Singleton, frequency_to_channel, to_camel_case
 
 RESERVED_NM_CONNECTIONS_DIR = "/usr/lib/NetworkManager/system-connections"
+
+# See nl80211_reg_rule_flags enum from nl80211.h
+NL80211_RRF_DFS = 1 << 4
+NL80211_RRF_NO_IR = 1 << 7
+NL80211_RRF_PASSIVE_SCAN = NL80211_RRF_NO_IR
 
 
 class NetworkService(metaclass=Singleton):
@@ -941,6 +946,85 @@ class NetworkService(metaclass=Singleton):
             connections.append(setting_connection)
 
         return connections
+
+    @staticmethod
+    def get_interface_available_ap_channels(ifname: str = "wlan0") -> list:
+        """
+        Retrieve a list of available AP channels/frequencies for the given interface
+        """
+        iw = IW()
+        try:
+            for interface in iw.get_interfaces_dump():
+                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                    continue
+
+                # Retrieve the list of supported channels
+                msg = nl80211cmd()
+                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_WIPHY"]
+                msg["attrs"] = [
+                    ["NL80211_ATTR_IFINDEX", interface.get_attr("NL80211_ATTR_IFINDEX")]
+                ]
+
+                res = iw.nlm_request(
+                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
+                )
+
+                phy = res[0].get_attr("NL80211_ATTR_WIPHY")
+                bands = res[0].get_attr("NL80211_ATTR_WIPHY_BANDS")
+                if not bands:
+                    raise Exception("no channels found")
+
+                supported_channel_freqs = []
+                for band in bands:
+                    for freq in band.get_attr("NL80211_BAND_ATTR_FREQS"):
+                        if freq.get_attr("NL80211_FREQUENCY_ATTR_DISABLED"):
+                            continue
+                        supported_channel_freqs.append(
+                            freq.get_attr("NL80211_FREQUENCY_ATTR_FREQ")
+                        )
+
+                # Retrieve the list of regulatory rules
+                msg = nl80211cmd()
+                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_REG"]
+                msg["attrs"] = [["NL80211_ATTR_WIPHY", phy]]
+
+                res = iw.nlm_request(msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST)
+
+                # Parse the regulatory rules and remove any channels that are not allowed
+                for reg_rule in res[0].get_attr("NL80211_ATTR_REG_RULES"):
+                    range_start_mhz = (
+                        reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_START") / 1000
+                    )
+                    range_end_mhz = (
+                        reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_END") / 1000
+                    )
+                    flags = reg_rule.get_attr("NL80211_ATTR_REG_RULE_FLAGS")
+                    passive_scan = bool(flags & NL80211_RRF_PASSIVE_SCAN)
+                    dfs = bool(flags & NL80211_RRF_DFS)
+
+                    for channel_freq in supported_channel_freqs[:]:
+                        if range_start_mhz <= channel_freq <= range_end_mhz and (
+                            dfs or passive_scan
+                        ):
+                            supported_channel_freqs.remove(channel_freq)
+
+                # Convert the frequency values to channel numbers
+                available_channels = []
+                for channel_freq in supported_channel_freqs:
+                    channel = frequency_to_channel(channel_freq)
+                    available_channels.append(
+                        {"channel": channel, "frequency": channel_freq}
+                    )
+
+                return available_channels
+
+            # If not found, just return an empty list
+            return []
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read channel list: {str(exception)}")
+            return []
+        finally:
+            iw.close()
 
     @staticmethod
     async def get_interface_status(

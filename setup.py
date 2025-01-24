@@ -142,6 +142,7 @@ def generate_docs():
             NetworkInterfaceStatsResource,
             NetworkInterfaceDriverInfoResource,
             NetworkInterfaceStationDumpResource,
+            NetworkInterfaceAvailableApChannelsResource,
         )
         from summit_rcm.rest_api.v2.network.connections import (
             NetworkConnectionsResource,
@@ -170,6 +171,9 @@ def generate_docs():
         routes["/api/v2/network/interfaces/{name}/stationDump"] = (
             NetworkInterfaceStationDumpResource
         )
+        routes["/api/v2/network/interfaces/{name}/availableApChannels"] = (
+            NetworkInterfaceAvailableApChannelsResource
+        )
         routes["/api/v2/network/connections"] = NetworkConnectionsResource
         routes["/api/v2/network/connections/uuid/{uuid}"] = (
             NetworkConnectionResourceByUuid
@@ -192,6 +196,7 @@ def generate_docs():
             NetworkInterfaceStatistics,
             NetworkInterfaceDriverInfo,
             NetworkInterfaceStationDump,
+            NetworkInterfaceAvailableApChannels,
             NetworkConnections,
             NetworkConnection,
             NetworkAccessPoints,
@@ -205,6 +210,7 @@ def generate_docs():
         routes["/networkInterfaceStatistics"] = NetworkInterfaceStatistics
         routes["/networkInterfaceDriverInfo"] = NetworkInterfaceDriverInfo
         routes["/networkInterfaceStationDump"] = NetworkInterfaceStationDump
+        routes["/networkInterfaceAvailableApChannels"] = NetworkInterfaceAvailableApChannels
         routes["/connections"] = NetworkConnections
         routes["/connection"] = NetworkConnection
         routes["/accesspoints"] = NetworkAccessPoints

@@ -34,6 +34,7 @@ try:
         AddNetworkInterfaceRequestModelLegacy,
         NetworkInterfaceDriverInfoResponseModelLegacy,
         NetworkInterfaceStationDumpResponseModelLegacy,
+        NetworkInterfaceAvailableApChannelsResponseModelLegacy,
         NetworkInterfaceInfoRequestModelLegacy,
         NetworkInterfaceResponseModelLegacy,
         NetworkInterfaceStatsResponseModelLegacy,
@@ -60,6 +61,7 @@ except (ImportError, DocsNotEnabledException):
     AddNetworkInterfaceRequestModelLegacy = None
     NetworkInterfaceDriverInfoResponseModelLegacy = None
     NetworkInterfaceStationDumpResponseModelLegacy = None
+    NetworkInterfaceAvailableApChannelsResponseModelLegacy = None
     NetworkInterfaceInfoRequestModelLegacy = None
     NetworkInterfaceResponseModelLegacy = None
     NetworkInterfaceStatsResponseModelLegacy = None
@@ -731,6 +733,45 @@ class NetworkInterfaceStationDump(object):
             result["SDCERR"] = 0
         except Exception as e:
             result["InfoMsg"] = f"Could not retrieve interface station dump - {str(e)}"
+        resp.media = result
+
+
+class NetworkInterfaceAvailableApChannels(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceAvailableApChannelsResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
+    async def on_get(self, req, resp):
+        """Retrieve available AP channels for a network interface (legacy)"""
+
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {
+            "SDCERR": 1,
+            "InfoMsg": "",
+            "channels": {},
+        }
+
+        try:
+            name = req.params.get("name", None)
+            if not name:
+                result["InfoMsg"] = "Invalid interface name"
+                resp.media = result
+                return
+
+            result["channels"] = NetworkService.get_interface_available_ap_channels(
+                ifname=name
+            )
+            result["SDCERR"] = 0
+        except Exception as e:
+            result["InfoMsg"] = f"Could not read available AP channels - {str(e)}"
         resp.media = result
 
 
