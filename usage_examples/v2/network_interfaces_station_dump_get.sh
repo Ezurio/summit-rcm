@@ -4,6 +4,13 @@
 ## Copyright (C) 2025 Ezurio LLC.
 ##
 
+##############################################
+#                                            #
+# NOTE: The station dump information is not  #
+# guaranteed to be always correct.           #
+#                                            #
+##############################################
+
 NAME="${NAME:-"wlan0"}"
 
 source ../global_settings
