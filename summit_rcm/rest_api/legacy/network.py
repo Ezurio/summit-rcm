@@ -708,6 +708,8 @@ class NetworkInterfaceStationDump(object):
 
         The return value is a dictionary of stations indexed by MAC address containing station dump
         information.
+
+        <b>NOTE:</b> The station dump information is not guaranteed to be always correct.
         """
 
         resp.status = falcon.HTTP_200

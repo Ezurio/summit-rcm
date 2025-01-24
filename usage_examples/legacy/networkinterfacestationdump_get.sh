@@ -2,6 +2,14 @@
 ## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 ## Copyright (C) 2024 Ezurio LLC.
 ##
+
+##############################################
+#                                            #
+# NOTE: The station dump information is not  #
+# guaranteed to be always correct.           #
+#                                            #
+##############################################
+
 IFNAME="${IFNAME:-"wlan0"}"
 source ../global_settings
 
