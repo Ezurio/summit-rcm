@@ -389,6 +389,7 @@ class AccessPoint(BaseModel):
     strength: Optional[int]
     maxBitrate: Optional[int]
     frequency: Optional[int]
+    channel: Optional[int]
     flags: Optional[int]
     wpaFlags: Optional[int]
     rsnFlags: Optional[int]
@@ -405,6 +406,7 @@ class AccessPointLegacy(BaseModel):
     Strength: Optional[int]
     MaxBitrate: Optional[int]
     Frequency: Optional[int]
+    Channel: Optional[int]
     Flags: Optional[int]
     WpaFlags: Optional[int]
     RsnFlags: Optional[int]
@@ -430,6 +432,7 @@ class ActiveAccessPointLegacy(BaseModel):
     Rsnflags: Optional[int]
     Strength: Optional[int]
     Frequency: Optional[int]
+    Channel: Optional[int]
     Signal: Optional[float]
 
 

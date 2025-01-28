@@ -671,20 +671,7 @@ class NetworkService(metaclass=Singleton):
                 if str(iface.get_attr("NL80211_ATTR_IFNAME")) != interface:
                     continue
 
-                msg = nl80211cmd()
-                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_SCAN"]
-                msg["attrs"] = [
-                    ["NL80211_ATTR_IFINDEX", iface.get_attr("NL80211_ATTR_IFINDEX")]
-                ]
-
-                res = iw.nlm_request(
-                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
-                )
-                return int(
-                    res[0]
-                    .get_attr("NL80211_ATTR_BSS")
-                    .get_attr("NL80211_BSS_FREQUENCY")
-                )
+                return int(iface.get_attr("NL80211_ATTR_WIPHY_FREQ"))
 
             # If not found, raise exception
             raise Exception("interface not found")
@@ -760,6 +747,9 @@ class NetworkService(metaclass=Singleton):
                 ap_properties["Signal" if is_legacy else "signal"] = (
                     signal if success else definition.INVALID_RSSI
                 )
+            ap_properties["Channel" if is_legacy else "channel"] = frequency_to_channel(
+                ap_properties["Frequency" if is_legacy else "frequency"]
+            )
         except Exception as exception:
             syslog(f"Could not read AP properties: {str(exception)}")
             return {}
