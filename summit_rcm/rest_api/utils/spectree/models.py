@@ -1208,6 +1208,63 @@ class NetworkInterfaceAvailableApChannelsResponseModelLegacy(
     channels: List[AvailableApChannel]
 
 
+class IPv4DhcpLease(BaseModel):
+    """Model for an IPv4 DHCP lease"""
+
+    expiry: int = Field(
+        description=(
+            "The expiration time (seconds since unix epoch), "
+            "0 means infinite (static lease)"
+        )
+    )
+    macAddress: str = Field(
+        description=(
+            "The link address, in format XX-YY:YY:YY[...], where XX is the ARP hardware type. "
+            '"XX-" may be omitted for Ethernet'
+        )
+    )
+    ipAddress: str = Field(description="The IPv4 address of the client")
+    hostname: str = Field(description='The hostname of the client or "*" for none')
+    clientIdentifier: str = Field(
+        description="The client identifier (colon-separated hex bytes) or '*' for none"
+    )
+
+
+class IPv6DhcpLease(BaseModel):
+    """Model for an IPv6 DHCP lease"""
+
+    expiry: int = Field(
+        description=(
+            "The expiration time (seconds since unix epoch), "
+            "0 means infinite (static lease)"
+        )
+    )
+    iaid: str = Field(
+        description=(
+            "The IAID as a Big Endian decimal number, "
+            "prefixed by T for IA_TAs (temporary addresses)"
+        )
+    )
+    ipAddress: str = Field(description="The IPv6 address of the client")
+    hostname: str = Field(description='The hostname of the client or "*" for none')
+    clientDuid: str = Field(
+        description="The client DUID (colon-separated hex bytes) or '*' if unknown"
+    )
+
+
+class NetworkInterfaceDhcpLeasesResponseModel(BaseModel):
+    """List of current DHCP leases"""
+
+    ipv4: list[IPv4DhcpLease]
+    ipv6: list[IPv6DhcpLease]
+
+
+class NetworkInterfaceDhcpLeasesResponseModelLegacy(DefaultResponseModelLegacy):
+    """List of current DHCP leases (legacy)"""
+
+    leases: NetworkInterfaceDhcpLeasesResponseModel
+
+
 class NetworkInterfaceResponseModel(BaseModel):
     """Model for response to request for a specific network interface"""
 
