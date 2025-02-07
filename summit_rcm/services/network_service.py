@@ -2912,6 +2912,70 @@ class NetworkService(metaclass=Singleton):
 
         raise Exception("Unable to retrieve driver info")
 
+    @staticmethod
+    def get_dhcp_leases(name: str) -> dict:
+        """
+        Retrieve DHCP leases for the requested interface
+        """
+        if not name:
+            raise FileNotFoundError("No interface name provided")
+
+        name = Path(name).name
+        result = {
+            "ipv4": [],
+            "ipv6": [],
+        }
+
+        if not os.path.exists(f"/var/lib/NetworkManager/dnsmasq-{name}.leases"):
+            return result
+        with open(
+            f"/var/lib/NetworkManager/dnsmasq-{name}.leases", encoding="utf-8"
+        ) as leases_file:
+            for line in leases_file:
+                elements = line.split()
+
+                # dnsmasq stores the DHCPv6 DUID in the leasefile, so we need to ignore entries with
+                # fewer than 5 elements when parsing.
+                #
+                # See the "--dhcp-duid" option here:
+                # https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html
+                # "Note that once set, the DUID is stored in the lease database..."
+                if len(elements) < 5:
+                    continue
+
+                try:
+                    # elements[0] is the expiration time (seconds since unix epoch),
+                    #   0 means infinite (static lease)
+                    # elements[1] is the MAC address for IPv4 entries and the IAID for IPv6 entries
+                    # elements[2] is the IP address
+                    # elements[3] is the hostname or "*" if none
+                    # elements[4] is the client identifier for IPv4 entries and the client DUID for
+                    #   IPv6
+                    if ":" in elements[1]:
+                        result["ipv4"].append(
+                            {
+                                "expiry": int(elements[0]),
+                                "macAddress": elements[1],
+                                "ipAddress": elements[2],
+                                "hostname": elements[3],
+                                "clientIdentifer": elements[4],
+                            }
+                        )
+                    else:
+                        result["ipv6"].append(
+                            {
+                                "expiry": int(elements[0]),
+                                "iaid": elements[1],
+                                "ipAddress": elements[2],
+                                "hostname": elements[3],
+                                "clientDuid": elements[4],
+                            }
+                        )
+                except Exception:
+                    # Skip any entry we can't parse
+                    pass
+        return result
+
 
 class ConnectionProfileReservedError(Exception):
     """Custom error class for when the requested connection profile is reserved."""

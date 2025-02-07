@@ -35,6 +35,7 @@ try:
         NetworkInterfaceDriverInfoResponseModelLegacy,
         NetworkInterfaceStationDumpResponseModelLegacy,
         NetworkInterfaceAvailableApChannelsResponseModelLegacy,
+        NetworkInterfaceDhcpLeasesResponseModelLegacy,
         NetworkInterfaceInfoRequestModelLegacy,
         NetworkInterfaceResponseModelLegacy,
         NetworkInterfaceStatsResponseModelLegacy,
@@ -62,6 +63,7 @@ except (ImportError, DocsNotEnabledException):
     NetworkInterfaceDriverInfoResponseModelLegacy = None
     NetworkInterfaceStationDumpResponseModelLegacy = None
     NetworkInterfaceAvailableApChannelsResponseModelLegacy = None
+    NetworkInterfaceDhcpLeasesResponseModelLegacy = None
     NetworkInterfaceInfoRequestModelLegacy = None
     NetworkInterfaceResponseModelLegacy = None
     NetworkInterfaceStatsResponseModelLegacy = None
@@ -772,6 +774,46 @@ class NetworkInterfaceAvailableApChannels(object):
             result["SDCERR"] = 0
         except Exception as e:
             result["InfoMsg"] = f"Could not read available AP channels - {str(e)}"
+        resp.media = result
+
+
+class NetworkInterfaceDhcpLeases(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceDhcpLeasesResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
+    async def on_get(self, req, resp):
+        """Retrieve the current DHCP leases for a network interface (legacy)"""
+
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {
+            "SDCERR": 1,
+            "InfoMsg": "",
+            "leases": {
+                "ipv4": [],
+                "ipv6": [],
+            },
+        }
+
+        try:
+            name = req.params.get("name", None)
+            if not name:
+                result["InfoMsg"] = "Invalid interface name"
+                resp.media = result
+                return
+
+            result["leases"] = NetworkService.get_dhcp_leases(name=name)
+            result["SDCERR"] = 0
+        except Exception as e:
+            result["InfoMsg"] = f"Could not read current DHCP leases - {str(e)}"
         resp.media = result
 
 
