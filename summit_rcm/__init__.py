@@ -259,6 +259,7 @@ try:
         - /api/v2/network/interfaces/{name}/driverInfo
         - /api/v2/network/interfaces/{name}/stationDump
         - /api/v2/network/interfaces/{name}/availableApChannels
+        - /api/v2/network/interfaces/{name}/dhcpLeases
         - /api/v2/network/connections
         - /api/v2/network/connections/uuid/{uuid}
         - /api/v2/network/connections/id/{id}
@@ -279,6 +280,7 @@ try:
                 NetworkInterfaceDriverInfoResource,
                 NetworkInterfaceStationDumpResource,
                 NetworkInterfaceAvailableApChannelsResource,
+                NetworkInterfaceDhcpLeasesResource,
             )
             from summit_rcm.rest_api.v2.network.connections import (
                 NetworkConnectionsResource,
@@ -325,6 +327,10 @@ try:
                     "/api/v2/network/interfaces/{name}/availableApChannels",
                     NetworkInterfaceAvailableApChannelsResource(),
                 )
+                add_route(
+                    "/api/v2/network/interfaces/{name}/dhcpLeases",
+                    NetworkInterfaceDhcpLeasesResource(),
+                )
                 add_route("/api/v2/network/connections", NetworkConnectionsResource())
                 add_route(
                     "/api/v2/network/connections/uuid/{uuid}",
@@ -363,6 +369,7 @@ try:
         - /networkInterfaceDriverInfo
         - /networkInterfaceStationDump
         - /networkInterfaceAvailableApChannels
+        - /networkInterfaceDhcpLeases
         - /connections
         - /connection
         - /accesspoints
@@ -376,6 +383,7 @@ try:
                 NetworkInterfaceDriverInfo,
                 NetworkInterfaceStationDump,
                 NetworkInterfaceAvailableApChannels,
+                NetworkInterfaceDhcpLeases,
                 NetworkConnections,
                 NetworkConnection,
                 NetworkAccessPoints,
@@ -400,6 +408,10 @@ try:
                 add_route(
                     "/networkInterfaceAvailableApChannels",
                     NetworkInterfaceAvailableApChannels(),
+                )
+                add_route(
+                    "/networkInterfaceDhcpLeases",
+                    NetworkInterfaceDhcpLeases(),
                 )
                 add_route("/connections", NetworkConnections())
                 add_route("/connection", NetworkConnection())

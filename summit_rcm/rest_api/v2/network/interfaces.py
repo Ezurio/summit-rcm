@@ -26,6 +26,7 @@ try:
         NetworkInterfaceDriverInfoResponseModel,
         NetworkInterfaceStationDumpResponseModel,
         NetworkInterfaceAvailableApChannelsResponseModel,
+        NetworkInterfaceDhcpLeasesResponseModel,
         NetworkInterfaceResponseModel,
         NetworkInterfaceStatsResponseModel,
         NetworkInterfacesResponseModel,
@@ -41,6 +42,7 @@ except (ImportError, DocsNotEnabledException):
     NetworkInterfaceDriverInfoResponseModel = None
     NetworkInterfaceStationDumpResponseModel = None
     NetworkInterfaceAvailableApChannelsResponseModel = None
+    NetworkInterfaceDhcpLeasesResponseModel = None
     NetworkInterfaceResponseModel = None
     NetworkInterfaceStatsResponseModel = None
     NetworkInterfacesResponseModel = None
@@ -370,4 +372,34 @@ class NetworkInterfaceAvailableApChannelsResource(object):
             resp.status = falcon.HTTP_200
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read available AP channels: {str(exception)}")
+            resp.status = falcon.HTTP_500
+
+
+class NetworkInterfaceDhcpLeasesResource(object):
+    """
+    Resource to handle queries and requests for the current DHCP leases for a network interface
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=NetworkInterfaceDhcpLeasesResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
+    async def on_get(self, _, resp: falcon.asgi.Response, name: str) -> None:
+        """Retrieve the current DHCP leases for a network interface"""
+        try:
+            if not name:
+                resp.status = falcon.HTTP_400
+                return
+
+            resp.media = NetworkService.get_dhcp_leases(name)
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read DHCP leases: {str(exception)}")
             resp.status = falcon.HTTP_500
