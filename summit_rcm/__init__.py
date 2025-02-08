@@ -87,6 +87,7 @@ try:
                 "accesspoints",
                 "networkInterfaces",
                 "networkInterface",
+                "wifiEnable",
                 "file",
                 "users",
                 "firmware",
