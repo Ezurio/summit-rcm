@@ -8,7 +8,7 @@ File that consists of the Version Command Functionality
 from syslog import LOG_ERR, syslog
 from typing import List, Tuple
 from summit_rcm.at_interface.commands.command import Command
-from summit_rcm.definition import SUMMIT_RCM_VERSION
+from summit_rcm.services.version_service import VersionService
 
 
 class VersionCommand(Command):
@@ -26,7 +26,7 @@ class VersionCommand(Command):
         if not valid:
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
-        return (True, f"+VER: {SUMMIT_RCM_VERSION}\r\nOK")
+        return (True, f"+VER: {VersionService().get_summit_rcm_version()}\r\nOK")
 
     @staticmethod
     def parse_params(params: str) -> Tuple[bool, dict]:

@@ -10,3 +10,4 @@ dist/
 summit-rcm.egg-info/
 usage_examples/cookie
 tags
+**/__pycache__/

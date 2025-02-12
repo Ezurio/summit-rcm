@@ -53,7 +53,7 @@ class Version:
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         try:
-            version = await VersionService().get_version(is_legacy=True)
+            version = await VersionService().get_version_info(is_legacy=True)
             version["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             version["InfoMsg"] = ""
         except Exception as e:
