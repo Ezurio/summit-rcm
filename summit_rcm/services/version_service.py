@@ -11,6 +11,9 @@ import os
 import re
 from syslog import LOG_ERR, syslog
 from subprocess import run, TimeoutExpired
+import importlib.metadata
+import pathlib
+import tomllib
 
 try:
     import aiofiles
@@ -23,7 +26,6 @@ from summit_rcm.services.network_manager_service import (
     NMDeviceType,
     NetworkManagerService,
 )
-from summit_rcm import definition
 from summit_rcm.settings import SystemSettingsManage
 from summit_rcm.utils import (
     Singleton,
@@ -39,23 +41,24 @@ NMCLI_VERSION_REG_EXP = r"nmcli.*version\s+(?P<VERSION>.*)"
 class VersionService(metaclass=Singleton):
     """Service to retrieve version info"""
 
-    _version = {}
+    _version_info = {}
+    _summit_rcm_version = "Unknown"
 
-    async def get_version(self, is_legacy: bool = False) -> dict:
+    async def get_version_info(self, is_legacy: bool = False) -> dict:
         """Retrieve the system version info"""
         try:
-            if not self._version:
+            if not self._version_info:
                 # Note: The NetworkManager version is retrieved from the nmcli tool instead of the
                 # D-Bus API because the D-Bus API "Version" property does not provide the radio
                 # stack version (it's derived from "VERSION" instead of "NM_DIST_VERSION" in the
                 # NetworkManager sources).
                 nm_version = await self.get_nmcli_version()
 
-                self._version["nmVersion"] = nm_version
-                self._version["summitRcm"] = definition.SUMMIT_RCM_VERSION
-                self._version["build"] = await self.get_os_release_version()
-                self._version["supplicant"] = await self.get_supplicant_version()
-                self._version["radioStack"] = str(nm_version).partition("-")[0]
+                self._version_info["nmVersion"] = nm_version
+                self._version_info["summitRcm"] = self.get_summit_rcm_version()
+                self._version_info["build"] = await self.get_os_release_version()
+                self._version_info["supplicant"] = await self.get_supplicant_version()
+                self._version_info["radioStack"] = str(nm_version).partition("-")[0]
                 for dev_obj_path in await NetworkManagerService().get_all_devices():
                     dev_props = await NetworkManagerService().get_obj_properties(
                         dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
@@ -66,41 +69,53 @@ class VersionService(metaclass=Singleton):
                         else NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
                     )
                     if dev_type == NMDeviceType.NM_DEVICE_TYPE_WIFI:
-                        self._version["driver"] = dev_props.get("Driver", "")
-                        self._version["kernelVermagic"] = dev_props.get(
+                        self._version_info["driver"] = dev_props.get("Driver", "")
+                        self._version_info["kernelVermagic"] = dev_props.get(
                             "DriverVersion", ""
                         )
                         break
                 try:
-                    self._version["bluez"] = self.get_bluez_version()
+                    self._version_info["bluez"] = self.get_bluez_version()
                 except Exception:
-                    self._version["bluez"] = "n/a"
-                self._version["uBoot"] = await self.get_uboot_version()
+                    self._version_info["bluez"] = "n/a"
+                self._version_info["uBoot"] = await self.get_uboot_version()
                 try:
-                    self._version["currentSide"] = await get_current_side()
+                    self._version_info["currentSide"] = await get_current_side()
                 except ValueError:
-                    self._version["currentSide"] = "sd"
-                self._version["baseHwPartNumber"] = await get_base_hw_part_number()
-            self._version["nextSide"] = (
-                "sd" if self._version["currentSide"] == "sd" else await get_next_side()
+                    self._version_info["currentSide"] = "sd"
+                self._version_info["baseHwPartNumber"] = await get_base_hw_part_number()
+            self._version_info["nextSide"] = (
+                "sd"
+                if self._version_info["currentSide"] == "sd"
+                else await get_next_side()
             )
 
             if is_legacy:
                 # Adjust property names for legacy support
-                version_legacy = self._version.copy()
-                version_legacy["u-boot"] = version_legacy.pop("uBoot")
-                version_legacy["nm_version"] = version_legacy.pop("nmVersion")
-                version_legacy["summit_rcm"] = version_legacy.pop("summitRcm")
-                version_legacy["radio_stack"] = version_legacy.pop("radioStack")
-                version_legacy["kernel_vermagic"] = version_legacy.pop("kernelVermagic")
-                version_legacy["current_side"] = version_legacy.pop("currentSide")
-                version_legacy["next_side"] = version_legacy.pop("nextSide")
-                version_legacy["base_hw_part_number"] = version_legacy.pop(
+                version__info_legacy = self._version_info.copy()
+                version__info_legacy["u-boot"] = version__info_legacy.pop("uBoot")
+                version__info_legacy["nm_version"] = version__info_legacy.pop(
+                    "nmVersion"
+                )
+                version__info_legacy["summit_rcm"] = version__info_legacy.pop(
+                    "summitRcm"
+                )
+                version__info_legacy["radio_stack"] = version__info_legacy.pop(
+                    "radioStack"
+                )
+                version__info_legacy["kernel_vermagic"] = version__info_legacy.pop(
+                    "kernelVermagic"
+                )
+                version__info_legacy["current_side"] = version__info_legacy.pop(
+                    "currentSide"
+                )
+                version__info_legacy["next_side"] = version__info_legacy.pop("nextSide")
+                version__info_legacy["base_hw_part_number"] = version__info_legacy.pop(
                     "baseHwPartNumber"
                 )
-                return version_legacy
+                return version__info_legacy
 
-            return self._version
+            return self._version_info
         except Exception as exception:
             syslog(f"Error reading version info: {str(exception)}")
             return {}
@@ -204,3 +219,26 @@ class VersionService(metaclass=Singleton):
         match = re.search(NMCLI_VERSION_REG_EXP, stdout.decode("utf-8").strip())
         if match:
             return match.group("VERSION")
+
+    def get_summit_rcm_version(self) -> str:
+        """Retrieve the Summit RCM version"""
+        if self._summit_rcm_version != "Unknown":
+            return self._summit_rcm_version
+
+        try:
+            source_location = pathlib.Path(__file__).parent.parent.parent
+            if (source_location.parent / "pyproject.toml").exists():
+                with open(
+                    source_location / "pyproject.toml", encoding="utf-8"
+                ) as pyproject_toml_file:
+                    self._summit_rcm_version = tomllib.load(pyproject_toml_file)[
+                        "project"
+                    ]["version"]
+                return self._summit_rcm_version
+
+            self._summit_rcm_version = importlib.metadata.version("summit-rcm")
+            return self._summit_rcm_version
+        except Exception as exception:
+            syslog(f"Unable to read Summit RCM version: {str(exception)}")
+            self._summit_rcm_version = "Unknown"
+            return self._summit_rcm_version
