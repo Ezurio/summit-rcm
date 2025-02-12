@@ -102,39 +102,7 @@ def get_cython_options():
     return cmdclass, ext_modules
 
 
-def generate_docs():
-    from summit_rcm.rest_api.utils.spectree.generate_api_spec import generate_api_spec
-
-    routes = {}
-
-    try:
-        from summit_rcm_firewall.rest_api.legacy.firewall import (
-            FirewallResourceLegacy,
-        )
-
-        routes["/firewall"] = FirewallResourceLegacy
-        routes["/firewall/{command}"] = FirewallResourceLegacy
-    except ImportError:
-        pass
-
-    try:
-        from summit_rcm_firewall.rest_api.v2.network.firewall import (
-            FirewallForwardedPortsResource,
-        )
-
-        routes["/api/v2/network/firewall/forwardedPorts"] = (
-            FirewallForwardedPortsResource
-        )
-    except ImportError:
-        pass
-
-    generate_api_spec(routes)
-
-
 def run_setup(CYTHON):
-    if os.environ.get("DOCS_GENERATION", "False") == "True":
-        generate_docs()
-
     if CYTHON:
         cmdclass, ext_modules = get_cython_options()
     else:

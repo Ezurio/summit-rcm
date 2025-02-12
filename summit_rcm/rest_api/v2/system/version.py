@@ -57,7 +57,7 @@ class VersionResource:
         Retrieve version info
         """
         try:
-            version = await VersionService().get_version(is_legacy=False)
+            version = await VersionService().get_version_info(is_legacy=False)
             if not version:
                 raise Exception("no version info found")
 
