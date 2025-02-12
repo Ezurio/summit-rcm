@@ -22,7 +22,7 @@ except ImportError:
     SpecTree = None
 from summit_rcm.settings import ServerConfig
 from summit_rcm.utils import Singleton
-from summit_rcm.definition import SUMMIT_RCM_VERSION
+from summit_rcm.services.version_service import VersionService
 
 OPENAPI_JSON_PATH = "/etc/summit-rcm-openapi.json"
 DOCS_PAGE_PATH = "api"
@@ -165,7 +165,7 @@ class SpectreeService(metaclass=Singleton):
         self.spec = SpecTree(
             "falcon-asgi",
             title="Summit RCM API Reference",
-            version=SUMMIT_RCM_VERSION,
+            version=VersionService().get_summit_rcm_version(),
             description="<p>This page provides an interactive reference and helpful code snippets "
             "for a variety of languages for the Summit RCM REST API.</p><p>If necessary, remember "
             " to first login to retrieve a valid session cookie before initiating a request to "

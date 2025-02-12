@@ -11,8 +11,6 @@ from summit_rcm.services.network_manager_service import (
     NMDeviceType,
 )
 
-SUMMIT_RCM_VERSION = "12.149.0.1"
-
 # TODO - deal with directories for file retrieval (see FIELDIR_DICT and files.py)
 SYSTEM_CONF_DIR = "/etc"
 
