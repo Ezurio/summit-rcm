@@ -2,68 +2,32 @@
 SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 Copyright (C) 2024 Ezurio LLC.
 -->
-This is a set up scripts which can be used for testing/verification and examples of usage for the various restful APIs.
+# Summit RCM Legacy (deprecated) API
+This is a set of scripts which can be used for testing/verification and examples of usage for the various RESTful APIs.
 
-These scripts and testing are verified on Ubuntu 20.04 but the curl commands should work on other platforms.  The global_settings will likely only work on Linux variants without modifications.
+These scripts and testing are verified on Ubuntu 24.04, but the curl commands should work on other platforms.  The global_settings will likely only work on Linux variants without modifications.
 
 The intent is for settings that remain consistent amongst all the scripts can be stored in the global_settings file.  The ip address of the Device Under Test (DUT) can be supplied with the variable IPADDR and this will be stored automatically.  Any other changes to global_settings must be manually modified.
 
 The global_settings in my setup are set for after the initial password change.  Therefore, for the initial login, I will supply the original password as a parameter.
 
-Finally, a word about the cookie file.  The login script will save a cookie file over an existing cookie even if the login fails. This could cause you to lose the session id and get errors when trying other commands, including logging out.  To prevent this, you can make a copy of your cookie file with the appropriate command for your system.  If the issue does occur, you can wait for your session to expire (about 10 minutes), restart the summit-rcm.service from the console login, or reboot the DUT. This condition presents itself with a message like:
-```html
-    <!DOCTYPE html PUBLIC
-    "-//W3C//DTD XHTML 1.0 Transitional//EN"
-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-    <html>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"></meta>
-        <title>401 Unauthorized</title>
-        <style type="text/css">
-        #powered_by {
-            margin-top: 20px;
-            border-top: 2px solid black;
-            font-style: italic;
-        }
+Finally, a word about the cookie file.  The login script will save a cookie file over an existing cookie even if the login fails. This could cause you to lose the session id and get errors when trying other commands, including logging out.  To prevent this, you can make a copy of your cookie file with the appropriate command for your system.  If the issue does occur, you can wait for your session to expire (about 10 minutes), restart the summit-rcm.service from the console login, or reboot the DUT. This condition presents itself as a HTTP 401 (Unauthorized) response.
 
-        #traceback {
-            color: red;
-        }
-        </style>
-    </head>
-        <body>
-            <h2>401 Unauthorized</h2>
-            <p>No permission -- see authorization schemes</p>
-            <pre id="traceback"></pre>
-        <div id="powered_by">
-          <span>
-            Powered by <a href="http://www.cherrypy.org">CherryPy unknown</a>
-          </span>
-        </div>
-        </body>
-    </html>
-```
-
-If you have the jq app installed on your system, it will attempt to parse the above and return a parse error.  If you get a parse error, try overriding the use of jq by adding 'JQ_APP=tee' at the beginning of the command:
-
-    # JQ_APP=tee ./login.sh
+NOTE: This is not an issue if the Summit RCM "Allow multiple sessions per user" setting is enabled.
 
 # Determine the IP address of the DUT *(commands not shown)*
 
 # Login / Logout / change password
 Assuming an IPADDR has never been set, when the first attempt to use any script, you will get an error.  Example:
 
-    # SUMMIT_RCM_PASSWORD=summit ./login.sh
+    # SUMMIT_RCM_PASSWORD=summit ./login_post.sh
     IPADDR variable needs to be set.
 
 Supply the IPADDR and results show successful login with a change password required message:
 
-    # IPADDR=192.168.1.233 SUMMIT_RCM_PASSWORD=summit ./login.sh
+    # IPADDR=192.168.1.233 SUMMIT_RCM_PASSWORD=summit ./login_post.sh
     =====
     Login
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   124  100    85  100    39    211     97 --:--:-- --:--:-- --:--:--   308
     {
       "SDCERR": 0,
       "REDIRECT": 1,
@@ -71,15 +35,12 @@ Supply the IPADDR and results show successful login with a change password requi
       "InfoMsg": "Password change required"
     }
 
-Note that the login is successful (and therefore the cookie is valid) but a password change is required. The current cookie file is used in the change_pw script:
+Note that the login is successful (and therefore the cookie is valid) but a password change is required. The current cookie file is used in the users_put-changepw.sh script:
 
-    # ./change_pw.sh
+    # ./users_put-changepw.sh
 
     =====
     Change password
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   144  100    69  100    75    175    190 --:--:-- --:--:-- --:--:--   365
     {
       "SDCERR": 0,
       "REDIRECT": 1,
@@ -87,13 +48,10 @@ Note that the login is successful (and therefore the cookie is valid) but a pass
     }
 
 Logout and login with new password:
-    # ./logout.sh
+    # ./login_delete.sh
 
     ======
     logout
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    48  100    48    0     0    121      0 --:--:-- --:--:-- --:--:--   121
     {
       "SDCERR": 0,
       "InfoMsg": "user root logged out"
@@ -103,9 +61,6 @@ Logout and login with new password:
 
     =====
     Login
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   387  100   344  100    43   1283    160 --:--:-- --:--:-- --:--:--  1438
     {
       "SDCERR": 0,
       "REDIRECT": 0,
@@ -115,12 +70,9 @@ Logout and login with new password:
 
 # Network Status
 
-./network_status.sh
+./networkStatus_get.sh
 =========================
     network status
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   904  100   904    0     0   1494      0 --:--:-- --:--:-- --:--:--  1494
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -187,12 +139,9 @@ Logout and login with new password:
 
 # Connections
 
-    # ./connections.sh
+    # ./connections_get.sh
     =========================
     Connections
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   295  100   295    0     0    417      0 --:--:-- --:--:-- --:--:--   417
     {
       "SDCERR": 0,
       "connections": {
@@ -217,117 +166,93 @@ Logout and login with new password:
 this will create all the example connections in this package:
 (The InfoMsg string will be changed to indicate the connection was created
 
-    # for connection in summit-rcm_*; do echo $connection; ./$connection; done
-    summit-rcm_EAP-TLS-ca-cert.sh
+    # for connection in connection_post_*; do echo $connection; ./$connection; done
+    connection_post_EAP-TLS-ca-cert.sh
     EAP TLS CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   999  100    28  100   971     21    728  0:00:01  0:00:01 --:--:--   750
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_EAP-TLS-no-cert.sh
+    connection_post_EAP-TLS-no-cert.sh
     EAP TLS w/o CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   965  100    28  100   937     21    729  0:00:01  0:00:01 --:--:--   750
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_EAP-TTLS-CA-cert.sh
+    connection_post_EAP-TTLS-CA-cert.sh
     EAP TLS w/o cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   960  100    28  100   932     19    637  0:00:01  0:00:01 --:--:--   656
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_EAP-TTLS-no-cert.sh
+    connection_post_EAP-TTLS-no-cert.sh
     EAP TTLS w/o CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   926  100    28  100   898     14    457  0:00:02  0:00:01  0:00:01   472
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_PEAP-GTC-CA-cert.sh
+    connection_post_PEAP-GTC-CA-cert.sh
 
     PEAP GTC w/CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   804  100    28  100   776     16    466  0:00:01  0:00:01 --:--:--   482
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_PEAP-GTC-NO-cert.sh
+    connection_post_PEAP-GTC-NO-cert.sh
 
     PEAP GTC w/o CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   770  100    28  100   742     14    389  0:00:02  0:00:01  0:00:01   404
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_PEAP-MSCHAPv2-CA-cert.sh
+    connection_post_PEAP-MSCHAPv2-CA-cert.sh
 
     PEAP MSCHAPv2 w/CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   819  100    28  100   791     14    405  0:00:02  0:00:01  0:00:01   419
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    summit-rcm_PEAP-MSCHAPv2-no-cert.sh
+    connection_post_PEAP-MSCHAPv2-no-cert.sh
 
     PEAP MSCHAPv2 w/o CA cert
 
     =========================
     Create connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   785  100    28  100   757     14    381  0:00:02  0:00:01  0:00:01   395
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -335,12 +260,9 @@ this will create all the example connections in this package:
 
 ## created connections:
 
-    ./connections.sh
+    ./connections_get.sh
     =========================
     Connections
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   988  100   988    0     0    740      0  0:00:01  0:00:01 --:--:--   741
     {
       "SDCERR": 0,
       "connections": {
@@ -396,7 +318,7 @@ this will create all the example connections in this package:
 ## examine new connections:
 ### *this requires the jq tool.  Install it before trying*
 
-    # for UUID in `JQ_APP=tee ./connections.sh |\
+    # for UUID in `JQ_APP=tee ./connections_get.sh |\
              jq -R 'fromjson? |\
              select(type == "object")'|\
              jq '.connections | [ to_entries[] | {uuid: .key} + .value]'|\
@@ -406,16 +328,10 @@ this will create all the example connections in this package:
              do
                  UUID=${UUID} ./connection_get.sh;
              done
-     % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   988  100   988    0     0    614      0  0:00:01  0:00:01 --:--:--   614
     a7b534f2-a739-44d7-a8d3-6bb62f5fee65
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1008  100  1008    0     0    763      0  0:00:01  0:00:01 --:--:--   762
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -479,9 +395,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1003  100  1003    0     0    662      0  0:00:01  0:00:01 --:--:--   662
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -545,9 +458,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1035  100  1035    0     0    708      0  0:00:01  0:00:01 --:--:--   708
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -612,9 +522,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1030  100  1030    0     0    789      0  0:00:01  0:00:01 --:--:--   789
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -679,9 +586,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1001  100  1001    0     0    652      0  0:00:01  0:00:01 --:--:--   652
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -745,9 +649,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   996  100   996    0     0    660      0  0:00:01  0:00:01 --:--:--   660
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -811,9 +712,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1016  100  1016    0     0    690      0  0:00:01  0:00:01 --:--:--   690
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -877,9 +775,6 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  1011  100  1011    0     0    777      0  0:00:01  0:00:01 --:--:--   777
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -944,16 +839,13 @@ this will create all the example connections in this package:
 
     =========================
     Get connection
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    44  100    44    0     0    125      0 --:--:-- --:--:-- --:--:--   125
     {
       "SDCERR": 1,
       "InfoMsg": "no UUID provided"
     }
 
 ## delete the new connections we just created
-    # for UUID in `JQ_APP=tee ./connections.sh |\
+    # for UUID in `JQ_APP=tee ./connections_get.sh |\
               jq -R 'fromjson? |\
               select(type == "object")'|\
               jq '.connections | [ to_entries[] | {uuid: .key} + .value]'|\
@@ -963,15 +855,9 @@ this will create all the example connections in this package:
               do
                   UUID=${UUID} ./connection_delete.sh
               done
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   988  100   988    0     0    655      0  0:00:01  0:00:01 --:--:--   655
     a7b534f2-a739-44d7-a8d3-6bb62f5fee65
     =========================
     DELETE Connection a7b534f2-a739-44d7-a8d3-6bb62f5fee65
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     20      0  0:00:01  0:00:01 --:--:--    20
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -981,9 +867,6 @@ this will create all the example connections in this package:
     44a2ce9c-12a4-4205-90f2-0025148a82da
     =========================
     DELETE Connection 44a2ce9c-12a4-4205-90f2-0025148a82da
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     23      0  0:00:01  0:00:01 --:--:--    23
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -993,9 +876,6 @@ this will create all the example connections in this package:
     43340c99-d518-44a4-8c87-394e4b931fdd
     =========================
     DELETE Connection 43340c99-d518-44a4-8c87-394e4b931fdd
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     26      0  0:00:01  0:00:01 --:--:--    26
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1005,9 +885,6 @@ this will create all the example connections in this package:
     dd30b4ef-3870-46cf-b6ef-02e064ec7192
     =========================
     DELETE Connection dd30b4ef-3870-46cf-b6ef-02e064ec7192
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     31      0 --:--:-- --:--:-- --:--:--    30
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1017,9 +894,6 @@ this will create all the example connections in this package:
     e39ae926-2dde-455a-9645-953a22e2035a
     =========================
     DELETE Connection e39ae926-2dde-455a-9645-953a22e2035a
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     35      0 --:--:-- --:--:-- --:--:--    35
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1029,9 +903,6 @@ this will create all the example connections in this package:
     e4eea0ae-9299-48d5-a879-a1cdb10a1425
     =========================
     DELETE Connection e4eea0ae-9299-48d5-a879-a1cdb10a1425
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     41      0 --:--:-- --:--:-- --:--:--    41
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1041,9 +912,6 @@ this will create all the example connections in this package:
     e29e0e05-a7f4-41c0-8d29-aa9a00496de1
     =========================
     DELETE Connection e29e0e05-a7f4-41c0-8d29-aa9a00496de1
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     47      0 --:--:-- --:--:-- --:--:--    47
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1053,9 +921,6 @@ this will create all the example connections in this package:
     3bc8bea2-446f-4f03-878d-1426e28540ae
     =========================
     DELETE Connection 3bc8bea2-446f-4f03-878d-1426e28540ae
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    28  100    28    0     0     57      0 --:--:-- --:--:-- --:--:--    57
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -1067,9 +932,6 @@ this will create all the example connections in this package:
 
     =========================
     Get networkinterfaces
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    86  100    86    0     0    133      0 --:--:-- --:--:-- --:--:--   133
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -1082,33 +944,33 @@ this will create all the example connections in this package:
     }
 # get/put pac/cert files
 
-    # ./get_file_list.sh
+    # ./files_get.sh
 
     =========================
-    Get list of pac files
+    Get list of pac files (supports 'pac' and 'cert')
     []
 
-    # FILE=user1.pem ./put_cert_file.sh
+    # FILE=user1.pem ./file_post-cert-pac.sh
 
     =========================
     Upload cert file for Network Manager
 
-    # TYPE=cert ./get_file_list.sh
+    # TYPE=cert ./files_get.sh
 
     =========================
-    Get list of cert files
+    Get list of cert files (supports 'pac' and 'cert')
     ["user1.pem"]
 
-    # FILE=user1.pac ./put_cert_file.sh
+    # FILE=user1.pac ./file_post-cert-pac.sh
 
     =========================
     Upload cert file for Network Manager
 
 
-    # ./get_file_list.sh
+    # ./files_get.sh
 
     =========================
-    Get list of pac files
+    Get list of pac files (supports 'pac' and 'cert')
     ["user1.pac"]
 
 # access points
@@ -1117,9 +979,6 @@ this will create all the example connections in this package:
 
     =========================
     PUT accesspoints
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    48  100    42  100     6     62      8 --:--:-- --:--:-- --:--:--    71
     {
       "SDCERR": 0,
       "InfoMsg": "Scan requested"
@@ -1129,9 +988,6 @@ this will create all the example connections in this package:
 
     =========================
     Get accesspoints
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  2523  100  2523    0     0   1014      0  0:00:02  0:00:02 --:--:--  1014
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -1284,31 +1140,58 @@ this will create all the example connections in this package:
 
 # log data query
 
-    # ./put_loglevel.sh
+    # ./logSetting_post.sh
 
     =========================
     Set LogLevel
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    77  100    28  100    49     82    144 --:--:-- --:--:-- --:--:--   226
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    #./get_logData.sh
+    #./logData_get.sh
 
     =========================
     Get LogData
-    2021-10-11 19:01:24.928443:#:4:#:NetworkManager:#:<warn>  [1633978884.9281] device (eth0): Activation: failed for connection 'Wired connection 1':#:2021-10-11 19:01:24.941887:#:6:#:NetworkManager:#:<info>  [1633978884.9415] device (eth0): state change: failed -> disconnected (reason 'none', sys-iface-state: 'managed'):#:2021-10-11 19:01:24.974278:#:6:#:NetworkManager:#:<info>  [1633978884.9726] dhcp4 (eth0):
+    {
+      "SDCERR": 0,
+      "InfoMsg": "type: JournalctlLogTypesEnum.ALL; days: -1; Priority: 6",
+      "count": 473,
+      "log": [
+        {
+          "time": "2024-09-17 23:49:08.383754",
+          "priority": "6",
+          "identifier": "kernel",
+          "message": "Booting Linux on physical CPU 0x0"
+        },
+        {
+          "time": "2024-09-17 23:49:08.384704",
+          "priority": "5",
+          "identifier": "kernel",
+          "message": "Linux version 4.19.203 (buildroot@buildroot) () #1 PREEMPT none"
+        },
+        {
+          "time": "2024-09-17 23:49:08.395830",
+          "priority": "6",
+          "identifier": "kernel",
+          "message": "CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7), cr=10c53c7d"
+        },
+        {
+          "time": "2024-09-17 23:49:08.416038",
+          "priority": "6",
+          "identifier": "kernel",
+          "message": "CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache"
+        }
+      ]
+    }
     <data truncated>
 
 
 # user management
 ## By default, no users can be added.  The settings.ini file requires an entry to allow addional users other than root
 
-    # ./add_user.sh
+    # ./users_post.sh
 
     =========================
     Add user
@@ -1318,52 +1201,40 @@ this will create all the example connections in this package:
 
     sshpass -p summit ssh root@192.168.1.233 "echo -e '\n[settings]\nmax_web_clients=5\n' >>  /data/secret/summit-rcm/summit-rcm-settings.ini"
 
-    # ./add_user.sh
+    # ./users_post.sh
 
     =========================
     Add user
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   366  100    38  100   328     94    813 --:--:-- --:--:-- --:--:--   905
     {
       "SDCERR": 0,
       "InfoMsg": "User added"
     }
 
 
-    # ./add_user.sh
+    # ./users_post.sh
 
     =========================
     Add user
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   380  100    52  100   328    231   1457 --:--:-- --:--:-- --:--:--  1688
     {
       "SDCERR": 1,
       "InfoMsg": "user test already exists"
     }
 
 
-    # ./del_user.sh
+    # ./users_delete.sh
 
     =========================
     del user
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    40  100    40    0     0    174      0 --:--:-- --:--:-- --:--:--   174
     {
       "SDCERR": 0,
       "InfoMsg": "User deleted"
     }
 
 
-    # ./del_user.sh
+    # ./users_delete.sh
 
     =========================
     del user
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    47  100    47    0     0    268      0 --:--:-- --:--:-- --:--:--   270
     {
       "SDCERR": 1,
       "InfoMsg": "user test not found"
@@ -1373,520 +1244,361 @@ this will create all the example connections in this package:
 
 # Date and Time
 
-     ./get_datetime.sh
+     ./datetime_get.sh
 
     =========================
     Get datetime
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  8857  100  8857    0     0  30332      0 --:--:-- --:--:-- --:--:-- 30332
     {
       "zones": [
-        "Europe/Andorra",
-        "Asia/Dubai",
-        "Asia/Kabul",
-        "America/Antigua",
-        "America/Anguilla",
-        "Europe/Tirane",
-        "Asia/Yerevan",
-        "Africa/Luanda",
-        "Antarctica/McMurdo",
+        "Africa/Abidjan",
+        "Africa/Algiers",
+        "Africa/Bissau",
+        "Africa/Cairo",
+        "Africa/Casablanca",
+        "Africa/Ceuta",
+        "Africa/El_Aaiun",
+        "Africa/Johannesburg",
+        "Africa/Juba",
+        "Africa/Khartoum",
+        "Africa/Lagos",
+        "Africa/Maputo",
+        "Africa/Monrovia",
+        "Africa/Nairobi",
+        "Africa/Ndjamena",
+        "Africa/Sao_Tome",
+        "Africa/Tripoli",
+        "Africa/Tunis",
+        "Africa/Windhoek",
+        "America/Adak",
+        "America/Anchorage",
+        "America/Araguaina",
+        "America/Argentina/Buenos_Aires",
+        "America/Argentina/Catamarca",
+        "America/Argentina/Cordoba",
+        "America/Argentina/Jujuy",
+        "America/Argentina/La_Rioja",
+        "America/Argentina/Mendoza",
+        "America/Argentina/Rio_Gallegos",
+        "America/Argentina/Salta",
+        "America/Argentina/San_Juan",
+        "America/Argentina/San_Luis",
+        "America/Argentina/Tucuman",
+        "America/Argentina/Ushuaia",
+        "America/Asuncion",
+        "America/Bahia",
+        "America/Bahia_Banderas",
+        "America/Barbados",
+        "America/Belem",
+        "America/Belize",
+        "America/Boa_Vista",
+        "America/Bogota",
+        "America/Boise",
+        "America/Cambridge_Bay",
+        "America/Campo_Grande",
+        "America/Cancun",
+        "America/Caracas",
+        "America/Cayenne",
+        "America/Chicago",
+        "America/Chihuahua",
+        "America/Ciudad_Juarez",
+        "America/Costa_Rica",
+        "America/Cuiaba",
+        "America/Danmarkshavn",
+        "America/Dawson",
+        "America/Dawson_Creek",
+        "America/Denver",
+        "America/Detroit",
+        "America/Edmonton",
+        "America/Eirunepe",
+        "America/El_Salvador",
+        "America/Fort_Nelson",
+        "America/Fortaleza",
+        "America/Glace_Bay",
+        "America/Goose_Bay",
+        "America/Grand_Turk",
+        "America/Guatemala",
+        "America/Guayaquil",
+        "America/Guyana",
+        "America/Halifax",
+        "America/Havana",
+        "America/Hermosillo",
+        "America/Indiana/Indianapolis",
+        "America/Indiana/Knox",
+        "America/Indiana/Marengo",
+        "America/Indiana/Petersburg",
+        "America/Indiana/Tell_City",
+        "America/Indiana/Vevay",
+        "America/Indiana/Vincennes",
+        "America/Indiana/Winamac",
+        "America/Inuvik",
+        "America/Iqaluit",
+        "America/Jamaica",
+        "America/Juneau",
+        "America/Kentucky/Louisville",
+        "America/Kentucky/Monticello",
+        "America/La_Paz",
+        "America/Lima",
+        "America/Los_Angeles",
+        "America/Maceio",
+        "America/Managua",
+        "America/Manaus",
+        "America/Martinique",
+        "America/Matamoros",
+        "America/Mazatlan",
+        "America/Menominee",
+        "America/Merida",
+        "America/Metlakatla",
+        "America/Mexico_City",
+        "America/Miquelon",
+        "America/Moncton",
+        "America/Monterrey",
+        "America/Montevideo",
+        "America/New_York",
+        "America/Nome",
+        "America/Noronha",
+        "America/North_Dakota/Beulah",
+        "America/North_Dakota/Center",
+        "America/North_Dakota/New_Salem",
+        "America/Nuuk",
+        "America/Ojinaga",
+        "America/Panama",
+        "America/Paramaribo",
+        "America/Phoenix",
+        "America/Port-au-Prince",
+        "America/Porto_Velho",
+        "America/Puerto_Rico",
+        "America/Punta_Arenas",
+        "America/Rankin_Inlet",
+        "America/Recife",
+        "America/Regina",
+        "America/Resolute",
+        "America/Rio_Branco",
+        "America/Santarem",
+        "America/Santiago",
+        "America/Santo_Domingo",
+        "America/Sao_Paulo",
+        "America/Scoresbysund",
+        "America/Sitka",
+        "America/St_Johns",
+        "America/Swift_Current",
+        "America/Tegucigalpa",
+        "America/Thule",
+        "America/Tijuana",
+        "America/Toronto",
+        "America/Vancouver",
+        "America/Whitehorse",
+        "America/Winnipeg",
+        "America/Yakutat",
         "Antarctica/Casey",
         "Antarctica/Davis",
-        "Antarctica/DumontDUrville",
+        "Antarctica/Macquarie",
         "Antarctica/Mawson",
         "Antarctica/Palmer",
         "Antarctica/Rothera",
-        "Antarctica/Syowa",
         "Antarctica/Troll",
         "Antarctica/Vostok",
-        "America/Argentina/Buenos_Aires",
-        "America/Argentina/Cordoba",
-        "America/Argentina/Salta",
-        "America/Argentina/Jujuy",
-        "America/Argentina/Tucuman",
-        "America/Argentina/Catamarca",
-        "America/Argentina/La_Rioja",
-        "America/Argentina/San_Juan",
-        "America/Argentina/Mendoza",
-        "America/Argentina/San_Luis",
-        "America/Argentina/Rio_Gallegos",
-        "America/Argentina/Ushuaia",
-        "Pacific/Pago_Pago",
-        "Europe/Vienna",
-        "Australia/Lord_Howe",
-        "Antarctica/Macquarie",
-        "Australia/Hobart",
-        "Australia/Currie",
-        "Australia/Melbourne",
-        "Australia/Sydney",
-        "Australia/Broken_Hill",
-        "Australia/Brisbane",
-        "Australia/Lindeman",
-        "Australia/Adelaide",
-        "Australia/Darwin",
-        "Australia/Perth",
-        "Australia/Eucla",
-        "America/Aruba",
-        "Europe/Mariehamn",
-        "Asia/Baku",
-        "Europe/Sarajevo",
-        "America/Barbados",
-        "Asia/Dhaka",
-        "Europe/Brussels",
-        "Africa/Ouagadougou",
-        "Europe/Sofia",
-        "Asia/Bahrain",
-        "Africa/Bujumbura",
-        "Africa/Porto-Novo",
-        "America/St_Barthelemy",
-        "Atlantic/Bermuda",
-        "Asia/Brunei",
-        "America/La_Paz",
-        "America/Kralendijk",
-        "America/Noronha",
-        "America/Belem",
-        "America/Fortaleza",
-        "America/Recife",
-        "America/Araguaina",
-        "America/Maceio",
-        "America/Bahia",
-        "America/Sao_Paulo",
-        "America/Campo_Grande",
-        "America/Cuiaba",
-        "America/Santarem",
-        "America/Porto_Velho",
-        "America/Boa_Vista",
-        "America/Manaus",
-        "America/Eirunepe",
-        "America/Rio_Branco",
-        "America/Nassau",
-        "Asia/Thimphu",
-        "Africa/Gaborone",
-        "Europe/Minsk",
-        "America/Belize",
-        "America/St_Johns",
-        "America/Halifax",
-        "America/Glace_Bay",
-        "America/Moncton",
-        "America/Goose_Bay",
-        "America/Blanc-Sablon",
-        "America/Toronto",
-        "America/Nipigon",
-        "America/Thunder_Bay",
-        "America/Iqaluit",
-        "America/Pangnirtung",
-        "America/Atikokan",
-        "America/Winnipeg",
-        "America/Rainy_River",
-        "America/Resolute",
-        "America/Rankin_Inlet",
-        "America/Regina",
-        "America/Swift_Current",
-        "America/Edmonton",
-        "America/Cambridge_Bay",
-        "America/Yellowknife",
-        "America/Inuvik",
-        "America/Creston",
-        "America/Dawson_Creek",
-        "America/Fort_Nelson",
-        "America/Vancouver",
-        "America/Whitehorse",
-        "America/Dawson",
-        "Indian/Cocos",
-        "Africa/Kinshasa",
-        "Africa/Lubumbashi",
-        "Africa/Bangui",
-        "Africa/Brazzaville",
-        "Europe/Zurich",
-        "Africa/Abidjan",
-        "Pacific/Rarotonga",
-        "America/Santiago",
-        "America/Punta_Arenas",
-        "Pacific/Easter",
-        "Africa/Douala",
-        "Asia/Shanghai",
-        "Asia/Urumqi",
-        "America/Bogota",
-        "America/Costa_Rica",
-        "America/Havana",
-        "Atlantic/Cape_Verde",
-        "America/Curacao",
-        "Indian/Christmas",
-        "Asia/Nicosia",
-        "Asia/Famagusta",
-        "Europe/Prague",
-        "Europe/Berlin",
-        "Europe/Busingen",
-        "Africa/Djibouti",
-        "Europe/Copenhagen",
-        "America/Dominica",
-        "America/Santo_Domingo",
-        "Africa/Algiers",
-        "America/Guayaquil",
-        "Pacific/Galapagos",
-        "Europe/Tallinn",
-        "Africa/Cairo",
-        "Africa/El_Aaiun",
-        "Africa/Asmara",
-        "Europe/Madrid",
-        "Africa/Ceuta",
-        "Atlantic/Canary",
-        "Africa/Addis_Ababa",
-        "Europe/Helsinki",
-        "Pacific/Fiji",
-        "Atlantic/Stanley",
-        "Pacific/Chuuk",
-        "Pacific/Pohnpei",
-        "Pacific/Kosrae",
-        "Atlantic/Faroe",
-        "Europe/Paris",
-        "Africa/Libreville",
-        "Europe/London",
-        "America/Grenada",
-        "Asia/Tbilisi",
-        "America/Cayenne",
-        "Europe/Guernsey",
-        "Africa/Accra",
-        "Europe/Gibraltar",
-        "America/Godthab",
-        "America/Danmarkshavn",
-        "America/Scoresbysund",
-        "America/Thule",
-        "Africa/Banjul",
-        "Africa/Conakry",
-        "America/Guadeloupe",
-        "Africa/Malabo",
-        "Europe/Athens",
-        "Atlantic/South_Georgia",
-        "America/Guatemala",
-        "Pacific/Guam",
-        "Africa/Bissau",
-        "America/Guyana",
-        "Asia/Hong_Kong",
-        "America/Tegucigalpa",
-        "Europe/Zagreb",
-        "America/Port-au-Prince",
-        "Europe/Budapest",
-        "Asia/Jakarta",
-        "Asia/Pontianak",
-        "Asia/Makassar",
-        "Asia/Jayapura",
-        "Europe/Dublin",
-        "Asia/Jerusalem",
-        "Europe/Isle_of_Man",
-        "Asia/Kolkata",
-        "Indian/Chagos",
-        "Asia/Baghdad",
-        "Asia/Tehran",
-        "Atlantic/Reykjavik",
-        "Europe/Rome",
-        "Europe/Jersey",
-        "America/Jamaica",
-        "Asia/Amman",
-        "Asia/Tokyo",
-        "Africa/Nairobi",
-        "Asia/Bishkek",
-        "Asia/Phnom_Penh",
-        "Pacific/Tarawa",
-        "Pacific/Enderbury",
-        "Pacific/Kiritimati",
-        "Indian/Comoro",
-        "America/St_Kitts",
-        "Asia/Pyongyang",
-        "Asia/Seoul",
-        "Asia/Kuwait",
-        "America/Cayman",
         "Asia/Almaty",
-        "Asia/Qyzylorda",
-        "Asia/Aqtobe",
+        "Asia/Amman",
+        "Asia/Anadyr",
         "Asia/Aqtau",
+        "Asia/Aqtobe",
+        "Asia/Ashgabat",
         "Asia/Atyrau",
-        "Asia/Oral",
-        "Asia/Vientiane",
+        "Asia/Baghdad",
+        "Asia/Baku",
+        "Asia/Bangkok",
+        "Asia/Barnaul",
         "Asia/Beirut",
-        "America/St_Lucia",
-        "Europe/Vaduz",
+        "Asia/Bishkek",
+        "Asia/Chita",
         "Asia/Colombo",
-        "Africa/Monrovia",
-        "Africa/Maseru",
-        "Europe/Vilnius",
-        "Europe/Luxembourg",
-        "Europe/Riga",
-        "Africa/Tripoli",
-        "Africa/Casablanca",
-        "Europe/Monaco",
-        "Europe/Chisinau",
-        "Europe/Podgorica",
-        "America/Marigot",
-        "Indian/Antananarivo",
-        "Pacific/Majuro",
-        "Pacific/Kwajalein",
-        "Europe/Skopje",
-        "Africa/Bamako",
-        "Asia/Yangon",
-        "Asia/Ulaanbaatar",
-        "Asia/Hovd",
-        "Asia/Choibalsan",
-        "Asia/Macau",
-        "Pacific/Saipan",
-        "America/Martinique",
-        "Africa/Nouakchott",
-        "America/Montserrat",
-        "Europe/Malta",
-        "Indian/Mauritius",
-        "Indian/Maldives",
-        "Africa/Blantyre",
-        "America/Mexico_City",
-        "America/Cancun",
-        "America/Merida",
-        "America/Monterrey",
-        "America/Matamoros",
-        "America/Mazatlan",
-        "America/Chihuahua",
-        "America/Ojinaga",
-        "America/Hermosillo",
-        "America/Tijuana",
-        "America/Bahia_Banderas",
-        "Asia/Kuala_Lumpur",
-        "Asia/Kuching",
-        "Africa/Maputo",
-        "Africa/Windhoek",
-        "Pacific/Noumea",
-        "Africa/Niamey",
-        "Pacific/Norfolk",
-        "Africa/Lagos",
-        "America/Managua",
-        "Europe/Amsterdam",
-        "Europe/Oslo",
-        "Asia/Kathmandu",
-        "Pacific/Nauru",
-        "Pacific/Niue",
-        "Pacific/Auckland",
-        "Pacific/Chatham",
-        "Asia/Muscat",
-        "America/Panama",
-        "America/Lima",
-        "Pacific/Tahiti",
-        "Pacific/Marquesas",
-        "Pacific/Gambier",
-        "Pacific/Port_Moresby",
-        "Pacific/Bougainville",
-        "Asia/Manila",
-        "Asia/Karachi",
-        "Europe/Warsaw",
-        "America/Miquelon",
-        "Pacific/Pitcairn",
-        "America/Puerto_Rico",
+        "Asia/Damascus",
+        "Asia/Dhaka",
+        "Asia/Dili",
+        "Asia/Dubai",
+        "Asia/Dushanbe",
+        "Asia/Famagusta",
         "Asia/Gaza",
         "Asia/Hebron",
-        "Europe/Lisbon",
-        "Atlantic/Madeira",
-        "Atlantic/Azores",
-        "Pacific/Palau",
-        "America/Asuncion",
-        "Asia/Qatar",
-        "Indian/Reunion",
-        "Europe/Bucharest",
-        "Europe/Belgrade",
-        "Europe/Kaliningrad",
-        "Europe/Moscow",
-        "Europe/Simferopol",
-        "Europe/Volgograd",
-        "Europe/Kirov",
-        "Europe/Astrakhan",
-        "Europe/Saratov",
-        "Europe/Ulyanovsk",
-        "Europe/Samara",
-        "Asia/Yekaterinburg",
-        "Asia/Omsk",
-        "Asia/Novosibirsk",
-        "Asia/Barnaul",
-        "Asia/Tomsk",
-        "Asia/Novokuznetsk",
-        "Asia/Krasnoyarsk",
-        "Asia/Irkutsk",
-        "Asia/Chita",
-        "Asia/Yakutsk",
-        "Asia/Khandyga",
-        "Asia/Vladivostok",
-        "Asia/Ust-Nera",
-        "Asia/Magadan",
-        "Asia/Sakhalin",
-        "Asia/Srednekolymsk",
-        "Asia/Kamchatka",
-        "Asia/Anadyr",
-        "Africa/Kigali",
-        "Asia/Riyadh",
-        "Pacific/Guadalcanal",
-        "Indian/Mahe",
-        "Africa/Khartoum",
-        "Europe/Stockholm",
-        "Asia/Singapore",
-        "Atlantic/St_Helena",
-        "Europe/Ljubljana",
-        "Arctic/Longyearbyen",
-        "Europe/Bratislava",
-        "Africa/Freetown",
-        "Europe/San_Marino",
-        "Africa/Dakar",
-        "Africa/Mogadishu",
-        "America/Paramaribo",
-        "Africa/Juba",
-        "Africa/Sao_Tome",
-        "America/El_Salvador",
-        "America/Lower_Princes",
-        "Asia/Damascus",
-        "Africa/Mbabane",
-        "America/Grand_Turk",
-        "Africa/Ndjamena",
-        "Indian/Kerguelen",
-        "Africa/Lome",
-        "Asia/Bangkok",
-        "Asia/Dushanbe",
-        "Pacific/Fakaofo",
-        "Asia/Dili",
-        "Asia/Ashgabat",
-        "Africa/Tunis",
-        "Pacific/Tongatapu",
-        "Europe/Istanbul",
-        "America/Port_of_Spain",
-        "Pacific/Funafuti",
-        "Asia/Taipei",
-        "Africa/Dar_es_Salaam",
-        "Europe/Kiev",
-        "Europe/Uzhgorod",
-        "Europe/Zaporozhye",
-        "Africa/Kampala",
-        "Pacific/Midway",
-        "Pacific/Wake",
-        "America/New_York",
-        "America/Detroit",
-        "America/Kentucky/Louisville",
-        "America/Kentucky/Monticello",
-        "America/Indiana/Indianapolis",
-        "America/Indiana/Vincennes",
-        "America/Indiana/Winamac",
-        "America/Indiana/Marengo",
-        "America/Indiana/Petersburg",
-        "America/Indiana/Vevay",
-        "America/Chicago",
-        "America/Indiana/Tell_City",
-        "America/Indiana/Knox",
-        "America/Menominee",
-        "America/North_Dakota/Center",
-        "America/North_Dakota/New_Salem",
-        "America/North_Dakota/Beulah",
-        "America/Denver",
-        "America/Boise",
-        "America/Phoenix",
-        "America/Los_Angeles",
-        "America/Anchorage",
-        "America/Juneau",
-        "America/Sitka",
-        "America/Metlakatla",
-        "America/Yakutat",
-        "America/Nome",
-        "America/Adak",
-        "Pacific/Honolulu",
-        "America/Montevideo",
-        "Asia/Samarkand",
-        "Asia/Tashkent",
-        "Europe/Vatican",
-        "America/St_Vincent",
-        "America/Caracas",
-        "America/Tortola",
-        "America/St_Thomas",
         "Asia/Ho_Chi_Minh",
-        "Pacific/Efate",
-        "Pacific/Wallis",
+        "Asia/Hong_Kong",
+        "Asia/Hovd",
+        "Asia/Irkutsk",
+        "Asia/Jakarta",
+        "Asia/Jayapura",
+        "Asia/Jerusalem",
+        "Asia/Kabul",
+        "Asia/Kamchatka",
+        "Asia/Karachi",
+        "Asia/Kathmandu",
+        "Asia/Khandyga",
+        "Asia/Kolkata",
+        "Asia/Krasnoyarsk",
+        "Asia/Kuching",
+        "Asia/Macau",
+        "Asia/Magadan",
+        "Asia/Makassar",
+        "Asia/Manila",
+        "Asia/Nicosia",
+        "Asia/Novokuznetsk",
+        "Asia/Novosibirsk",
+        "Asia/Omsk",
+        "Asia/Oral",
+        "Asia/Pontianak",
+        "Asia/Pyongyang",
+        "Asia/Qatar",
+        "Asia/Qostanay",
+        "Asia/Qyzylorda",
+        "Asia/Riyadh",
+        "Asia/Sakhalin",
+        "Asia/Samarkand",
+        "Asia/Seoul",
+        "Asia/Shanghai",
+        "Asia/Singapore",
+        "Asia/Srednekolymsk",
+        "Asia/Taipei",
+        "Asia/Tashkent",
+        "Asia/Tbilisi",
+        "Asia/Tehran",
+        "Asia/Thimphu",
+        "Asia/Tokyo",
+        "Asia/Tomsk",
+        "Asia/Ulaanbaatar",
+        "Asia/Urumqi",
+        "Asia/Ust-Nera",
+        "Asia/Vladivostok",
+        "Asia/Yakutsk",
+        "Asia/Yangon",
+        "Asia/Yekaterinburg",
+        "Asia/Yerevan",
+        "Atlantic/Azores",
+        "Atlantic/Bermuda",
+        "Atlantic/Canary",
+        "Atlantic/Cape_Verde",
+        "Atlantic/Faroe",
+        "Atlantic/Madeira",
+        "Atlantic/South_Georgia",
+        "Atlantic/Stanley",
+        "Australia/Adelaide",
+        "Australia/Brisbane",
+        "Australia/Broken_Hill",
+        "Australia/Darwin",
+        "Australia/Eucla",
+        "Australia/Hobart",
+        "Australia/Lindeman",
+        "Australia/Lord_Howe",
+        "Australia/Melbourne",
+        "Australia/Perth",
+        "Australia/Sydney",
+        "Europe/Andorra",
+        "Europe/Astrakhan",
+        "Europe/Athens",
+        "Europe/Belgrade",
+        "Europe/Berlin",
+        "Europe/Brussels",
+        "Europe/Bucharest",
+        "Europe/Budapest",
+        "Europe/Chisinau",
+        "Europe/Dublin",
+        "Europe/Gibraltar",
+        "Europe/Helsinki",
+        "Europe/Istanbul",
+        "Europe/Kaliningrad",
+        "Europe/Kirov",
+        "Europe/Kyiv",
+        "Europe/Lisbon",
+        "Europe/London",
+        "Europe/Madrid",
+        "Europe/Malta",
+        "Europe/Minsk",
+        "Europe/Moscow",
+        "Europe/Paris",
+        "Europe/Prague",
+        "Europe/Riga",
+        "Europe/Rome",
+        "Europe/Samara",
+        "Europe/Saratov",
+        "Europe/Simferopol",
+        "Europe/Sofia",
+        "Europe/Tallinn",
+        "Europe/Tirane",
+        "Europe/Ulyanovsk",
+        "Europe/Vienna",
+        "Europe/Vilnius",
+        "Europe/Volgograd",
+        "Europe/Warsaw",
+        "Europe/Zurich",
+        "Indian/Chagos",
+        "Indian/Maldives",
+        "Indian/Mauritius",
         "Pacific/Apia",
-        "Asia/Aden",
-        "Indian/Mayotte",
-        "Africa/Johannesburg",
-        "Africa/Lusaka",
-        "Africa/Harare",
-        "Etc/GMT",
-        "Etc/GMT-0",
-        "Etc/GMT-1",
-        "Etc/GMT-10",
-        "Etc/GMT-11",
-        "Etc/GMT-12",
-        "Etc/GMT-13",
-        "Etc/GMT-2",
-        "Etc/GMT-3",
-        "Etc/GMT-4",
-        "Etc/GMT-5",
-        "Etc/GMT-6",
-        "Etc/GMT-7",
-        "Etc/GMT-8",
-        "Etc/GMT-9",
-        "Etc/Greenwich",
-        "Etc/Universal",
-        "Etc/Zulu",
-        "Etc/GMT0",
-        "Etc/GMT+0",
-        "Etc/GMT+1",
-        "Etc/GMT+10",
-        "Etc/GMT+11",
-        "Etc/GMT+12",
-        "Etc/GMT-14",
-        "Etc/GMT+2",
-        "Etc/GMT+3",
-        "Etc/GMT+4",
-        "Etc/GMT+5",
-        "Etc/GMT+6",
-        "Etc/GMT+7",
-        "Etc/GMT+8",
-        "Etc/GMT+9",
-        "Etc/UCT",
-        "Etc/UTC"
+        "Pacific/Auckland",
+        "Pacific/Bougainville",
+        "Pacific/Chatham",
+        "Pacific/Easter",
+        "Pacific/Efate",
+        "Pacific/Fakaofo",
+        "Pacific/Fiji",
+        "Pacific/Galapagos",
+        "Pacific/Gambier",
+        "Pacific/Guadalcanal",
+        "Pacific/Guam",
+        "Pacific/Honolulu",
+        "Pacific/Kanton",
+        "Pacific/Kiritimati",
+        "Pacific/Kosrae",
+        "Pacific/Kwajalein",
+        "Pacific/Marquesas",
+        "Pacific/Nauru",
+        "Pacific/Niue",
+        "Pacific/Norfolk",
+        "Pacific/Noumea",
+        "Pacific/Pago_Pago",
+        "Pacific/Palau",
+        "Pacific/Pitcairn",
+        "Pacific/Port_Moresby",
+        "Pacific/Rarotonga",
+        "Pacific/Tahiti",
+        "Pacific/Tarawa",
+        "Pacific/Tongatapu",
+        "UTC"
       ],
       "zone": "America/New_York",
-      "method": "manual",
-      "time": "2021-10-11 15:51:55\n",
+      "method": "auto",
+      "time": "2021-10-11 15:51:55",
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
 
-    # TZ='America/New_York' ./set_timezone.sh
+    # ./datetime_put_datetime.sh
 
     =========================
     Set datetime
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    99  100    61  100    38     37     23  0:00:01  0:00:01 --:--:--    61
     {
-      "time": "2021-10-11 15:52:02\n",
+      "time": "2021-10-11 15:52:02",
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
-### ./set_timezone.sh with no timezone will just return the current time
+### ./datetime_put.sh will change the timezone
 
-    # ./set_timezone.sh
+    # TZ='America/New_York' ./datetime_put.sh
 
     =========================
-    Set datetime
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    83  100    61  100    22    194     70 --:--:-- --:--:-- --:--:--   265
+    Set time zone
     {
-      "time": "2021-10-11 15:52:07\n",
+      "time": "2021-10-11 15:52:07",
       "SDCERR": 0,
-      "InfoMsg": ""
+      "InfoMsg": "America/New_York"
     }
 
 # Factory reset / reboot
 
-    # ./factory_reset.sh
+    # ./factoryReset_put.sh
 
     =========================
     Factory Reset
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    43  100    43    0     0     62      0 --:--:-- --:--:-- --:--:--    62
     {
       "SDCERR": 0,
       "InfoMsg": "Reboot required"
@@ -1897,7 +1609,7 @@ this will create all the example connections in this package:
     Reboot required
 
 
-    # ./reboot.sh
+    # ./reboot_put.sh
 
     =========================
     Factory Reset
@@ -1905,9 +1617,6 @@ this will create all the example connections in this package:
 
     =========================
     Reboot
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    44  100    44    0     0     73      0 --:--:-- --:--:-- --:--:--    74
     {
       "SDCERR": 0,
       "InfoMsg": "Reboot initiated"
@@ -1916,37 +1625,28 @@ this will create all the example connections in this package:
 # download upload encrypted file
 ## this feature lets you download a config or log encrypted with a supplied password, or a debug file with both encrypted with the sever certificate - appropriate for email
 
-    # ./get_config.sh
+    # ./file_get-config.sh
 
     =========================
     Get config
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   755  100   755    0     0   3106      0 --:--:-- --:--:-- --:--:--  3106
     config.zip downloaded
 
-    # ./get_log.sh
+    # ./file_get-log.sh
 
     =========================
     Get config
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   755  100   755    0     0   2233      0 --:--:-- --:--:-- --:--:--  2233
 
     log.zip downloaded.
-    # ./get_debug.sh
+    # ./file_get-debug.sh
 
     =========================
     Get config
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   755  100   755    0     0   2046      0 --:--:-- --:--:-- --:--:--  2040
 
-    debug.encrtpt file downloaded. To decrypt:
+    debug.encrypt file downloaded. To decrypt:
     openssl cms -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip -inform DER
 
 ## upload a config.zip configuration:
-    # ./post_config.sh
+    # ./file_post-config.sh
 
     =========================
     POST config
@@ -1954,7 +1654,11 @@ this will create all the example connections in this package:
     config.zip uploaded. Reboot to take effect
 
 ## delete file
-### not working currently
+    # FILE=user1.pem TYPE=cert ./file_delete-cert.sh 
+
+    =========================
+    Delete cert file for Network Manager
+    {"SDCERR": 0, "InfoMsg": "file user1.pem deleted"}
 
 # firmware update
 
@@ -1963,20 +1667,25 @@ this will create all the example connections in this package:
 
 # version info
 
-    # ./version.sh
+    # ./version_get.sh
 
     =========================
     Versions
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   229  100   229    0     0    748      0 --:--:-- --:--:-- --:--:--   748
     {
-      "nm_version": "9.0.0.15-1.32.4",
-      "summit_rcm": "11.0.0.0",
-      "build": "Summit Linux development build 0.7.0.0 20211010",
-      "supplicant": "sdcsupp v9.0.0.15-40.3.16.26",
+      "build": "Summit Linux development build 0.12.0.0",
+      "supplicant": "12.0.0.113-40.3.25.3",
       "driver": "lrdmwl_sdio",
-      "driver_version": "4.19.203"
+      "bluez": "5.72",
+      "u-boot": "2024.04-12.0.0.138-som60sd",
+      "nm_version": "12.0.0.113-1.46.2",
+      "summit_rcm": "12.0.0.153",
+      "radio_stack": "12.0.0.113",
+      "kernel_vermagic": "4.19.203",
+      "current_side": "a",
+      "next_side": "a",
+      "base_hw_part_number": "453-00004",
+      "SDCERR": 0,
+      "InfoMsg": ""
     }
 
 #WIFI Geolocation Scanning control (only setable with LITE mode)
@@ -1985,9 +1694,6 @@ this will create all the example connections in this package:
 
     =========================
     AWM Get
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   107  100   107    0     0    378      0 --:--:-- --:--:-- --:--:--   376
     {
       "SDCERR": 0,
       "InfoMsg": "AWM configuration only supported in LITE mode",
@@ -2000,9 +1706,6 @@ this will create all the example connections in this package:
     AWM PUT
     empty:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   132  100   130  100     2    714     10 --:--:-- --:--:-- --:--:--   725
     {
       "SDCERR": 1,
       "InfoMsg": "AWM's geolocation scanning configuration only supported in LITE mode",
@@ -2013,9 +1716,6 @@ this will create all the example connections in this package:
 
     set:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   163  100   130  100    33    698    177 --:--:-- --:--:-- --:--:--   871
     {
       "SDCERR": 1,
       "InfoMsg": "AWM's geolocation scanning configuration only supported in LITE mode",
@@ -2026,17 +1726,11 @@ this will create all the example connections in this package:
 
     unset:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   163  100   130  100    33    684    173 --:--:-- --:--:-- --:--:--   857
     {
       "SDCERR": 1,
       "InfoMsg": "AWM's geolocation scanning configuration only supported in LITE mode",
       "geolocation_scanning_enable": 1
     }
-
-# Positioning
-# Positioning Switch
 
 # Fips
 
@@ -2044,9 +1738,6 @@ this will create all the example connections in this package:
 
     =========================
     Fips Get
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    63  100    63    0     0    127      0 --:--:-- --:--:-- --:--:--   127
     {
       "SDCERR": 0,
       "InfoMsg": "Not a FIPS image",
@@ -2057,9 +1748,6 @@ this will create all the example connections in this package:
 
     =========================
     Fips GET
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    63  100    63    0     0    176      0 --:--:-- --:--:-- --:--:--   175
     {
       "SDCERR": 0,
       "InfoMsg": "Not a FIPS image",
@@ -2070,9 +1758,6 @@ this will create all the example connections in this package:
     Fips PUT
     empty:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    64  100    62  100     2    179      5 --:--:-- --:--:-- --:--:--   184
     {
       "SDCERR": 1,
       "InfoMsg": "Invalid option: no option provided"
@@ -2081,9 +1766,6 @@ this will create all the example connections in this package:
 
     invalid:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    67  100    50  100    17    135     46 --:--:-- --:--:-- --:--:--   182
     {
       "SDCERR": 1,
       "InfoMsg": "Invalid option: status"
@@ -2092,9 +1774,6 @@ this will create all the example connections in this package:
 
     unset:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    60  100    44  100    16    107     39 --:--:-- --:--:-- --:--:--   146
     {
       "SDCERR": 1,
       "InfoMsg": "Not a FIPS image"
@@ -2111,9 +1790,6 @@ this will create all the example connections in this package:
     Bluetooth scan
     reset controller, clear cache and force fresh scan:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    79  100    28  100    51    965   1758 --:--:-- --:--:-- --:--:--  2724
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2123,9 +1799,6 @@ this will create all the example connections in this package:
 
     scan:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    79  100    28  100    51     39     72 --:--:-- --:--:-- --:--:--   111
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2135,9 +1808,6 @@ this will create all the example connections in this package:
 
     confirm:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    96  100    96    0     0   8000      0 --:--:-- --:--:-- --:--:--  8000
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2150,9 +1820,6 @@ this will create all the example connections in this package:
 
     results:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100  4449  100  4449    0     0   217k      0 --:--:-- --:--:-- --:--:--  217k
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2209,9 +1876,6 @@ this will create all the example connections in this package:
 
     enable discovery:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    47  100    28  100    19   2153   1461 --:--:-- --:--:-- --:--:--  3615
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2221,9 +1885,6 @@ this will create all the example connections in this package:
 
     pair:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   104  100    91    0    13      2      0  0:00:45  0:00:31  0:00:14    28
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2233,9 +1894,6 @@ this will create all the example connections in this package:
 
     read state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   578  100   578    0     0  10703      0 --:--:-- --:--:-- --:--:-- 10703
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2266,9 +1924,6 @@ this will create all the example connections in this package:
 
     Bluetooth connect:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    29  100    13  100    16     46     57 --:--:-- --:--:-- --:--:--   103
     {
       "SDCERR": 0
       "InfoMsg": ""
@@ -2277,9 +1932,6 @@ this will create all the example connections in this package:
 
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   428  100   428    0     0  30571      0 --:--:-- --:--:-- --:--:-- 30571
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2307,9 +1959,6 @@ this will create all the example connections in this package:
 
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   428  100   428    0     0  30571      0 --:--:-- --:--:-- --:--:-- 30571
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2335,9 +1984,6 @@ this will create all the example connections in this package:
 
     open vsp port 1001:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   294  100    28  100   266     53    507 --:--:-- --:--:-- --:--:--   561
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2346,9 +1992,6 @@ this will create all the example connections in this package:
 
     check VSP service ports:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   137  100    96  100    41   7384   3153 --:--:-- --:--:-- --:--:-- 10538
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2376,9 +2019,6 @@ this will create all the example connections in this package:
 
     close vsp service port:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    75  100    28  100    47      7     13  0:00:04  0:00:03  0:00:01    21
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2386,9 +2026,6 @@ this will create all the example connections in this package:
 
     check VSP service ports:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    92  100    51  100    41   3187   2562 --:--:-- --:--:-- --:--:--  5750
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2397,9 +2034,6 @@ this will create all the example connections in this package:
 
     Bluetooth disconnect:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    29  100    13  100    16    812   1000 --:--:-- --:--:-- --:--:--  1812
     {
       "SDCERR": 0
       "InfoMsg": ""
@@ -2408,9 +2042,6 @@ this will create all the example connections in this package:
 
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   428  100   428    0     0  28533      0 --:--:-- --:--:-- --:--:-- 28533
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2440,9 +2071,6 @@ this will create all the example connections in this package:
 
     Bluetooth connect:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    29  100    13  100    16     32     40 --:--:-- --:--:-- --:--:--    72
     {
       "SDCERR": 0
       "InfoMsg": ""
@@ -2451,9 +2079,6 @@ this will create all the example connections in this package:
 
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   631  100   631    0     0   1719      0 --:--:-- --:--:-- --:--:--  1719
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2483,9 +2108,6 @@ this will create all the example connections in this package:
 
     open vsp port 1001:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    98  100    28  100    70     51    128 --:--:-- --:--:-- --:--:--   179
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2494,9 +2116,6 @@ this will create all the example connections in this package:
 
     check HID service ports:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   135  100    95  100    40    281    118 --:--:-- --:--:-- --:--:--   398
     {
       "SDCERR": 0,
       "InfoMsg": "00:07:BE:33:80:AB",
@@ -2522,9 +2141,6 @@ this will create all the example connections in this package:
 
     close HID service TCP port:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    74  100    28  100    46     86    141 --:--:-- --:--:-- --:--:--   228
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2532,9 +2148,6 @@ this will create all the example connections in this package:
 
     check HID service ports:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    90  100    50  100    40    192    153 --:--:-- --:--:-- --:--:--   346
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2543,9 +2156,6 @@ this will create all the example connections in this package:
 
     Bluetooth disconnect:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    29  100    13  100    16      3      4  0:00:04  0:00:03  0:00:01     8
     {
       "SDCERR": 0
       "InfoMsg": ""
@@ -2554,9 +2164,6 @@ this will create all the example connections in this package:
 
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   618  100   618    0     0   1889      0 --:--:-- --:--:-- --:--:--  1884
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2586,9 +2193,6 @@ this will create all the example connections in this package:
     Bluetooth ble server start
 
     open ble server port 1001:
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-	                             Dload  Upload   Total   Spent    Left  Speed
-    100   102  100    28  100    74      9     24  0:00:03  0:00:03 --:--:--    33
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2665,9 +2269,6 @@ this will create all the example connections in this package:
 
     =========================
     Bluetooth ble server stop
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    74  100    28  100    46     15     24  0:00:01  0:00:01 --:--:--    40
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2677,9 +2278,6 @@ this will create all the example connections in this package:
     # IPADDR=localhost ./bluetooth_ble_start_discovery.sh
     =========================
     Bluetooth ble start discovery
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    78  100    28  100    50     52     93 --:--:-- --:--:-- --:--:--   144
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2717,9 +2315,6 @@ this will create all the example connections in this package:
     # IPADDR=localhost ./bluetooth_ble_stop_discovery.sh
     =========================
     Bluetooth ble stop discovery
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    77  100    28  100    49   1217   2130 --:--:-- --:--:-- --:--:--  3347
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2732,18 +2327,12 @@ this will create all the example connections in this package:
 
     Bluetooth connect:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100    53  100    28  100    25      8      7  0:00:03  0:00:03 --:--:--    16
     {
       "SDCERR": 0,
       "InfoMsg": ""
     }
 
     read Bluetooth state:
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   428  100   428    0     0  26750      0 --:--:-- --:--:-- --:--:-- 26750
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2769,9 +2358,6 @@ this will create all the example connections in this package:
     Short delay to allow services to discover...
     read Bluetooth state:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   428  100   428    0     0  28533      0 --:--:-- --:--:-- --:--:-- 28533
     {
       "SDCERR": 0,
       "InfoMsg": "",
@@ -2799,9 +2385,6 @@ this will create all the example connections in this package:
     =========================
     Bluetooth GATT notify
     Please invoke bluetooth_ble_connect.sh prior to receive response.
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   243  100    28  100   215    358   2756 --:--:-- --:--:-- --:--:--  3115
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2825,9 +2408,6 @@ this will create all the example connections in this package:
     =========================
     Bluetooth GATT read
     Please invoke bluetooth_ble_connect.sh prior to receive response.
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   215  100    28  100   187    368   2460 --:--:-- --:--:-- --:--:--  2866
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2850,9 +2430,6 @@ this will create all the example connections in this package:
     =========================
     Bluetooth GATT read
     Please invoke bluetooth_ble_connect.sh prior to receive response.
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   356  100   169  100   187      7      8  0:00:24  0:00:22  0:00:02    46
     {
       "SDCERR": 1,
       "InfoMsg": "Failed to read device E0:13:7D:9D:2E:45 characteristic 6e400003-b5a3-f393-e0a9-e50e24dcca9e: org.bluez.Error.NotPermitted: Read not permitted"
@@ -2864,9 +2441,6 @@ this will create all the example connections in this package:
     =========================
     Bluetooth GATT write
     Please invoke bluetooth_ble_connect.sh prior to receive response.
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   247  100    28  100   219   1272   9954 --:--:-- --:--:-- --:--:-- 11227
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2877,9 +2451,6 @@ this will create all the example connections in this package:
     =========================
     Bluetooth GATT notify
     Please invoke bluetooth_ble_connect.sh prior to receive response.
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   243  100    28  100   215    337   2590 --:--:-- --:--:-- --:--:--  2927
     {
       "SDCERR": 0,
       "InfoMsg": ""
@@ -2905,9 +2476,6 @@ this will create all the example connections in this package:
     Bluetooth scan
     reset controller, clear cache and force fresh scan:
 
-      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                     Dload  Upload   Total   Spent    Left  Speed
-    100   805  100   754  100    51  75400   5100 --:--:-- --:--:-- --:--:-- 80500
     parse error: Invalid numeric literal at line 1, column 10
 
 
@@ -2918,7 +2486,7 @@ The restful APIs are all using SSL but the certificate on the device may not be 
 
 if you do not want to use the --insecure on your curl commands:
 
-Think of how the ca certs work for existing web sites.  There are a bunch of global certificate authorities that issue certificates to companies for their web sites.  There is typically one CA certificate for a paticular CA authority. The domain name is in the sub-certificates issued to the companies. The validation of trust goes through the certificate chain to the CA certificates but, the domain name comes from the final sub-certificate.
+Think of how the ca certs work for existing web sites.  There are a bunch of global certificate authorities that issue certificates to companies for their web sites.  There is typically one CA certificate for a particular CA authority. The domain name is in the sub-certificates issued to the companies. The validation of trust goes through the certificate chain to the CA certificates but, the domain name comes from the final sub-certificate.
 
 So, first, take a look at the server.crt on the som60 (DUT) itself: (My DUT is 192.168.1.233)
 
@@ -2943,10 +2511,9 @@ Finally, replace --insecure with --cacert ca.crt and use the DNS name insead of 
 
 ## Override global_setting values
 
-Any value provided with global_settings can be overidden at invocation buy suppling the desired value before the calling the script.
+Any value provided with global_settings can be overidden at invocation by suppling the desired value before the calling the script.
 For instance, the actual strings curl is sending can be examined by adding CURL_APP=echo to the beginning of any command line invocation.  Similarly, the use of the jq app can be overridden.
 
     CURL_APP=echo JQ_APP=tee ./login.sh
 
 *Note that these substitutions are not persistent - with the exception of IPADDR which is persistent.*
-
