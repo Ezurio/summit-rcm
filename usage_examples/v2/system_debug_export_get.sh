@@ -26,4 +26,4 @@ wait
 
 echo
 echo "${ARCHIVE_PATH} file downloaded. To decrypt:"
-echo "openssl cms -decrypt -in ${ARCHIVE_PATH} -recip ../../ssl/server.crt -inkey ../../ssl/server.key -out debug.zip -inform DER"
+echo "openssl cms -decrypt -in ${ARCHIVE_PATH} -recip /path/to/server.crt -inkey /path/to/server.key -out debug.zip -inform DER"
