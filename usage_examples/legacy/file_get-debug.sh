@@ -15,4 +15,4 @@ ${CURL_APP} -s --location \
     --output debug.encrypt
 
 echo -e "\ndebug.encrypt file downloaded. To decrypt:"
-echo "openssl smime -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip --inform DER"
+echo "openssl cms -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip -inform DER"
