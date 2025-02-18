@@ -1943,7 +1943,7 @@ this will create all the example connections in this package:
     100   755  100   755    0     0   2046      0 --:--:-- --:--:-- --:--:--  2040
 
     debug.encrtpt file downloaded. To decrypt:
-    openssl smime -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip --inform DER
+    openssl cms -decrypt -in debug.encrypt -recip server.crt -inkey server.key -out debug.zip -inform DER
 
 ## upload a config.zip configuration:
     # ./post_config.sh
