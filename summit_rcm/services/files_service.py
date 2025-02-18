@@ -531,7 +531,7 @@ class FilesService(metaclass=Singleton):
             proc = run(
                 [
                     "openssl",
-                    "smime",
+                    "cms",
                     "-encrypt",
                     "-aes256",
                     "-in",
