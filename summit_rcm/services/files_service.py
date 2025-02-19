@@ -502,11 +502,11 @@ class FilesService(metaclass=Singleton):
         result = (False, "Unknown error", None)
 
         try:
-            debug_paths: list[str] = [FilesService.get_log_path()]
-            if FilesService.is_encrypted_storage_toolkit_enabled():
-                debug_paths.append(definition.FILEDIR_DICT.get("config"))
-            else:
-                debug_paths.extend([NETWORKMANAGER_DIR_FULL, SUMMIT_RCM_DIR])
+            debug_paths: list[str] = [
+                FilesService.get_log_path(),
+                NETWORKMANAGER_DIR_FULL,
+                SUMMIT_RCM_DIR,
+            ]
 
             # Generate the archive using 'zip' (the built-in Python zipfile implementation is
             # handled in pure Python, is "extremely slow", and does not support generating
