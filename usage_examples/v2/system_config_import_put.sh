@@ -21,7 +21,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/system/config/import \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'archive=@"'${ARCHIVE_PATH}'"' \
     --form 'password="'${ARCHIVE_PASSWORD}'"' \
     -o >(${JQ_APP})

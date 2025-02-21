@@ -17,7 +17,7 @@ REQUEST_URL="${URL}/certificateProvisioning"
 
 ${CURL_APP} -s --location \
     --request POST "${REQUEST_URL}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'configFile=@"'"${CONFIG_FILE}"'"' \
     --form 'opensslKeyGenArgs="'"${OPENSSL_KEY_GEN_ARGS}"'"' \
     --output dev.csr

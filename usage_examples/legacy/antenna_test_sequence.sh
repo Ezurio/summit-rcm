@@ -26,9 +26,8 @@ login () {
     ${CURL_APP} -s --header "Content-Type: application/json" \
         --request POST \
         --data '{"username":"'"${SUMMIT_RCM_USERNAME}"'","password":"'"${SUMMIT_RCM_PASSWORD}"'"}' \
-        --insecure ${URL}/login \
-        -c cookie \
-        -b cookie \
+        ${URL}/login \
+        ${AUTH_OPT} \
     | ${JQ_APP}
 
     echo "Login complete"
@@ -38,12 +37,13 @@ login () {
 find_wlan0_mac_address () {
     echo "Retrieving wlan0 MAC address..."
 
-    network_interface=`${CURL_APP} -s --location \
+    network_interface=$(${CURL_APP} -s --location \
         --request GET ${URL}/networkInterface?name=wlan0 \
-        -b cookie -c cookie --insecure \
-    | ${JQ_APP}`
+        ${AUTH_OPT} \
+    | ${JQ_APP})
 
-    WLAN_MAC=`echo $network_interface | tr '\n' ' ' | sed -nr 's/.*"PermHwAddress": "([a-fA-F0-9\:]*)",.*/\1/p'`
+    WLAN_MAC=$(echo "$network_interface" | tr '\n' ' ' | \
+        sed -nr 's/.*"PermHwAddress": "([a-fA-F0-9\:]*)",.*/\1/p')
 
     echo "Found wlan0 MAC address as '${WLAN_MAC}'"
     echo ""
@@ -54,7 +54,7 @@ set_radio_siso_mode () {
 
     ${CURL_APP} -s --location \
         --request PUT "${URL}/radioSISOMode?SISO_mode=$1" \
-        -b cookie -c cookie --insecure \
+        ${AUTH_OPT} \
         --data-raw '' \
     | ${JQ_APP}
 
@@ -69,7 +69,7 @@ create_ap_connection () {
     ${CURL_APP} -s --header "Content-Type: application/json" \
         --request POST \
         ${URL}/connection \
-        -b cookie -c cookie --insecure \
+        ${AUTH_OPT} \
         --data '{
             "connection": {
                 "autoconnect": 1,
@@ -92,13 +92,14 @@ create_ap_connection () {
         }'\
     | ${JQ_APP}
 
-    connections=`${CURL_APP} -s --header "Content-Type: application/json" \
+    connections=$(${CURL_APP} -s --header "Content-Type: application/json" \
         --request GET \
         ${URL}/connections \
-        -b cookie -c cookie --insecure \
-    | ${JQ_APP}`
+        ${AUTH_OPT} \
+    | ${JQ_APP})
 
-    CONNECTION_UUID=`echo $connections | tr '\n' ' ' | sed -nr "s/.*\"(.*)\": \{\s*\"activated\": .,\s*\"id\": \"${SSID}\".*/\1/p"`
+    CONNECTION_UUID=$(echo "$connections" | tr '\n' ' ' | \
+        sed -nr "s/.*\"(.*)\": \{\s*\"activated\": .,\s*\"id\": \"${SSID}\".*/\1/p")
     echo "Connection created"
     echo "> SSID: ${SSID}"
     echo "> UUID: ${CONNECTION_UUID}"
@@ -111,7 +112,7 @@ activate_connection () {
     ${CURL_APP} -s --header "Content-Type: application/json" \
         --request PUT \
         ${URL}/connection \
-        -b cookie -c cookie --insecure \
+        ${AUTH_OPT} \
         --data '{
             "uuid": "'"$1"'",
             "activate" : '1'
@@ -136,7 +137,7 @@ remove_connection () {
 
     ${CURL_APP}  \
         -s --request DELETE ${URL}/connection?uuid=$1 \
-        -b cookie -c cookie --insecure \
+        ${AUTH_OPT} \
     | ${JQ_APP}
 
     echo "Connection deleted"
@@ -156,13 +157,13 @@ set_radio_siso_mode 1
 create_ap_connection "ANT0"
 
 # Activate the ANT0 connection
-activate_connection $CONNECTION_UUID
+activate_connection "$CONNECTION_UUID"
 
 # Sleep to allow for detecting SSID
 delay_for_ap_detection 30
 
 # Delete ANT0 connection
-remove_connection $CONNECTION_UUID
+remove_connection "$CONNECTION_UUID"
 
 # Configure the SOM60's radio for ANT1 (SISO_MODE=2)
 set_radio_siso_mode 2
@@ -171,13 +172,13 @@ set_radio_siso_mode 2
 create_ap_connection "ANT1"
 
 # Activate the ANT1 connection
-activate_connection $CONNECTION_UUID
+activate_connection "$CONNECTION_UUID"
 
 # Sleep to allow for detecting SSID
 delay_for_ap_detection 30
 
 # Delete ANT1 connection
-remove_connection $CONNECTION_UUID
+remove_connection "$CONNECTION_UUID"
 
 # Revert to default SISO mode (SISO_MODE=-1)
 set_radio_siso_mode -1

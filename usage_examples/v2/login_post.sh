@@ -17,7 +17,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request POST ${URL}/api/v2/login \
     --header 'Content-Type: application/json' \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "username": "'"${SUMMIT_RCM_USERNAME}"'",
         "password": "'"${SUMMIT_RCM_PASSWORD}"'"

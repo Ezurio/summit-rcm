@@ -16,7 +16,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request PUT ${URL}/api/v2/system/allowUnauthenticatedResetReboot \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --header "Content-Type: application/json" \
     -o >(${JQ_APP})
 

@@ -34,7 +34,7 @@ curl -s --location \
     -w "%{http_code}\n" \
     --request PUT ${URL}/api/v2/system/logs/config \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "suppDebugLevel": "'"${SUPPLICANT_DEBUG_LEVEL}"'",
         "driverDebugLevel": '"${WIFI_DRIVER_DEBUG_LEVEL}"'

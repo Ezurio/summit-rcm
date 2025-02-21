@@ -9,7 +9,7 @@ echo -e "\n\n========================="
 echo "wifi enable put"
 ${CURL_APP} -s --location --request PUT "${URL}/wifiEnable?enable=${ENABLE}" \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data-raw '' \
 | ${JQ_APP}
 

@@ -19,7 +19,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request GET ${URL}/api/v2/system/debug/export \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --output ${ARCHIVE_PATH}
 
 wait

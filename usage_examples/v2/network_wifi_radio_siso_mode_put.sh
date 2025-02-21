@@ -20,7 +20,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/network/wifi/radioSISOMode \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "sisoMode": '"${SISO_MODE}"'
     }' \

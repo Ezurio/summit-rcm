@@ -19,7 +19,7 @@ fi
 echo -e "\nset trusted and autoConnect:\n"
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie --insecure\
+    ${AUTH_OPT} \
     --data "{\"autoConnect\": ${BT_AUTOCONNECT}}" \
     | ${JQ_APP}
 echo -e '\n'
@@ -27,6 +27,6 @@ echo -e '\n'
 echo -e "\nread state:\n"
 ${CURL_APP} --location --request GET ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie --insecure\
+    ${AUTH_OPT} \
     | ${JQ_APP}
 echo -e '\n'

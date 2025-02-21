@@ -29,7 +29,7 @@ fi
 echo -e "\nBluetooth connect:\n"
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{"connected": 1}' \
     | ${JQ_APP}
 echo -e '\n'
@@ -37,7 +37,7 @@ echo -e '\n'
 echo -e "\nread Bluetooth state:\n"
 ${CURL_APP} --location --request GET ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     | ${JQ_APP} | grep --color --context=99 Connected
 echo -e '\n'
 
@@ -47,7 +47,7 @@ sleep 1
 echo -e "\nread Bluetooth state:\n"
 ${CURL_APP} --location --request GET ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     | ${JQ_APP} | grep --color --context=99 ServicesResolved
 echo -e '\n'
 
@@ -55,7 +55,7 @@ echo -e "\nopen vsp port ${VSP_TCP_PORT}:\n"
 
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "gattConnect",
         "tcpPort": "'"${VSP_TCP_PORT}"'",
@@ -71,7 +71,7 @@ ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${
 echo -e "\n\ncheck VSP service ports:\n"
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "gattList"
         }' \

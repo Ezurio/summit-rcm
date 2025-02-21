@@ -19,7 +19,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request POST ${URL}/api/v2/system/certificateProvisioning \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'configFile=@"'"${CONFIG_FILE}"'"' \
     --form 'opensslKeyGenArgs="'"${OPENSSL_KEY_GEN_ARGS}"'"' \
     --output dev.csr

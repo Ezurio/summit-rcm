@@ -11,6 +11,6 @@ echo "network interface available AP channels"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --request GET \
     ${URL}/networkInterfaceAvailableApChannels?name=${IFNAME} \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 echo -e "\n"

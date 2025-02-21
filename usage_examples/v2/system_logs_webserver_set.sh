@@ -27,7 +27,7 @@ curl -s --location \
     -w "%{http_code}\n" \
     --request PUT ${URL}/api/v2/system/logs/webserver \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "webserverLogLevel": "'"${WEBSERVER_LOG_LEVEL}"'"
     }' \

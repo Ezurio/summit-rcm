@@ -21,7 +21,7 @@ fi
 
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "bleGatt",
         "operation": "notify",

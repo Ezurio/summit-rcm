@@ -22,7 +22,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/network/wifi \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "wifiRadioSoftwareEnabled": '"${WIFI_RADIO_SOFTWARE_ENABLED}"',
         "wifiRadioHardwareEnabled": true

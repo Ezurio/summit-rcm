@@ -11,7 +11,7 @@ echo "Get networkinterfaces"
 
 ${CURL_APP} -s --location \
     --request GET ${URL}/networkInterfaces \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 
 echo -e "\n"
