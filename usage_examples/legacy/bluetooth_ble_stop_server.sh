@@ -9,7 +9,7 @@ echo "Bluetooth ble server stop"
 
 ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "bleStopServer"
         }' \

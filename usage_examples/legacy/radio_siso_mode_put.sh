@@ -10,7 +10,7 @@ echo "Set radio SISO mode"
 
 ${CURL_APP} -s --location \
     --request PUT "${URL}/radioSISOMode?SISO_mode=${SISO_MODE}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data-raw '' \
 | ${JQ_APP}
 echo -e "\n"

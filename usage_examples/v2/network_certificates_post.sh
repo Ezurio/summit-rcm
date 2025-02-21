@@ -21,7 +21,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request POST ${URL}/api/v2/network/certificates/${FILE_NAME} \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'file=@"'"${FILE_PATH}"'"' \
     -o >(${JQ_APP})
 

@@ -16,8 +16,7 @@ ${CURL_APP} -s --location \
     --data '{
     "datetime": "'"${DATETIME}"'","method": "manual"
     }' \
-    --insecure \
-    -b cookie -c cookie \
+    ${AUTH_OPT} \
     | ${JQ_APP}
 
 

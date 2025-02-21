@@ -16,7 +16,7 @@ fi
 echo -e "\nBluetooth Get Connection Info:\n"
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{"command": "getConnInfo"}' \
     | ${JQ_APP}
 echo -e '\n'
@@ -25,6 +25,6 @@ echo -e '\n'
 echo -e "\nread Bluetooth state:\n"
 ${CURL_APP} --location --request GET ${URL}/api/v2/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     | ${JQ_APP} | grep --color --context=99 -i rssi
 echo -e '\n'

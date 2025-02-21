@@ -26,7 +26,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PATCH ${URL}/api/v2/login/users/${TARGET_USER_USERNAME} \
     --header 'Content-Type: application/json' \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "currentPassword": "'"${CURRENT_PASSWORD}"'",
         "newPassword": "'"${NEW_PASSWORD}"'",

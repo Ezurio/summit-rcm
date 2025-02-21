@@ -10,7 +10,7 @@ echo "Activate LogForwarding"
 ${CURL_APP} -s --location \
     --request PUT ${URL}/logForwarding \
     --header "Content-Type: application/json" \
-    -b cookie --insecure \
+    ${AUTH_OPT} \
     --data-raw '{"state":"active"}' \
 | ${JQ_APP}
 

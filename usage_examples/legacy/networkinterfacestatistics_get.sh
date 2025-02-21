@@ -10,6 +10,6 @@ echo "network interface statistics"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --request GET \
     ${URL}/networkInterfaceStatistics?name=${IFNAME} \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 echo -e "\n"
