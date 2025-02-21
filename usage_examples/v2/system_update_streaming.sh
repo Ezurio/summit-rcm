@@ -37,7 +37,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/system/update \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "status": 2,
         "url": "",
@@ -63,7 +63,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/system/update \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "status": 5,
         "url": "",
@@ -84,7 +84,7 @@ curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request POST ${URL}/api/v2/system/update/updateFile \
     --header "Content-Type: application/octet-stream" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data-binary @${FIRMWARE} \
     -o >(${JQ_APP})
 
@@ -103,7 +103,7 @@ while true; do
     curl -s --location \
         -w "%{http_code}\nResponse:\n" \
         --request GET ${URL}/api/v2/system/update \
-        -b cookie -c cookie --insecure \
+        ${AUTH_OPT} \
         -o >(${JQ_APP}) | tee status
 
     wait

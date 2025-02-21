@@ -11,6 +11,6 @@ echo "network interface current DHCP leases"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --request GET \
     ${URL}/networkInterfaceDhcpLeases?name=${IFNAME} \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 echo -e "\n"

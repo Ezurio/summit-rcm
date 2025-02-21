@@ -13,7 +13,7 @@ echo "Activate/Deactivate connection"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --request PUT \
     ${URL}/connection \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
       "uuid": "'"${UUID}"'",
       "activate" : '${ACTIVATE}'

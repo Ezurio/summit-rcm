@@ -23,7 +23,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request GET "${URL}/api/v2/system/logs/data?type=${LOG_TYPE}&priority=${PRIORITY}&days=${DAYS}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     -o >(${JQ_APP})
 
 wait

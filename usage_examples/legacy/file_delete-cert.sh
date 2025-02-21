@@ -12,7 +12,7 @@ echo "========================="
 echo "Delete cert file for Network Manager"
 
 ${CURL_APP} -s --request DELETE "${URL}/file?file=${FILE}&type=${TYPE}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
  #   | ${JQ_APP}
 
 echo -e "\n"

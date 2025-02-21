@@ -1,8 +1,15 @@
+#! /bin/bash
+##
+## SPDX-License-Identifier: LicenseRef-Ezurio-Clause
+## Copyright (C) 2024 Ezurio LLC.
+##
+
 # global settings.  If these values are set prior to sourcing this file,
 #                   the earlier value will be retained.
 #                   Adjust these values for your system.
 
-# setup the Ip address of the DUT
+# Setup the IP address of the DUT, use a domain name if using a CA certificate
+# Domain name is assumed to be provided by DNS or /etc/hosts
 if [ -z "$IPADDR" ]; then
     IPADDR=198.18.101.1
 else
@@ -35,6 +42,33 @@ if [ -z "${JQ_APP}" ]; then
         JQ_APP=smart_jq
     fi
 fi
+
+# Path to the CA certificate to use for server authentication, leave blank for default insecure mode
+AUTH_CA_CERT=""
+# Path to the client certificate and key to use for mutual authentication, leave blank for default insecure mode
+AUTH_CLIENT_CERT=""
+AUTH_CLIENT_KEY=""
+
+# Set authentication type to use for the Summit RCM API, one of:
+#  - "insecure" for no authentication using username/password (default)
+#  - "server-only" for server authentication using a CA certificate and username/password
+#  - "mutual" for server and client authentication using CA certificate and client key/certificate pair
+AUTH_TYPE="${AUTH_TYPE:-insecure}"
+case "${AUTH_TYPE}" in
+    insecure)
+        AUTH_OPT="--insecure -b cookie -c cookie"
+        ;;
+    server-only)
+        AUTH_OPT="--cacert ${AUTH_CA_CERT} -b cookie -c cookie"
+        ;;
+    mutual)
+        AUTH_OPT="--cacert ${AUTH_CA_CERT} --cert ${AUTH_CLIENT_CERT} --key ${AUTH_CLIENT_KEY}"
+        ;;
+    *)
+        echo "Invalid AUTH_TYPE: ${AUTH_TYPE}"
+        exit 1
+        ;;
+esac
 
 URL="${URL:-"https://${IPADDR}"}"
 SUMMIT_RCM_USERNAME="${SUMMIT_RCM_USERNAME:-root}"

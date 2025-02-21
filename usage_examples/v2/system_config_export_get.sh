@@ -21,7 +21,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request GET ${URL}/api/v2/system/config/export \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --header "Content-Type: application/json" \
     --data '{
         "password": "'"${ARCHIVE_PASSWORD}"'"

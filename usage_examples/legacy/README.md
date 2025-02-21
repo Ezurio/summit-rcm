@@ -7,9 +7,9 @@ This is a set of scripts which can be used for testing/verification and examples
 
 These scripts and testing are verified on Ubuntu 24.04, but the curl commands should work on other platforms.  The global_settings will likely only work on Linux variants without modifications.
 
-The intent is for settings that remain consistent amongst all the scripts can be stored in the global_settings file.  The ip address of the Device Under Test (DUT) can be supplied with the variable IPADDR and this will be stored automatically.  Any other changes to global_settings must be manually modified.
+The intent is for settings that remain consistent amongst all the scripts can be stored in the global_settings file.  The ip address or optional domain name of the Device Under Test (DUT) can be supplied with the variable IPADDR and this will be stored automatically.  Any other changes to global_settings must be manually modified.
 
-The global_settings in my setup are set for after the initial password change.  Therefore, for the initial login, I will supply the original password as a parameter.
+The global_settings are set for after the initial password change. Therefore, for the initial login, the users_put-changepw.sh performs a login POST with the password stored in the ORIGINAL_SUMMIT_RCM_PASSWORD variable and then changes the password to the value stored in the SUMMIT_RCM_PASSWORD variable.
 
 Finally, a word about the cookie file.  The login script will save a cookie file over an existing cookie even if the login fails. This could cause you to lose the session id and get errors when trying other commands, including logging out.  To prevent this, you can make a copy of your cookie file with the appropriate command for your system.  If the issue does occur, you can wait for your session to expire (about 10 minutes), restart the summit-rcm.service from the console login, or reboot the DUT. This condition presents itself as a HTTP 401 (Unauthorized) response.
 
@@ -2480,40 +2480,54 @@ this will create all the example connections in this package:
 
 
 # Extra notes
-## Certificate chain of trust - why are we using --insecure flag?
+## Certificate chain of trust - why are we using `--insecure` flag?
 
-The restful APIs are all using SSL but the certificate on the device may not be installed on your testing machine, or the device might not be named according to the server certificate on the DUT.  We can still use curl with SSL but without certificate validation with the --insecure flag (as all the exmaples do)
+The RESTful APIs are all using SSL, but the certificate on the device may not be installed on your testing machine, or the device might not be named according to the server certificate on the DUT.  We can still use `curl` with SSL but without certificate validation with the `--insecure` flag (as all the examples do by default).
 
-if you do not want to use the --insecure on your curl commands:
+If you do not want to use the `--insecure` flag in your `curl` commands:
 
-Think of how the ca certs work for existing web sites.  There are a bunch of global certificate authorities that issue certificates to companies for their web sites.  There is typically one CA certificate for a particular CA authority. The domain name is in the sub-certificates issued to the companies. The validation of trust goes through the certificate chain to the CA certificates but, the domain name comes from the final sub-certificate.
+Think of how the CA certs work for existing web sites. There are a myriad of global certificate authorities that issue certificates to companies for their web sites. There is typically one CA certificate for a particular CA authority. The domain name is in the sub-certificates issued to the companies. The validation of trust goes through the certificate chain to the CA certificates, but the domain name comes from the final sub-certificate.
 
-So, first, take a look at the server.crt on the som60 (DUT) itself: (My DUT is 192.168.1.233)
+So, first, take a look at the `server.crt` on the DUT itself (here, 192.168.1.233):
 
-	ssh root@192.168.1.233 "openssl x509 -in /etc/summit-rcm/ssl/server.crt -text -noout" | grep DNS
-	root@192.168.1.233's password:
-                DNS:test.summit.com, DNS:*.summit.com
+```
+ssh root@192.168.1.233 "openssl x509 -in /etc/summit-rcm/ssl/server.crt -text -noout" | grep DNS
+root@192.168.1.233's password:
+              DNS:test.summit.com, DNS:*.summit.com
+```
 
-The certificate indicates that test.summit.com is where it is expecting to be found so we can point our device to it with that name by adding that to our /etc/hosts file.
+The certificate indicates that `test.summit.com` is where it is expecting to be found, so we can point our device to it with that name by adding that to our `/etc/hosts` file.
 
-Add test.summit.com to your /etc/hosts file with the address of your DUT:
+Add `test.summit.com` to your `/etc/hosts` file with the address of your DUT:
 
-	# cat /etc/hosts | grep summit
-	192.168.1.233 test.summit.com
+```
+# cat /etc/hosts | grep summit
+192.168.1.233 test.summit.com
+```
 
-Next, pull the ca.crt from the DUT and put it in the directory from which you are running curl scripts.
+Next, pull the `ca.crt` from the DUT and put it in the directory from which you are running `curl` scripts.
 
-	scp root@192.168.1.233:/etc/summit-rcm/ssl/ca.crt .
+```
+scp root@192.168.1.233:/etc/summit-rcm/ssl/ca.crt .
+```
 
-Finally, replace --insecure with --cacert ca.crt and use the DNS name insead of IPADDR.  Example:
+Finally, in the `global_settings` file, add the path of the `ca.crt` to the `AUTH_CA_CERT` variable, set the `AUTH_TYPE` to "server-only", and use the DNS name insead of `IPADDR`.  Example:
 
-    IPADDR=test.summit.com ./login.sh
+```
+IPADDR=test.summit.com ./login_post.sh
+```
 
-## Override global_setting values
+## Mutual certificate-based authentication
 
-Any value provided with global_settings can be overidden at invocation by suppling the desired value before the calling the script.
-For instance, the actual strings curl is sending can be examined by adding CURL_APP=echo to the beginning of any command line invocation.  Similarly, the use of the jq app can be overridden.
+Instructions for setting up mutual certificate-based authentication is outside of the scope of this README, you will need a custom build and a reference PKI for producing a client key and certificate. Please contact support for more details, the contact information can be found on our main website.
 
-    CURL_APP=echo JQ_APP=tee ./login.sh
+## Override `global_setting` values
+
+Any value provided with global_settings can be overidden at invocation by supplying the desired value before the calling the script.
+For instance, the actual strings `curl` is sending can be examined by adding `CURL_APP=echo` to the beginning of any command line invocation. Similarly, the use of the `jq` app can be overridden.
+
+```
+CURL_APP=echo JQ_APP=tee ./login_post.sh
+```
 
 *Note that these substitutions are not persistent - with the exception of IPADDR which is persistent.*

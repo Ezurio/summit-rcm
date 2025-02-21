@@ -13,7 +13,7 @@ echo "Create connection"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --request POST \
     ${URL}/connection \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{
         "connection": {
             "autoconnect": 0,

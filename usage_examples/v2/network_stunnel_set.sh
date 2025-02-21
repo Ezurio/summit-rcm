@@ -19,7 +19,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\n" \
     --request PUT ${URL}/api/v2/network/stunnel \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --header "Content-Type: application/json" \
     --data '{
         "state": "'"${DESIRED_STATE}"'"
