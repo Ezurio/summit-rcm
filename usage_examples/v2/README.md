@@ -2169,3 +2169,57 @@ Status Code: 200
 ./debug.encrypt file downloaded. To decrypt:
 openssl cms -decrypt -in ./debug.encrypt -recip /path/to/server.crt -inkey /path/to/server.key -out debug.zip -inform DER
 ```
+
+## Appendix
+
+### Certificate chain of trust - why are we using `--insecure` flag?
+
+The RESTful APIs are all using SSL, but the certificate on the device may not be installed on your testing machine, or the device might not be named according to the server certificate on the DUT.  We can still use `curl` with SSL but without certificate validation with the `--insecure` flag (as all the examples do by default).
+
+If you do not want to use the `--insecure` flag in your `curl` commands:
+
+Think of how the CA certs work for existing web sites. There are a myriad of global certificate authorities that issue certificates to companies for their web sites. There is typically one CA certificate for a particular CA authority. The domain name is in the sub-certificates issued to the companies. The validation of trust goes through the certificate chain to the CA certificates, but the domain name comes from the final sub-certificate.
+
+So, first, take a look at the `server.crt` on the DUT itself (here, 192.168.1.233):
+
+```
+ssh root@192.168.1.233 "openssl x509 -in /etc/summit-rcm/ssl/server.crt -text -noout" | grep DNS
+root@192.168.1.233's password:
+              DNS:test.summit.com, DNS:*.summit.com
+```
+
+The certificate indicates that `test.summit.com` is where it is expecting to be found, so we can point our device to it with that name by adding that to our `/etc/hosts` file.
+
+Add `test.summit.com` to your `/etc/hosts` file with the address of your DUT:
+
+```
+# cat /etc/hosts | grep summit
+192.168.1.233 test.summit.com
+```
+
+Next, pull the `ca.crt` from the DUT and put it in the directory from which you are running `curl` scripts.
+
+```
+scp root@192.168.1.233:/etc/summit-rcm/ssl/ca.crt .
+```
+
+Finally, in the `global_settings` file, add the path of the `ca.crt` to the `AUTH_CA_CERT` variable, set the `AUTH_TYPE` to "server-only", and use the DNS name insead of `IPADDR`.  Example:
+
+```
+IPADDR=test.summit.com ./login_post.sh
+```
+
+### Mutual certificate-based authentication
+
+Instructions for setting up mutual certificate-based authentication is outside of the scope of this README, you will need a custom build and a reference PKI for producing a client key and certificate. Please contact support for more details, the contact information can be found on our main website.
+
+### Override `global_setting` values
+
+Any value provided with global_settings can be overidden at invocation by supplying the desired value before the calling the script.
+For instance, the actual strings `curl` is sending can be examined by adding `CURL_APP=echo` to the beginning of any command line invocation. Similarly, the use of the `jq` app can be overridden.
+
+```
+CURL_APP=echo JQ_APP=tee ./login_post.sh
+```
+
+*Note that these substitutions are not persistent - with the exception of IPADDR which is persistent.*

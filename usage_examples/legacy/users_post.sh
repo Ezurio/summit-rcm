@@ -14,7 +14,7 @@ echo "Add user"
 ${CURL_APP} -s --location \
     --request POST ${URL}/users \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data '{"username":"'"${USR}"'", "password":"'"${PASSWORD}"'", "permission":"'"${PERMISSIONS}"'"}' \
 | ${JQ_APP}
 echo -e "\n"

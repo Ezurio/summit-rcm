@@ -12,7 +12,7 @@ echo "del user"
 ${CURL_APP} -s --location \
     --request DELETE ${URL}/users?username=${USR} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     | ${JQ_APP}
 
 echo -e "\n"

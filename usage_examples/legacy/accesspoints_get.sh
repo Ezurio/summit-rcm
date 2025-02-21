@@ -10,7 +10,7 @@ echo "Get accesspoints"
 
 ${CURL_APP} -s --location \
     --request GET ${URL}/accesspoints \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 
 echo -e "\n"

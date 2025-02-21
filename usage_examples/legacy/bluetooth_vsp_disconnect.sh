@@ -19,7 +19,7 @@ echo -e "\nclose vsp service port:\n"
 
 ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "gattDisconnect"
         }' \
@@ -28,7 +28,7 @@ ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER}/${BT_DEVI
 echo -e "\ncheck VSP service ports:\n"
 ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "gattList"
         }' \
@@ -37,7 +37,7 @@ ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER} \
 echo -e "\nBluetooth disconnect:\n"
 ${CURL_APP} --location --request PUT ${URL}/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{"connected": 0}' \
     | ${JQ_APP}
 echo -e '\n'
@@ -45,7 +45,7 @@ echo -e '\n'
 echo -e "\nread Bluetooth state:\n"
 ${CURL_APP} --location --request GET ${URL}/bluetooth/${BT_CONTROLLER}/${BT_DEVICE} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     | ${JQ_APP} | grep --color --context=99 Connected
 echo -e '\n'
 

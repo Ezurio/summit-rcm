@@ -11,7 +11,7 @@ ${CURL_APP} -s --location \
     --header "Content-Type: application/json" \
     --request GET \
     "${URL}/files?type=network&password=${ARCHIVE_PASSWORD}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --data-raw '' \
     --output connections.zip
 

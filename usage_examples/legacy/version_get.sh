@@ -10,7 +10,7 @@ echo "Versions"
 ${CURL_APP} -s --header "Content-Type: application/json" \
     --location \
     --request GET ${URL}/version \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
 | ${JQ_APP}
 
 echo -e "\n"

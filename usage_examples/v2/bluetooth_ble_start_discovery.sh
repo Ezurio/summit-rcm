@@ -9,7 +9,7 @@ echo "Bluetooth ble start discovery"
 
 ${CURL_APP} --location --request PUT ${URL}/api/v2/bluetooth/${BT_CONTROLLER} \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data '{
         "command": "bleStartDiscovery"
         }' \

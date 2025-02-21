@@ -11,7 +11,7 @@ REQUEST_URL="${URL}/certificateProvisioning"
 
 ${CURL_APP} -s --location \
     --request PUT "${REQUEST_URL}" \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'certificate=@"'"${FILE}"'"' \
 | ${JQ_APP}
 

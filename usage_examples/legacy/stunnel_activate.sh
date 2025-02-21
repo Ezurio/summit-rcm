@@ -10,7 +10,7 @@ echo "Activate stunnel"
 ${CURL_APP} -s --location \
     --request PUT ${URL}/stunnel \
     --header "Content-Type: application/json" \
-    -b cookie --insecure \
+    ${AUTH_OPT} \
     --data-raw '{"state":"active"}' \
 | ${JQ_APP}
 

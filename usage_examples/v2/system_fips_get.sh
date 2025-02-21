@@ -16,7 +16,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request GET ${URL}/api/v2/system/fips \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     -o >(${JQ_APP})
 
 wait

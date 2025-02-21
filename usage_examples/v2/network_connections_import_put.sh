@@ -23,7 +23,7 @@ echo -n "Status Code: "
 curl -s --location \
     -w "%{http_code}\nResponse:\n" \
     --request PUT ${URL}/api/v2/network/connections/import \
-    -b cookie -c cookie --insecure \
+    ${AUTH_OPT} \
     --form 'archive=@"'${ARCHIVE_PATH}'"' \
     --form 'config="{
             \"overwrite\": '"${OVERWRITE_EXISTING}"',

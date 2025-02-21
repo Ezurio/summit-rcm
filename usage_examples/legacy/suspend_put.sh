@@ -8,7 +8,7 @@ echo -e "\n\n========================="
 echo "Suspend"
 ${CURL_APP} -s --location --request PUT ${URL}/suspend \
     --header "Content-Type: application/json" \
-    -b cookie -c cookie --insecure\
+    ${AUTH_OPT} \
     --data-raw ''\
 | ${JQ_APP}
 
