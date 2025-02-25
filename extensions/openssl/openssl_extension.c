@@ -76,7 +76,11 @@ static PyObject * get_cert_info(PyObject *self, PyObject *args)
 		PyErr_SetString(PyExc_RuntimeError, "get_cert_info: path is required");
 		goto exit;
 	}
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	OSSL_PROVIDER_load(NULL, "legacy");
+#elif OPENSSL_API_COMPAT < 0x10100000L
 	OpenSSL_add_all_algorithms();
+#endif
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -246,6 +250,10 @@ exit:
 		fclose(fp);
 
 	ERR_clear_error();
+
+#if OPENSSL_API_COMPAT < 0x10100000L
+	EVP_cleanup();
+#endif
 
 	return result;
 }
