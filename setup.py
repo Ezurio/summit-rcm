@@ -108,6 +108,7 @@ def get_cython_options():
         ext_mod.cython_directives = {
             "language_level": "3",
             "always_allow_keywords": True,
+            "annotation_typing": False,
         }
 
     cmdclass = {"build_ext": ve_build_ext}
