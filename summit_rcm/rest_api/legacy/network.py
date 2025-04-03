@@ -812,6 +812,8 @@ class NetworkInterfaceDhcpLeases(object):
 
             result["leases"] = NetworkService.get_dhcp_leases(name=name)
             result["SDCERR"] = 0
+        except FileNotFoundError:
+            result["InfoMsg"] = "Invalid interface name"
         except Exception as e:
             result["InfoMsg"] = f"Could not read current DHCP leases - {str(e)}"
         resp.media = result
