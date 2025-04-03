@@ -2927,7 +2927,7 @@ class NetworkService(metaclass=Singleton):
         }
 
         if not os.path.exists(f"/var/lib/NetworkManager/dnsmasq-{name}.leases"):
-            return result
+            raise FileNotFoundError("Invalid interface name")
         with open(
             f"/var/lib/NetworkManager/dnsmasq-{name}.leases", encoding="utf-8"
         ) as leases_file:
