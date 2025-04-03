@@ -400,6 +400,9 @@ class NetworkInterfaceDhcpLeasesResource(object):
             resp.media = NetworkService.get_dhcp_leases(name)
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_200
+        except FileNotFoundError as exception:
+            syslog(LOG_ERR, f"Invalid interface name provided: {str(exception)}")
+            resp.status = falcon.HTTP_400
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read DHCP leases: {str(exception)}")
             resp.status = falcon.HTTP_500
