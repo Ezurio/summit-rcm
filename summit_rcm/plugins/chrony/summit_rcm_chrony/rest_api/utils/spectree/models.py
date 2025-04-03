@@ -5,11 +5,11 @@
 """Module to hold SpecTree Models"""
 
 from typing import List
-try:
-    from pydantic.v1 import BaseModel
-except ImportError:
-    from pydantic import BaseModel
-from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
+from summit_rcm.rest_api.utils.spectree.models import (
+    DefaultResponseModelLegacy,
+    BaseModel,
+    RootModel,
+)
 
 
 class ChronySourceModel(BaseModel):
@@ -19,10 +19,10 @@ class ChronySourceModel(BaseModel):
     type: str
 
 
-class ChronySourcesResponseModel(BaseModel):
+class ChronySourcesResponseModel(RootModel):
     """Model for the response to a request for chrony NTP sources"""
 
-    __root__: List[ChronySourceModel]
+    root: List[ChronySourceModel]
 
 
 class ChronySourcesRequestModelLegacy(BaseModel):

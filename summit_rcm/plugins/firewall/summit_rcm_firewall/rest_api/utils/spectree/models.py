@@ -5,11 +5,11 @@
 """Module to hold SpecTree Models"""
 
 from typing import List, Optional
-try:
-    from pydantic.v1 import BaseModel
-except ImportError:
-    from pydantic import BaseModel
-from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
+from summit_rcm.rest_api.utils.spectree.models import (
+    DefaultResponseModelLegacy,
+    BaseModel,
+    RootModel,
+)
 
 
 class ForwardedPortModel(BaseModel):
@@ -32,13 +32,13 @@ class ForwardedPortModelLegacy(BaseModel):
     ip_version: str
 
 
-class ForwardedPortsResponseModel(BaseModel):
+class ForwardedPortsResponseModel(RootModel):
     """Model for the response to a request for forwarded ports"""
 
-    __root__: List[ForwardedPortModel]
+    root: List[ForwardedPortModel]
 
 
 class ForwardedPortsResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for the response to a request for forwarded ports (legacy)"""
 
-    Forward: Optional[List[ForwardedPortModel]]
+    Forward: Optional[List[ForwardedPortModel]] = None

@@ -5,10 +5,11 @@
 """Module to hold SpecTree Models"""
 
 from typing import Any, Dict, List, Optional
-try:
-    from pydantic.v1 import BaseModel, Field
-except ImportError:
-    from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel as PydanticBaseModel,
+    RootModel as PydanticRootModel,
+    Field,
+)
 from spectree import BaseFile
 
 from summit_rcm.definition import (
@@ -31,52 +32,62 @@ from summit_rcm.services.network_manager_service import (
 )
 
 
-class BadRequestErrorResponseModel(BaseModel):
+class RootModel(PydanticRootModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class BaseModel(PydanticBaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class BadRequestErrorResponseModel(RootModel):
     """Model for a 400 (Bad Request) error response"""
 
-    __root__: None
+    root: None
 
 
-class UnauthorizedErrorResponseModel(BaseModel):
+class UnauthorizedErrorResponseModel(RootModel):
     """Model for a 401 (Unauthorized) error response"""
 
-    __root__: None
+    root: None
 
 
-class ForbiddenErrorResponseModel(BaseModel):
+class ForbiddenErrorResponseModel(RootModel):
     """Model for a 403 (Forbidden) error response"""
 
-    __root__: None
+    root: None
 
 
-class NotFoundErrorResponseModel(BaseModel):
+class NotFoundErrorResponseModel(RootModel):
     """Model for a 404 (Not Found) error response"""
 
-    __root__: None
+    root: None
 
 
-class ConflictErrorResponseModel(BaseModel):
+class ConflictErrorResponseModel(RootModel):
     """Model for a 409 (Conflict) error response"""
 
-    __root__: None
+    root: None
 
 
-class LengthRequiredErrorResponseModel(BaseModel):
+class LengthRequiredErrorResponseModel(RootModel):
     """Model for a 411 (Length Required) error response"""
 
-    __root__: None
+    root: None
 
 
-class UnsupportedMediaTypeErrorResponseModel(BaseModel):
+class UnsupportedMediaTypeErrorResponseModel(RootModel):
     """Model for a 415 (Unsupported Media Type) error response"""
 
-    __root__: None
+    root: None
 
 
-class InternalServerErrorResponseModel(BaseModel):
+class InternalServerErrorResponseModel(RootModel):
     """Model for a 500 (Internal Server Error) error response"""
 
-    __root__: None
+    root: None
 
 
 class DefaultResponseModelLegacy(BaseModel):
@@ -93,10 +104,10 @@ class UserResponseModel(BaseModel):
     permissions: str
 
 
-class UsersResponseModel(BaseModel):
+class UsersResponseModel(RootModel):
     """Model for all users"""
 
-    __root__: List[UserResponseModel]
+    root: List[UserResponseModel]
 
 
 class NewUserRequestModel(BaseModel):
@@ -203,22 +214,22 @@ class GetDateTimeResponseModelLegacy(DefaultResponseModelLegacy):
 class SetDateTimeRequestModel(BaseModel):
     """Model for a request to set the current date/time info"""
 
-    zone: Optional[str]
-    datetime: Optional[str]
+    zone: Optional[str] = None
+    datetime: Optional[str] = None
 
 
 class SetDateTimeRequestModelLegacy(BaseModel):
     """Model for a request to set the current date/time info (legacy)"""
 
-    zone: Optional[str]
-    datetime: Optional[str]
-    method: Optional[str]
+    zone: Optional[str] = None
+    datetime: Optional[str] = None
+    method: Optional[str] = None
 
 
 class SetDateTimeResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for the response to a request to set the current date/time info (legacy)"""
 
-    time: Optional[str]
+    time: Optional[str] = None
 
 
 class FactoryResetModel(BaseModel):
@@ -273,17 +284,17 @@ class LogData(BaseModel):
     message: str
 
 
-class LogsDataResponseModel(BaseModel):
+class LogsDataResponseModel(RootModel):
     """Model for log data response"""
 
-    __root__: List[LogData]
+    root: List[LogData]
 
 
 class LogsDataResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for log data response (legacy)"""
 
-    count: Optional[int]
-    log: Optional[List[LogData]]
+    count: Optional[int] = None
+    log: Optional[List[LogData]] = None
 
 
 class LogVerbosity(BaseModel):
@@ -296,9 +307,9 @@ class LogVerbosity(BaseModel):
 class LogVerbosityResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for a log verbosity response (legacy)"""
 
-    suppDebugLevel: Optional[str]
-    driverDebugLevel: Optional[str]
-    Errormsg: Optional[str]
+    suppDebugLevel: Optional[str] = None
+    driverDebugLevel: Optional[str] = None
+    Errormsg: Optional[str] = None
 
 
 class WebserverLogLevel(BaseModel):
@@ -320,10 +331,10 @@ class ChronyNTPSource(BaseModel):
     type: str
 
 
-class ChronyNTPSources(BaseModel):
+class ChronyNTPSources(RootModel):
     """Model for a Chrony NTP sources request/response"""
 
-    __root__: List[ChronyNTPSource]
+    root: List[ChronyNTPSource]
 
 
 class PowerState(BaseModel):
@@ -335,15 +346,15 @@ class PowerState(BaseModel):
 class FirmwareUpdateStatus(BaseModel):
     """Model for firmware update status request/response"""
 
-    status: Optional[SummitRCMUpdateStatus]
-    url: Optional[str]
-    image: Optional[str]
+    status: Optional[SummitRCMUpdateStatus] = None
+    url: Optional[str] = None
+    image: Optional[str] = None
 
 
 class FirmwareUpdateModelLegacy(BaseModel):
     """Model for firmware update status request/response (legacy)"""
 
-    url: Optional[str]
+    url: Optional[str] = None
     image: Optional[str] = Field(default="main")
 
 
@@ -384,62 +395,62 @@ class VersionInfoLegacy(DefaultResponseModelLegacy):
 class AccessPoint(BaseModel):
     """Model for an access point"""
 
-    ssid: Optional[str]
-    hwAddress: Optional[str]
-    strength: Optional[int]
-    maxBitrate: Optional[int]
-    frequency: Optional[int]
-    channel: Optional[int]
-    flags: Optional[int]
-    wpaFlags: Optional[int]
-    rsnFlags: Optional[int]
-    lastSeen: Optional[int]
-    security: Optional[str]
-    keymgmt: Optional[str]
+    ssid: Optional[str] = None
+    hwAddress: Optional[str] = None
+    strength: Optional[int] = None
+    maxBitrate: Optional[int] = None
+    frequency: Optional[int] = None
+    channel: Optional[int] = None
+    flags: Optional[int] = None
+    wpaFlags: Optional[int] = None
+    rsnFlags: Optional[int] = None
+    lastSeen: Optional[int] = None
+    security: Optional[str] = None
+    keymgmt: Optional[str] = None
 
 
 class AccessPointLegacy(BaseModel):
     """Model for an access point (legacy)"""
 
-    SSID: Optional[str]
-    HwAddress: Optional[str]
-    Strength: Optional[int]
-    MaxBitrate: Optional[int]
-    Frequency: Optional[int]
-    Channel: Optional[int]
-    Flags: Optional[int]
-    WpaFlags: Optional[int]
-    RsnFlags: Optional[int]
-    LastSeen: Optional[int]
-    Security: Optional[str]
-    Keymgmt: Optional[str]
+    SSID: Optional[str] = None
+    HwAddress: Optional[str] = None
+    Strength: Optional[int] = None
+    MaxBitrate: Optional[int] = None
+    Frequency: Optional[int] = None
+    Channel: Optional[int] = None
+    Flags: Optional[int] = None
+    WpaFlags: Optional[int] = None
+    RsnFlags: Optional[int] = None
+    LastSeen: Optional[int] = None
+    Security: Optional[str] = None
+    Keymgmt: Optional[str] = None
 
 
 class ActiveAccessPoint(AccessPoint):
     """Model for an active access point"""
 
-    signal: Optional[float]
+    signal: Optional[float] = None
 
 
 class ActiveAccessPointLegacy(BaseModel):
     """Model for an active access point (legacy)"""
 
-    Ssid: Optional[str]
-    HwAddress: Optional[str]
-    Maxbitrate: Optional[int]
-    Flags: Optional[int]
-    Wpaflags: Optional[int]
-    Rsnflags: Optional[int]
-    Strength: Optional[int]
-    Frequency: Optional[int]
-    Channel: Optional[int]
-    Signal: Optional[float]
+    Ssid: Optional[str] = None
+    HwAddress: Optional[str] = None
+    Maxbitrate: Optional[int] = None
+    Flags: Optional[int] = None
+    Wpaflags: Optional[int] = None
+    Rsnflags: Optional[int] = None
+    Strength: Optional[int] = None
+    Frequency: Optional[int] = None
+    Channel: Optional[int] = None
+    Signal: Optional[float] = None
 
 
-class AccessPoints(BaseModel):
+class AccessPoints(RootModel):
     """Model for an access points response"""
 
-    __root__: List[AccessPoint]
+    root: List[AccessPoint]
 
 
 class AccessPointsResponseModelLegacy(DefaultResponseModelLegacy):
@@ -462,16 +473,16 @@ class AccessPointSecondsSinceLastScanResponseModel(BaseModel):
     secondsSinceLastScan: int
 
 
-class CertificateFiles(BaseModel):
+class CertificateFiles(RootModel):
     """Model for certificate files response"""
 
-    __root__: List[str]
+    root: List[str]
 
 
 class CertificateInfoRequest(BaseModel):
     """Model for a certificate info request"""
 
-    password: Optional[str]
+    password: Optional[str] = None
 
 
 class CertificateInfoExtension(BaseModel):
@@ -496,16 +507,16 @@ class CertificateInfoResponse(BaseModel):
 class CertificateInfoRequestQueryLegacy(BaseModel):
     """Model for a certificate info request query (legacy)"""
 
-    name: Optional[str]
-    password: Optional[str]
+    name: Optional[str] = None
+    password: Optional[str] = None
 
 
 class CertificateInfoResponseLegacy(DefaultResponseModelLegacy):
     """Model for a certificate info response (legacy)"""
 
-    cert_info: Optional[CertificateInfoResponse]
-    files: Optional[List[str]]
-    count: Optional[int]
+    cert_info: Optional[CertificateInfoResponse] = None
+    files: Optional[List[str]] = None
+    count: Optional[int] = None
 
 
 class CertificateUploadRequestFormModel(BaseModel):
@@ -518,7 +529,7 @@ class FileUploadRequestModelLegacy(BaseModel):
     """Model for a request to upload a file (legacy)"""
 
     type: str
-    password: Optional[str]
+    password: Optional[str] = None
     file: BaseFile
 
 
@@ -526,7 +537,7 @@ class FileDownloadQueryModelLegacy(BaseModel):
     """Model for a file download query (legacy)"""
 
     type: str
-    password: Optional[str]
+    password: Optional[str] = None
 
 
 class FileDeleteQueryModelLegacy(BaseModel):
@@ -540,14 +551,14 @@ class FileInfoRequestQueryModelLegacy(BaseModel):
     """Model for a file info request query (legacy)"""
 
     type: str
-    password: Optional[str]
+    password: Optional[str] = None
 
 
 class FileInfoResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for a file info response (legacy)"""
 
-    files: Optional[List[str]]
-    count: Optional[int]
+    files: Optional[List[str]] = None
+    count: Optional[int] = None
 
 
 class ConnectionProfileInfo(BaseModel):
@@ -602,11 +613,11 @@ class ConnectionSettingsConnectionModel(BaseModel):
         alias="gateway-ping-timeout",
         default=NM_SETTING_CONNECTION_DEFAULTS["gateway-ping-timeout"],
     )
-    id: Optional[str]
-    interface_name: Optional[str] = Field(alias="interface-name")
+    id: Optional[str] = None
+    interface_name: Optional[str] = Field(alias="interface-name", default=None)
     lldp: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["lldp"])
     llmnr: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["llmnr"])
-    master: Optional[str]
+    master: Optional[str] = None
     mdns: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["mdns"])
     metered: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["metered"])
     mptcp_flags: Optional[int] = Field(
@@ -625,13 +636,13 @@ class ConnectionSettingsConnectionModel(BaseModel):
     secondaries: Optional[List[str]] = Field(
         default=NM_SETTING_CONNECTION_DEFAULTS["secondaries"]
     )
-    slave_type: Optional[str] = Field(alias="slave-type")
-    stable_id: Optional[str] = Field(alias="stable-id")
+    slave_type: Optional[str] = Field(alias="slave-type", default=None)
+    stable_id: Optional[str] = Field(alias="stable-id", default=None)
     timestamp: Optional[int] = Field(
         default=NM_SETTING_CONNECTION_DEFAULTS["timestamp"]
     )
-    type: Optional[str]
-    uuid: Optional[str]
+    type: Optional[str] = None
+    uuid: Optional[str] = None
     wait_activation_delay: Optional[int] = Field(
         alias="wait-activation-delay",
         default=NM_SETTING_CONNECTION_DEFAULTS["wait-activation-delay"],
@@ -640,7 +651,7 @@ class ConnectionSettingsConnectionModel(BaseModel):
         alias="wait-device-timeout",
         default=NM_SETTING_CONNECTION_DEFAULTS["wait-device-timeout"],
     )
-    zone: Optional[str]
+    zone: Optional[str] = None
 
 
 class ConnectionSettings8021xModel(BaseModel):
@@ -650,34 +661,38 @@ class ConnectionSettings8021xModel(BaseModel):
         alias="altsubject-matches",
         default=NM_SETTING_8021X_DEFAULTS["altsubject-matches"],
     )
-    anonymous_identity: Optional[str] = Field(alias="anonymous-identity")
+    anonymous_identity: Optional[str] = Field(alias="anonymous-identity", default=None)
     auth_timeout: Optional[int] = Field(
         alias="auth-timeout", default=NM_SETTING_8021X_DEFAULTS["auth-timeout"]
     )
-    ca_cert: Optional[str] = Field(alias="ca-cert")
-    ca_cert_password: Optional[str] = Field(alias="ca-cert-password")
+    ca_cert: Optional[str] = Field(alias="ca-cert", default=None)
+    ca_cert_password: Optional[str] = Field(alias="ca-cert-password", default=None)
     ca_cert_password_flags: Optional[int] = Field(
         alias="ca-cert-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["ca-cert-password-flags"],
     )
-    ca_path: Optional[str] = Field(alias="ca-path")
-    client_cert: Optional[str] = Field(alias="client-cert")
-    client_cert_password: Optional[str] = Field(alias="client-cert-password")
+    ca_path: Optional[str] = Field(alias="ca-path", default=None)
+    client_cert: Optional[str] = Field(alias="client-cert", default=None)
+    client_cert_password: Optional[str] = Field(
+        alias="client-cert-password", default=None
+    )
     client_cert_password_flags: Optional[int] = Field(
         alias="client-cert-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["client-cert-password-flags"],
     )
-    domain_match: Optional[str] = Field(alias="domain-match")
-    domain_suffix_match: Optional[str] = Field(alias="domain-suffix-match")
+    domain_match: Optional[str] = Field(alias="domain-match", default=None)
+    domain_suffix_match: Optional[str] = Field(
+        alias="domain-suffix-match", default=None
+    )
     eap: Optional[List[str]] = Field(default=NM_SETTING_8021X_DEFAULTS["eap"])
-    identity: Optional[str]
+    identity: Optional[str] = None
     optional: Optional[bool] = Field(default=NM_SETTING_8021X_DEFAULTS["optional"])
-    pac_file: Optional[str] = Field(alias="pac-file")
-    password: Optional[str]
+    pac_file: Optional[str] = Field(alias="pac-file", default=None)
+    password: Optional[str] = None
     password_flags: Optional[int] = Field(
         default=NM_SETTING_8021X_DEFAULTS["password-flags"]
     )
-    password_raw: Optional[str] = Field(alias="password-raw")
+    password_raw: Optional[str] = Field(alias="password-raw", default=None)
     password_raw_flags: Optional[int] = Field(
         alias="password-raw-flags",
         default=NM_SETTING_8021X_DEFAULTS["password-raw-flags"],
@@ -687,55 +702,64 @@ class ConnectionSettings8021xModel(BaseModel):
         default=NM_SETTING_8021X_DEFAULTS["phase1-auth-flags"],
     )
     phase1_fast_provisioning: Optional[str] = Field(
-        alias="phase1-fast-provisioning",
+        alias="phase1-fast-provisioning", default=None
     )
-    phase1_peaplabel: Optional[str] = Field(alias="phase1-peaplabel")
-    phase1_peapver: Optional[str] = Field(alias="phase1-peapver")
+    phase1_peaplabel: Optional[str] = Field(alias="phase1-peaplabel", default=None)
+    phase1_peapver: Optional[str] = Field(alias="phase1-peapver", default=None)
     phase2_altsubject_matches: Optional[List[str]] = Field(
         alias="phase2-altsubject-matches",
         default=NM_SETTING_8021X_DEFAULTS["phase2-altsubject-matches"],
     )
-    phase2_auth: Optional[str] = Field(alias="phase2-auth")
-    phase2_autheap: Optional[str] = Field(alias="phase2-autheap")
-    phase2_ca_cert: Optional[str] = Field(alias="phase2-ca-cert")
-    phase2_ca_cert_password: Optional[str] = Field(alias="phase2-ca-cert-password")
+    phase2_auth: Optional[str] = Field(alias="phase2-auth", default=None)
+    phase2_autheap: Optional[str] = Field(alias="phase2-autheap", default=None)
+    phase2_ca_cert: Optional[str] = Field(alias="phase2-ca-cert", default=None)
+    phase2_ca_cert_password: Optional[str] = Field(
+        alias="phase2-ca-cert-password", default=None
+    )
     phase2_ca_cert_password_flags: Optional[int] = Field(
         alias="phase2-ca-cert-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["phase2-ca-cert-password-flags"],
     )
-    phase2_ca_path: Optional[str] = Field(alias="phase2-ca-path")
-    phase2_client_cert: Optional[str] = Field(alias="phase2-client-cert")
+    phase2_ca_path: Optional[str] = Field(alias="phase2-ca-path", default=None)
+    phase2_client_cert: Optional[str] = Field(alias="phase2-client-cert", default=None)
     phase2_client_cert_password: Optional[str] = Field(
-        alias="phase2-client-cert-password"
+        alias="phase2-client-cert-password", default=None
     )
     phase2_client_cert_password_flags: Optional[int] = Field(
         alias="phase2-client-cert-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["phase2-client-cert-password-flags"],
     )
-    phase2_domain_match: Optional[str] = Field(alias="phase2-domain-match")
-    phase2_domain_suffix_match: Optional[str] = Field(
-        alias="phase2-domain-suffix-match"
+    phase2_domain_match: Optional[str] = Field(
+        alias="phase2-domain-match", default=None
     )
-    phase2_private_key: Optional[str] = Field(alias="phase2-private-key")
+    phase2_domain_suffix_match: Optional[str] = Field(
+        alias="phase2-domain-suffix-match", default=None
+    )
+    phase2_private_key: Optional[str] = Field(alias="phase2-private-key", default=None)
     phase2_private_key_password: Optional[str] = Field(
-        alias="phase2-private-key-password"
+        alias="phase2-private-key-password",
+        default=None,
     )
     phase2_private_key_password_flags: Optional[int] = Field(
         alias="phase2-private-key-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["phase2-private-key-password-flags"],
     )
-    phase2_subject_match: Optional[str] = Field(alias="phase2-subject-match")
-    pin: Optional[str]
+    phase2_subject_match: Optional[str] = Field(
+        alias="phase2-subject-match", default=None
+    )
+    pin: Optional[str] = None
     pin_flags: Optional[int] = Field(
         alias="pin-flags", default=NM_SETTING_8021X_DEFAULTS["pin-flags"]
     )
-    private_key: Optional[str] = Field(alias="private-key")
-    private_key_password: Optional[str] = Field(alias="private-key-password")
+    private_key: Optional[str] = Field(alias="private-key", default=None)
+    private_key_password: Optional[str] = Field(
+        alias="private-key-password", default=None
+    )
     private_key_password_flags: Optional[int] = Field(
         alias="private-key-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["private-key-password-flags"],
     )
-    subject_match: Optional[str] = Field(alias="subject-match")
+    subject_match: Optional[str] = Field(alias="subject-match", default=None)
     system_ca_certs: Optional[bool] = Field(
         alias="system-ca-certs", default=NM_SETTING_8021X_DEFAULTS["system-ca-certs"]
     )
@@ -744,30 +768,30 @@ class ConnectionSettings8021xModel(BaseModel):
 class ConnectionSettingsGsmModel(BaseModel):
     """Model for the 'gsm' setting of a NetworkManager Connection"""
 
-    apn: Optional[str]
+    apn: Optional[str] = None
     auto_config: Optional[bool] = Field(alias="auto-config", default=False)
-    device_id: Optional[str] = Field(alias="device-id")
+    device_id: Optional[str] = Field(alias="device-id", default=None)
     home_only: Optional[bool] = Field(alias="home-only", default=False)
     mtu: Optional[int] = Field(default=0)
-    network_id: Optional[str] = Field(alias="network-id")
-    number: Optional[str]
-    password: Optional[str]
+    network_id: Optional[str] = Field(alias="network-id", default=None)
+    number: Optional[str] = None
+    password: Optional[str] = None
     password_flags: Optional[int] = Field(
         alias="password-flags", default=NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE
     )
-    pin: Optional[str]
+    pin: Optional[str] = None
     pin_flags: Optional[int] = Field(
         alias="pin-flags", default=NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE
     )
-    sim_id: Optional[str] = Field(alias="sim-id")
-    sim_operator_id: Optional[str] = Field(alias="sim-operator-id")
-    username: Optional[str]
+    sim_id: Optional[str] = Field(alias="sim-id", default=None)
+    sim_operator_id: Optional[str] = Field(alias="sim-operator-id", default=None)
+    username: Optional[str] = None
 
 
 class ConnectionSettingsIPConfigModel(BaseModel):
     """Base model for an IP config setting of a NetworkManager Connection"""
 
-    addresses: Optional[List[str]]
+    addresses: Optional[List[str]] = None
     auto_route_ext_gw: Optional[bool] = Field(
         alias="auto-route-ext-gw",
         default=NM_SETTING_IPCONFIG_DEFAULTS["auto-route-ext-gw"],
@@ -775,12 +799,12 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     dad_timeout: Optional[int] = Field(
         alias="dad-timeout", default=NM_SETTING_IPCONFIG_DEFAULTS["dad-timeout"]
     )
-    dhcp_hostname: Optional[str] = Field(alias="dhcp-hostname")
+    dhcp_hostname: Optional[str] = Field(alias="dhcp-hostname", default=None)
     dhcp_hostname_flags: Optional[int] = Field(
         alias="dhcp-hostname-flags",
         default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-hostname-flags"],
     )
-    dhcp_iaid: Optional[str] = Field(alias="dhcp-iaid")
+    dhcp_iaid: Optional[str] = Field(alias="dhcp-iaid", default=None)
     dhcp_reject_servers: Optional[List[str]] = Field(
         alias="dhcp-reject-servers",
         default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-reject-servers"],
@@ -802,7 +826,7 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     dns_search: Optional[List[str]] = Field(
         alias="dns-search", default=NM_SETTING_IPCONFIG_DEFAULTS["dns-search"]
     )
-    gateway: Optional[str]
+    gateway: Optional[str] = None
     ignore_auto_dns: Optional[bool] = Field(
         alias="ignore-auto-dns", default=NM_SETTING_IPCONFIG_DEFAULTS["ignore-auto-dns"]
     )
@@ -813,7 +837,7 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     may_fail: Optional[bool] = Field(
         alias="may-fail", default=NM_SETTING_IPCONFIG_DEFAULTS["may-fail"]
     )
-    method: Optional[str]
+    method: Optional[str] = None
     never_default: Optional[bool] = Field(
         alias="never-default", default=NM_SETTING_IPCONFIG_DEFAULTS["never-default"]
     )
@@ -827,16 +851,16 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     route_table: Optional[int] = Field(
         alias="route-table", default=NM_SETTING_IPCONFIG_DEFAULTS["route-table"]
     )
-    routes: Optional[List[str]]
+    routes: Optional[List[str]] = None
 
 
 class ConnectionSettingsIP4ConfigModel(ConnectionSettingsIPConfigModel):
     """Model for the 'ipv4' setting of a NetworkManager Connection"""
 
-    dhcp_client_id: Optional[str] = Field(alias="dhcp-client-id")
-    dhcp_fqdn: Optional[str] = Field(alias="dhcp-fqdn")
+    dhcp_client_id: Optional[str] = Field(alias="dhcp-client-id", default=None)
+    dhcp_fqdn: Optional[str] = Field(alias="dhcp-fqdn", default=None)
     dhcp_vendor_class_identifier: Optional[str] = Field(
-        alias="dhcp-vendor-class-identifier"
+        alias="dhcp-vendor-class-identifier", default=None
     )
     link_local: Optional[int] = Field(
         alias="link-local", default=NM_SETTING_IP4CONFIG_DEFAULTS["link-local"]
@@ -849,7 +873,7 @@ class ConnectionSettingsIP6ConfigModel(ConnectionSettingsIPConfigModel):
     addr_gen_mode: Optional[int] = Field(
         alias="addr-gen-mode", default=NM_SETTING_IP6CONFIG_DEFAULTS["addr-gen-mode"]
     )
-    dhcp_duid: Optional[str] = Field(alias="dhcp-duid")
+    dhcp_duid: Optional[str] = Field(alias="dhcp-duid", default=None)
     ip6_privacy: Optional[int] = Field(
         alias="ip6-privacy", default=NM_SETTING_IP6CONFIG_DEFAULTS["ip6-privacy"]
     )
@@ -857,7 +881,7 @@ class ConnectionSettingsIP6ConfigModel(ConnectionSettingsIPConfigModel):
     ra_timeout: Optional[int] = Field(
         alias="ra-timeout", default=NM_SETTING_IP6CONFIG_DEFAULTS["ra-timeout"]
     )
-    token: Optional[str]
+    token: Optional[str] = None
 
 
 class ConnectionSettingsWiredModel(BaseModel):
@@ -870,20 +894,20 @@ class ConnectionSettingsWiredModel(BaseModel):
     auto_negotiate: Optional[bool] = Field(
         alias="auto-negotiate", default=NM_SETTING_WIRED_DEFAULTS["auto-negotiate"]
     )
-    cloned_mac_address: Optional[str] = Field(alias="cloned-mac-address")
-    duplex: Optional[str]
+    cloned_mac_address: Optional[str] = Field(alias="cloned-mac-address", default=None)
+    duplex: Optional[str] = None
     generate_mac_address_mask: Optional[str] = Field(
-        alias="generate-mac-address-mask",
+        alias="generate-mac-address-mask", default=None
     )
-    mac_address: Optional[str] = Field(alias="mac-address")
+    mac_address: Optional[str] = Field(alias="mac-address", default=None)
     mac_address_blacklist: Optional[List[str]] = Field(
         alias="mac-address-blacklist",
         default=NM_SETTING_WIRED_DEFAULTS["mac-address-blacklist"],
     )
     mtu: Optional[int] = Field(default=NM_SETTING_WIRED_DEFAULTS["mtu"])
-    port: Optional[str]
-    s390_nettype: Optional[str] = Field(alias="s390-nettype")
-    s390_options: Optional[str] = Field(alias="s390-options")
+    port: Optional[str] = None
+    s390_nettype: Optional[str] = Field(alias="s390-nettype", default=None)
+    s390_options: Optional[str] = Field(alias="s390-options", default=None)
     s390_subchannels: Optional[List[str]] = Field(
         alias="s390-subchannels", default=NM_SETTING_WIRED_DEFAULTS["s390-subchannels"]
     )
@@ -891,7 +915,9 @@ class ConnectionSettingsWiredModel(BaseModel):
     wake_on_lan: Optional[int] = Field(
         alias="wake-on-lan", default=NM_SETTING_WIRED_DEFAULTS["wake-on-lan"]
     )
-    wake_on_lan_password: Optional[str] = Field(alias="wake-on-lan-password")
+    wake_on_lan_password: Optional[str] = Field(
+        alias="wake-on-lan-password", default=None
+    )
 
 
 class ConnectionSettingsWirelessModel(BaseModel):
@@ -900,15 +926,15 @@ class ConnectionSettingsWirelessModel(BaseModel):
     ap_isolation: Optional[int] = Field(
         alias="ap-isolation", default=NM_SETTING_WIRELESS_DEFAULTS["ap-isolation"]
     )
-    band: Optional[str]
-    bssid: Optional[str]
+    band: Optional[str] = None
+    bssid: Optional[str] = None
     channel: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["channel"])
-    cloned_mac_address: Optional[str] = Field(alias="cloned-mac-address")
+    cloned_mac_address: Optional[str] = Field(alias="cloned-mac-address", default=None)
     generate_mac_address_mask: Optional[str] = Field(
-        alias="generate-mac-address-mask",
+        alias="generate-mac-address-mask", default=None
     )
     hidden: Optional[bool] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["hidden"])
-    mac_address: Optional[str] = Field(alias="mac-address")
+    mac_address: Optional[str] = Field(alias="mac-address", default=None)
     mac_address_blacklist: Optional[List[str]] = Field(
         alias="mac-address-blacklist",
         default=NM_SETTING_WIRELESS_DEFAULTS["mac-address-blacklist"],
@@ -917,14 +943,14 @@ class ConnectionSettingsWirelessModel(BaseModel):
         alias="mac-address-randomization",
         default=NM_SETTING_WIRELESS_DEFAULTS["mac-address-randomization"],
     )
-    mode: Optional[str]
+    mode: Optional[str] = None
     mtu: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["mtu"])
     powersave: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["powersave"])
     rate: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["rate"])
     seen_bssids: Optional[List[str]] = Field(
         alias="seen-bssids", default=NM_SETTING_WIRELESS_DEFAULTS["seen-bssids"]
     )
-    ssid: Optional[str]
+    ssid: Optional[str] = None
     tx_power: Optional[int] = Field(
         alias="tx-power", default=NM_SETTING_WIRELESS_DEFAULTS["tx-power"]
     )
@@ -943,13 +969,13 @@ class ConnectionSettingsWirelessSecurityModel(BaseModel):
     group: Optional[List[str]] = Field(
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["group"]
     )
-    key_mgmt: Optional[str] = Field(alias="key-mgmt")
-    leap_password: Optional[str] = Field(alias="leap-password")
+    key_mgmt: Optional[str] = Field(alias="key-mgmt", default=None)
+    leap_password: Optional[str] = Field(alias="leap-password", default=None)
     leap_password_flags: Optional[int] = Field(
         alias="leap-password-flags",
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["leap-password-flags"],
     )
-    leap_username: Optional[str] = Field(alias="leap-username")
+    leap_username: Optional[str] = Field(alias="leap-username", default=None)
     pairwise: Optional[List[str]] = Field(
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["pairwise"]
     )
@@ -957,14 +983,14 @@ class ConnectionSettingsWirelessSecurityModel(BaseModel):
     proto: Optional[List[str]] = Field(
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["proto"]
     )
-    psk: Optional[str]
+    psk: Optional[str] = None
     psk_flags: Optional[int] = Field(
         alias="psk-flags", default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["psk-flags"]
     )
-    wep_key0: Optional[str] = Field(alias="wep-key0")
-    wep_key1: Optional[str] = Field(alias="wep-key1")
-    wep_key2: Optional[str] = Field(alias="wep-key2")
-    wep_key3: Optional[str] = Field(alias="wep-key3")
+    wep_key0: Optional[str] = Field(alias="wep-key0", default=None)
+    wep_key1: Optional[str] = Field(alias="wep-key1", default=None)
+    wep_key2: Optional[str] = Field(alias="wep-key2", default=None)
+    wep_key3: Optional[str] = Field(alias="wep-key3", default=None)
     wep_key_flags: Optional[int] = Field(
         alias="wep-key-flags",
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["wep-key-flags"],
@@ -986,28 +1012,34 @@ class ConnectionProfile(BaseModel):
     """Model for a connection profile"""
 
     connection: ConnectionSettingsConnectionModel
-    enterprise_auth: Optional[ConnectionSettings8021xModel] = Field(alias="802-1x")
-    gsm: Optional[ConnectionSettingsGsmModel]
-    ipv4: Optional[ConnectionSettingsIP4ConfigModel]
-    ipv6: Optional[ConnectionSettingsIP6ConfigModel]
-    wired: Optional[ConnectionSettingsWiredModel] = Field(alias="802-3-ethernet")
-    wireless: Optional[ConnectionSettingsWirelessModel] = Field(alias="802-11-wireless")
-    wireless_security: Optional[ConnectionSettingsWirelessSecurityModel] = Field(
-        alias="802-11-wireless-security"
+    enterprise_auth: Optional[ConnectionSettings8021xModel] = Field(
+        alias="802-1x", default=None
     )
-    activated: Optional[bool]
+    gsm: Optional[ConnectionSettingsGsmModel] = None
+    ipv4: Optional[ConnectionSettingsIP4ConfigModel] = None
+    ipv6: Optional[ConnectionSettingsIP6ConfigModel] = None
+    wired: Optional[ConnectionSettingsWiredModel] = Field(
+        alias="802-3-ethernet", default=None
+    )
+    wireless: Optional[ConnectionSettingsWirelessModel] = Field(
+        alias="802-11-wireless", default=None
+    )
+    wireless_security: Optional[ConnectionSettingsWirelessSecurityModel] = Field(
+        alias="802-11-wireless-security", default=None
+    )
+    activated: Optional[bool] = None
 
 
 class ConnectionProfileLegacy(DefaultResponseModelLegacy):
     """Model for a connection profile (legacy)"""
 
-    connection: Optional[ConnectionProfile]
+    connection: Optional[ConnectionProfile] = None
 
 
-class ConnectionProfiles(BaseModel):
+class ConnectionProfiles(RootModel):
     """Model for response to request for all connection profiles"""
 
-    __root__: List[ConnectionProfileInfo]
+    root: List[ConnectionProfileInfo]
 
 
 class ConnectionProfilesLegacy(DefaultResponseModelLegacy):
@@ -1031,10 +1063,10 @@ class ConnectionProfileImportRequestFormModel(BaseModel):
     archive: BaseFile
 
 
-class NetworkInterfacesResponseModel(BaseModel):
+class NetworkInterfacesResponseModel(RootModel):
     """Model for response to request for all network interfaces"""
 
-    __root__: List[str]
+    root: List[str]
 
 
 class NetworkInterfacesResponseModelLegacy(DefaultResponseModelLegacy):
@@ -1046,21 +1078,21 @@ class NetworkInterfacesResponseModelLegacy(DefaultResponseModelLegacy):
 class NetworkInterfaceStatus(BaseModel):
     """Model for a network interface status"""
 
-    state: Optional[int]
-    stateText: Optional[str]
-    mtu: Optional[int]
-    deviceType: Optional[int]
-    deviceTypeText: Optional[str]
+    state: Optional[int] = None
+    stateText: Optional[str] = None
+    mtu: Optional[int] = None
+    deviceType: Optional[int] = None
+    deviceTypeText: Optional[str] = None
 
 
 class NetworkInterfaceStatusLegacy(BaseModel):
     """Model for a network interface status (legacy)"""
 
-    State: Optional[int]
-    StateText: Optional[str]
-    Mtu: Optional[int]
-    DeviceType: Optional[int]
-    DeviceTypeText: Optional[str]
+    State: Optional[int] = None
+    StateText: Optional[str] = None
+    Mtu: Optional[int] = None
+    DeviceType: Optional[int] = None
+    DeviceTypeText: Optional[str] = None
 
 
 class NetworkInterfaceWirelessProperties(BaseModel):
@@ -1131,60 +1163,60 @@ class RouteDataModelLegacy(BaseModel):
 class IP4ConfigModel(BaseModel):
     """Model for the IPv4 configuration"""
 
-    addressData: Optional[List[AddressDataModel]]
-    routeData: Optional[List[RouteDataModel]]
-    gateway: Optional[str]
-    domains: Optional[List[str]]
-    nameservers: Optional[List[str]]
-    winsServers: Optional[List[str]]
+    addressData: Optional[List[AddressDataModel]] = None
+    routeData: Optional[List[RouteDataModel]] = None
+    gateway: Optional[str] = None
+    domains: Optional[List[str]] = None
+    nameservers: Optional[List[str]] = None
+    winsServers: Optional[List[str]] = None
 
 
 class IP4ConfigModelLegacy(BaseModel):
     """Model for the IPv4 configuration (legacy)"""
 
-    Addresses: Optional[Dict[str, str]]
-    AddressData: Optional[List[AddressDataModel]]
-    Routes: Optional[Dict[str, str]]
-    RouteData: Optional[List[RouteDataModelLegacy]]
-    Gateway: Optional[str]
-    Domains: Optional[List[str]]
-    NameserverData: Optional[List[str]]
-    WinsServerData: Optional[List[str]]
+    Addresses: Optional[Dict[str, str]] = None
+    AddressData: Optional[List[AddressDataModel]] = None
+    Routes: Optional[Dict[str, str]] = None
+    RouteData: Optional[List[RouteDataModelLegacy]] = None
+    Gateway: Optional[str] = None
+    Domains: Optional[List[str]] = None
+    NameserverData: Optional[List[str]] = None
+    WinsServerData: Optional[List[str]] = None
 
 
 class IP6ConfigModel(BaseModel):
     """Model for the IPv6 configuration"""
 
-    addressData: Optional[List[AddressDataModel]]
-    routeData: Optional[List[RouteDataModel]]
-    gateway: Optional[str]
-    domains: Optional[List[str]]
-    nameservers: Optional[List[str]]
+    addressData: Optional[List[AddressDataModel]] = None
+    routeData: Optional[List[RouteDataModel]] = None
+    gateway: Optional[str] = None
+    domains: Optional[List[str]] = None
+    nameservers: Optional[List[str]] = None
 
 
 class IP6ConfigModelLegacy(BaseModel):
     """Model for the IPv6 configuration (legacy)"""
 
-    Addresses: Optional[Dict[str, str]]
-    AddressData: Optional[List[AddressDataModel]]
-    Routes: Optional[Dict[str, str]]
-    RouteData: Optional[List[RouteDataModelLegacy]]
-    Gateway: Optional[str]
-    Domains: Optional[List[str]]
-    NameserverData: Optional[List[str]]
-    WinsServerData: Optional[List[str]]
+    Addresses: Optional[Dict[str, str]] = None
+    AddressData: Optional[List[AddressDataModel]] = None
+    Routes: Optional[Dict[str, str]] = None
+    RouteData: Optional[List[RouteDataModelLegacy]] = None
+    Gateway: Optional[str] = None
+    Domains: Optional[List[str]] = None
+    NameserverData: Optional[List[str]] = None
+    WinsServerData: Optional[List[str]] = None
 
 
 class DhcpConfigModel(BaseModel):
     """Model for the DHCP configuration"""
 
-    options: Optional[Dict[str, str]]
+    options: Optional[Dict[str, str]] = None
 
 
 class DhcpConfigModelLegacy(BaseModel):
     """Model for the DHCP configuration (legacy)"""
 
-    Options: Optional[Dict[str, str]]
+    Options: Optional[Dict[str, str]] = None
 
 
 class AvailableApChannel(BaseModel):
@@ -1194,10 +1226,10 @@ class AvailableApChannel(BaseModel):
     channel: int
 
 
-class NetworkInterfaceAvailableApChannelsResponseModel(BaseModel):
+class NetworkInterfaceAvailableApChannelsResponseModel(RootModel):
     """List of available AP channels"""
 
-    __root__: List[AvailableApChannel]
+    root: List[AvailableApChannel]
 
 
 class NetworkInterfaceAvailableApChannelsResponseModelLegacy(
@@ -1268,83 +1300,83 @@ class NetworkInterfaceDhcpLeasesResponseModelLegacy(DefaultResponseModelLegacy):
 class NetworkInterfaceResponseModel(BaseModel):
     """Model for response to request for a specific network interface"""
 
-    status: Optional[NetworkInterfaceStatus]
-    ip4Config: Optional[IP4ConfigModel]
-    ip6Config: Optional[IP6ConfigModel]
-    dhcp4Config: Optional[DhcpConfigModel]
-    dhcp6Config: Optional[DhcpConfigModel]
-    wireless: Optional[NetworkInterfaceWirelessProperties]
-    activeAccessPoint: Optional[ActiveAccessPoint]
-    wired: Optional[NetworkInterfaceWiredProperties]
-    udi: Optional[str]
-    path: Optional[str]
-    interface: Optional[str]
-    ipInterface: Optional[str]
-    driver: Optional[str]
-    driverVersion: Optional[str]
-    firmwareVersion: Optional[str]
-    capabilities: Optional[int]
-    stateReason: Optional[int]
-    activeConnection: Optional[ConnectionSettingsConnectionModel]
+    status: Optional[NetworkInterfaceStatus] = None
+    ip4Config: Optional[IP4ConfigModel] = None
+    ip6Config: Optional[IP6ConfigModel] = None
+    dhcp4Config: Optional[DhcpConfigModel] = None
+    dhcp6Config: Optional[DhcpConfigModel] = None
+    wireless: Optional[NetworkInterfaceWirelessProperties] = None
+    activeAccessPoint: Optional[ActiveAccessPoint] = None
+    wired: Optional[NetworkInterfaceWiredProperties] = None
+    udi: Optional[str] = None
+    path: Optional[str] = None
+    interface: Optional[str] = None
+    ipInterface: Optional[str] = None
+    driver: Optional[str] = None
+    driverVersion: Optional[str] = None
+    firmwareVersion: Optional[str] = None
+    capabilities: Optional[int] = None
+    stateReason: Optional[int] = None
+    activeConnection: Optional[ConnectionSettingsConnectionModel] = None
     managed: Optional[bool] = Field(default=False)
-    autoconnect: Optional[bool]
+    autoconnect: Optional[bool] = None
     firmwareMissing: Optional[bool] = Field(default=False)
     nmPluginMissing: Optional[bool] = Field(default=False)
-    availableConnections: Optional[List[ConnectionSettingsConnectionModel]]
-    physicalPortId: Optional[str]
-    metered: Optional[int]
-    meteredText: Optional[str]
-    lldpNeighbors: Optional[List[str]]
-    real: Optional[bool]
-    ip4Connectivity: Optional[int]
-    ip4ConnectivityText: Optional[str]
-    ip6Connectivity: Optional[int]
-    ip6ConnectivityText: Optional[str]
-    interfaceFlags: Optional[int]
+    availableConnections: Optional[List[ConnectionSettingsConnectionModel]] = None
+    physicalPortId: Optional[str] = None
+    metered: Optional[int] = None
+    meteredText: Optional[str] = None
+    lldpNeighbors: Optional[List[str]] = None
+    real: Optional[bool] = None
+    ip4Connectivity: Optional[int] = None
+    ip4ConnectivityText: Optional[str] = None
+    ip6Connectivity: Optional[int] = None
+    ip6ConnectivityText: Optional[str] = None
+    interfaceFlags: Optional[int] = None
 
 
 class NetworkInterfaceStatusModelLegacy(BaseModel):
     """Model for a network interface status (legacy)"""
 
-    status: Optional[NetworkInterfaceStatusLegacy]
-    ip4config: Optional[IP4ConfigModelLegacy]
-    ip6config: Optional[IP6ConfigModelLegacy]
-    dhcp4config: Optional[DhcpConfigModelLegacy]
-    dhcp6config: Optional[DhcpConfigModelLegacy]
-    wireless: Optional[NetworkInterfaceWirelessPropertiesLegacy]
-    activeaccesspoint: Optional[ActiveAccessPointLegacy]
-    wired: Optional[NetworkInterfaceWiredPropertiesLegacy]
-    udi: Optional[str]
-    path: Optional[str]
-    interface: Optional[str]
-    ip_interface: Optional[str]
-    driver: Optional[str]
-    driver_version: Optional[str]
-    firmware_version: Optional[str]
-    capabilities: Optional[int]
-    state_reason: Optional[int]
-    connection_active: Optional[ConnectionSettingsConnectionModel]
+    status: Optional[NetworkInterfaceStatusLegacy] = None
+    ip4config: Optional[IP4ConfigModelLegacy] = None
+    ip6config: Optional[IP6ConfigModelLegacy] = None
+    dhcp4config: Optional[DhcpConfigModelLegacy] = None
+    dhcp6config: Optional[DhcpConfigModelLegacy] = None
+    wireless: Optional[NetworkInterfaceWirelessPropertiesLegacy] = None
+    activeaccesspoint: Optional[ActiveAccessPointLegacy] = None
+    wired: Optional[NetworkInterfaceWiredPropertiesLegacy] = None
+    udi: Optional[str] = None
+    path: Optional[str] = None
+    interface: Optional[str] = None
+    ip_interface: Optional[str] = None
+    driver: Optional[str] = None
+    driver_version: Optional[str] = None
+    firmware_version: Optional[str] = None
+    capabilities: Optional[int] = None
+    state_reason: Optional[int] = None
+    connection_active: Optional[ConnectionSettingsConnectionModel] = None
     managed: Optional[bool] = Field(default=False)
-    autoconnect: Optional[bool]
+    autoconnect: Optional[bool] = None
     firmware_missing: Optional[bool] = Field(default=False)
     nm_plugin_missing: Optional[bool] = Field(default=False)
-    available_connections: Optional[List[ConnectionSettingsConnectionModel]]
-    physical_port_id: Optional[str]
-    metered: Optional[int]
-    metered_text: Optional[str]
-    lldp_neighbors: Optional[List[str]]
-    real: Optional[bool]
-    ip4connectivity: Optional[int]
-    ip4connectivity_text: Optional[str]
-    ip6connectivity: Optional[int]
-    ip6connectivity_text: Optional[str]
-    interface_flags: Optional[int]
+    available_connections: Optional[List[ConnectionSettingsConnectionModel]] = None
+    physical_port_id: Optional[str] = None
+    metered: Optional[int] = None
+    metered_text: Optional[str] = None
+    lldp_neighbors: Optional[List[str]] = None
+    real: Optional[bool] = None
+    ip4connectivity: Optional[int] = None
+    ip4connectivity_text: Optional[str] = None
+    ip6connectivity: Optional[int] = None
+    ip6connectivity_text: Optional[str] = None
+    interface_flags: Optional[int] = None
 
 
 class NetworkInterfaceResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for response to request for a specific network interface (legacy)"""
 
-    properties: Optional[NetworkInterfaceStatusModelLegacy]
+    properties: Optional[NetworkInterfaceStatusModelLegacy] = None
 
 
 class NetworkInterfaceStatsResponseModel(BaseModel):
@@ -1446,10 +1478,10 @@ class Station(BaseModel):
     )
 
 
-class NetworkInterfaceStationDumpResponseModel(BaseModel):
+class NetworkInterfaceStationDumpResponseModel(RootModel):
     """Dictionary of station dump information indexed by MAC address"""
 
-    __root__: Dict[str, Station]
+    root: Dict[str, Station]
 
 
 class NetworkInterfaceStationDumpResponseModelLegacy(DefaultResponseModelLegacy):
@@ -1506,15 +1538,15 @@ class WiFiEnableRequestResponseModelLegacy(DefaultResponseModelLegacy):
 class NetworkStatusResponseModel(BaseModel):
     """Model for response to request for network status"""
 
-    status: Optional[Dict[str, NetworkInterfaceResponseModel]]
-    devices: Optional[int]
+    status: Optional[Dict[str, NetworkInterfaceResponseModel]] = None
+    devices: Optional[int] = None
 
 
 class NetworkStatusResponseModelLegacy(BaseModel):
     """Model for response to request for network status (legacy)"""
 
-    status: Optional[Dict[str, NetworkInterfaceResponseModelLegacy]]
-    devices: Optional[int]
+    status: Optional[Dict[str, NetworkInterfaceResponseModelLegacy]] = None
+    devices: Optional[int] = None
 
 
 class DefinitionsModel(BaseModel):
@@ -1531,4 +1563,4 @@ class DefinitionsModel(BaseModel):
 class DefinitionsResponseModelLegacy(DefaultResponseModelLegacy):
     """Model for response to request for definitions (legacy)"""
 
-    Definitions: Optional[DefinitionsModel]
+    Definitions: Optional[DefinitionsModel] = None

@@ -5,15 +5,14 @@
 """Module to hold SpecTree Models"""
 
 from typing import Optional
-try:
-    from pydantic.v1 import BaseModel
-except ImportError:
-    from pydantic import BaseModel
 from spectree import BaseFile
 from summit_rcm_provisioning.services.provisioning_service import (
     ProvisioningState,
 )
-from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
+from summit_rcm.rest_api.utils.spectree.models import (
+    DefaultResponseModelLegacy,
+    BaseModel,
+)
 
 
 class CertificateProvisioningStateModel(BaseModel):
@@ -32,7 +31,7 @@ class CertificateProvisioningCsrGenerationRequestFormModel(BaseModel):
     """Model for a request to generate a CSR"""
 
     configFile: BaseFile
-    opensslKeyGenArgs: Optional[str]
+    opensslKeyGenArgs: Optional[str] = None
 
 
 class CertificateProvisioningCertUploadRequestFormModel(BaseModel):

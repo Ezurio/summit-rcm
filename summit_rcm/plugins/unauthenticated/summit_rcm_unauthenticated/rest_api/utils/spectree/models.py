@@ -4,11 +4,10 @@
 #
 """Module to hold SpecTree Models"""
 
-try:
-    from pydantic.v1 import BaseModel
-except ImportError:
-    from pydantic import BaseModel
-from summit_rcm.rest_api.utils.spectree.models import DefaultResponseModelLegacy
+from summit_rcm.rest_api.utils.spectree.models import (
+    DefaultResponseModelLegacy,
+    BaseModel,
+)
 
 
 class AllowUnauthenticatedRebootResetStateModel(BaseModel):
