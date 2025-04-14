@@ -22,6 +22,7 @@ from summit_rcm_bluetooth.services.bt import (
     CACHED_ADAPTER_PROPS,
     CACHED_DEVICE_PROPS,
     PASS_ADAPTER_PROPS,
+    SETTABLE_DISCOVERY_FILTERS,
     Bluetooth,
     get_controller_obj,
     lower_camel_case,
@@ -129,12 +130,15 @@ class BluetoothRESTService:
 
                     adapter_iface = controller_obj.get_interface(ADAPTER_IFACE)
 
-                    if not filters or "transportFilter" in filters:
-                        controller_result[
-                            "transportFilter"
-                        ] = Bluetooth().get_adapter_transport_filter(
-                            controller_friendly_name
-                        )
+                    for discovery_filters in SETTABLE_DISCOVERY_FILTERS:
+                        prop_name, _, _ = discovery_filters
+                        if not filters or prop_name in filters:
+                            controller_result[
+                                prop_name
+                            ] = Bluetooth().get_adapter_filter_property(
+                                controller_friendly_name,
+                                prop_name
+                            )
                         matched_filter = True
 
                     for pass_property in PASS_ADAPTER_PROPS:
