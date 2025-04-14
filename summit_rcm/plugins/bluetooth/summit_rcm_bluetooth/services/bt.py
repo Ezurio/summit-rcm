@@ -45,13 +45,18 @@ SETTABLE_DEVICE_PROPS = [
     ("AutoConnectAutoDisable", bool, "b"),
 ]
 
+# These discovery filters can be set on the controller.
+SETTABLE_DISCOVERY_FILTERS = [
+    ("RSSI", int, "n"),
+    ("Transport", str, "s"),
+    ("Pattern", str, "s"),
+]
+
 CACHED_DEVICE_PROPS = ["connected", "autoConnect", "autoConnectAutoDisable"]
 
 # These controller properties can be directly set, without requiring any special-case logic.
 PASS_ADAPTER_PROPS = ["Discovering", "Powered", "Discoverable"]
 
-# Additionally transportFilter is cached, but by special-case logic that confirms
-# value is accepted.
 CACHED_ADAPTER_PROPS = ["discovering", "powered", "discoverable"]
 
 ADAPTER_PATH_PATTERN = re.compile("^/org/bluez/hci\\d+$")
@@ -512,7 +517,8 @@ class Bluetooth(metaclass=Singleton):
         powered = post_data.get("powered", None)
         discovering = post_data.get("discovering", None)
         discoverable = post_data.get("discoverable", None)
-        transport_filter = post_data.get("transportFilter", None)
+        discovery_filters = {}
+
         if powered is not None:
             await adapter_interface.set_powered(bool(powered))
             if not powered:
@@ -520,17 +526,24 @@ class Bluetooth(metaclass=Singleton):
                 discoverable = discoverable if discoverable else None
                 discovering = discovering if discovering else None
 
-        if transport_filter is not None:
-            result.update(
-                await self.set_adapter_transport_filter(
-                    adapter_interface, controller_friendly_name, transport_filter
-                )
+        for settable_filter in SETTABLE_DISCOVERY_FILTERS:
+            prop_name, prop_type, prop_signature = settable_filter
+            value = post_data.get(prop_name, None)
+            if value is not None:
+                discovery_filters[prop_name] = Variant(prop_signature, prop_type(value))
+
+        # Set discovery filters even if none are set to clear any previously set filters
+        result.update(
+            await self.set_adapter_discovery_filter(
+                adapter_interface, controller_friendly_name, discovery_filters
             )
-            if (
-                "SDCERR" in result
-                and result["SDCERR"] != definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-            ):
-                return result
+        )
+        if (
+            "SDCERR" in result
+            and result["SDCERR"] != definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
+        ):
+            return result
+
         if discoverable is not None:
             await adapter_interface.set_discoverable(bool(discoverable))
         if discovering is not None:
@@ -548,29 +561,38 @@ class Bluetooth(metaclass=Singleton):
 
         return result
 
-    def get_adapter_transport_filter(self, controller_friendly_name):
+    def get_adapter_filter_property(self, controller_friendly_name, property):
         controller_state = self.get_controller_state(controller_friendly_name)
-        return controller_state.properties.get("transportFilter", None)
+        return controller_state.properties.get(property, None)
 
-    async def set_adapter_transport_filter(
+    async def set_adapter_discovery_filter(
         self,
         adapter_interface: ProxyInterface,
         controller_friendly_name,
-        transport_filter,
+        discovery_filters,
     ):
-        """Set a transport filter on the controller.  Note that "When multiple clients call
+        """Set discovery filters on the controller.  Note that "When multiple clients call
         SetDiscoveryFilter, their filters are internally merged" """
         result = {}
-        discovery_filters = {"Transport": Variant("s", str(transport_filter))}
         try:
             await adapter_interface.call_set_discovery_filter(discovery_filters)
         except Exception:
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_FAIL"]
-            result["InfoMsg"] = f"Transport filter {transport_filter} not accepted"
+            result["InfoMsg"] = f"Discovery filter {variant_to_python(discovery_filters)} not accepted"
             return result
 
         controller_state = self.get_controller_state(controller_friendly_name)
-        controller_state.properties["transportFilter"] = transport_filter
+        for settable_filter in SETTABLE_DISCOVERY_FILTERS:
+            prop_name, _, _ = settable_filter
+            # Add the filter to the cached properties
+            if prop_name in discovery_filters:
+                controller_state.properties[prop_name] = variant_to_python(discovery_filters[prop_name])
+            else:
+                # If the filter is not in discovery_filters, remove it from the cached properties
+                # as it should no longer be set as a filter on the controller.
+                if prop_name in controller_state.properties:
+                    del controller_state.properties[prop_name]
+
         return result
 
     async def set_device_properties(
