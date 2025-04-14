@@ -93,7 +93,9 @@ class BluetoothControllerModel(BaseModel):
     bluetoothDevices: Optional[List[BluetoothDeviceModel]] = Field(
         description="List of Bluetooth devices", default=None
     )
-    transportFilter: Optional[str] = Field(description="Transport filter", default=None)
+    RSSI: Optional[int] = Field(description="RSSI Discovery filter", default=None)
+    Transport: Optional[str] = Field(description="Transport Discovery filter", default=None)
+    Pattern: Optional[str] = Field(description="Pattern Discovery filter", default=None)
     discovering: Optional[int] = Field(description="Discovering state", default=None)
     powered: Optional[int] = Field(description="Power state", default=None)
     discoverable: Optional[int] = Field(description="Discoverable state", default=None)
@@ -129,7 +131,9 @@ class BluetoothControlRequestModel(BaseModel):
     powered: Optional[int] = Field(description="Power state", default=None)
     discovering: Optional[int] = Field(description="Discovering state", default=None)
     discoverable: Optional[int] = Field(description="Discoverable state", default=None)
-    transportFilter: Optional[str] = Field(description="Transport filter", default=None)
+    RSSI: Optional[int] = Field(description="RSSI Discovery filter", default=None)
+    Transport: Optional[str] = Field(description="Transport Discovery filter", default=None)
+    Pattern: Optional[str] = Field(description="Pattern Discovery filter", default=None)
     autoConnect: Optional[int] = Field(description="Auto-connect state", default=None)
     paired: Optional[int] = Field(description="Paired state", default=None)
     passkey: Optional[str] = Field(description="Passkey", default=None)
