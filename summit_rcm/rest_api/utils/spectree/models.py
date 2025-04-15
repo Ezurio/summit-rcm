@@ -594,6 +594,9 @@ class ConnectionSettingsConnectionModel(BaseModel):
     autoconnect: Optional[bool] = Field(
         default=NM_SETTING_CONNECTION_DEFAULTS["autoconnect"]
     )
+    autoconnet_ports: Optional[int] = Field(
+        alias="autoconnect-ports", default=NM_SETTING_CONNECTION_DEFAULTS["autoconnect-ports"]
+    )
     autoconnect_priority: Optional[int] = Field(
         alias="autoconnect-priority",
         default=NM_SETTING_CONNECTION_DEFAULTS["autoconnect-priority"],
@@ -606,8 +609,15 @@ class ConnectionSettingsConnectionModel(BaseModel):
         alias="autoconnect-slaves",
         default=NM_SETTING_CONNECTION_DEFAULTS["autoconnect-slaves"],
     )
+    controller: Optional[str] = Field(
+        default=NM_SETTING_CONNECTION_DEFAULTS["controller"]
+    )
     dns_over_tls: Optional[int] = Field(
         alias="dns-over-tls", default=NM_SETTING_CONNECTION_DEFAULTS["dns-over-tls"]
+    )
+    down_on_poweroff: Optional[int] = Field(
+        alias="down-on-poweroff",
+        default=NM_SETTING_CONNECTION_DEFAULTS["down-on-poweroff"]
     )
     gateway_ping_timeout: Optional[int] = Field(
         alias="gateway-ping-timeout",
@@ -615,6 +625,17 @@ class ConnectionSettingsConnectionModel(BaseModel):
     )
     id: Optional[str] = None
     interface_name: Optional[str] = Field(alias="interface-name", default=None)
+    ip_ping_addresses: Optional[List[str]] = Field(
+        alias="ip-ping-addresses",
+        default=NM_SETTING_CONNECTION_DEFAULTS["ip-ping-addresses"]
+    )
+    ip_ping_addressess_require_all: Optional[int] = Field(
+        alias="ip-ping-addresses-require-all",
+        default=NM_SETTING_CONNECTION_DEFAULTS["ip-ping-addresses-require-all"],
+    )
+    ip_ping_timeout: Optional[int] = Field(
+        alias="ip-ping-timeout", default=NM_SETTING_CONNECTION_DEFAULTS["ip-ping-timeout"]
+    )
     lldp: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["lldp"])
     llmnr: Optional[int] = Field(default=NM_SETTING_CONNECTION_DEFAULTS["llmnr"])
     master: Optional[str] = None
@@ -630,8 +651,16 @@ class ConnectionSettingsConnectionModel(BaseModel):
     permissions: Optional[List[str]] = Field(
         default=NM_SETTING_CONNECTION_DEFAULTS["permissions"]
     )
+    port_type: Optional[str] = Field(
+        alias="port-type",
+        default=NM_SETTING_CONNECTION_DEFAULTS["port-type"],
+    )
     read_only: Optional[bool] = Field(
-        alias="read-only", default=NM_SETTING_CONNECTION_DEFAULTS["read-only"]
+        alias="read-only",
+        default=NM_SETTING_CONNECTION_DEFAULTS["read-only"],
+        deprecated=(
+            "Deprecated since version 1.44: This property is deprecated and has no meaning."
+        ),
     )
     secondaries: Optional[List[str]] = Field(
         default=NM_SETTING_CONNECTION_DEFAULTS["secondaries"]
@@ -686,6 +715,9 @@ class ConnectionSettings8021xModel(BaseModel):
     )
     eap: Optional[List[str]] = Field(default=NM_SETTING_8021X_DEFAULTS["eap"])
     identity: Optional[str] = None
+    openssl_ciphers: Optional[str] = Field(
+        alias="openssl-ciphers", default=NM_SETTING_8021X_DEFAULTS["openssl-ciphers"]
+    )
     optional: Optional[bool] = Field(default=NM_SETTING_8021X_DEFAULTS["optional"])
     pac_file: Optional[str] = Field(alias="pac-file", default=None)
     password: Optional[str] = None
@@ -759,7 +791,13 @@ class ConnectionSettings8021xModel(BaseModel):
         alias="private-key-password-flags",
         default=NM_SETTING_8021X_DEFAULTS["private-key-password-flags"],
     )
-    subject_match: Optional[str] = Field(alias="subject-match", default=None)
+    subject_match: Optional[str] = Field(
+        alias="subject-match",
+        default=None,
+        deprecated=(
+            "Deprecated since version 1.2: Use NM.Setting8021x :phase2-domain-suffix-match instead."
+        ),
+    )
     system_ca_certs: Optional[bool] = Field(
         alias="system-ca-certs", default=NM_SETTING_8021X_DEFAULTS["system-ca-certs"]
     )
@@ -772,9 +810,49 @@ class ConnectionSettingsGsmModel(BaseModel):
     auto_config: Optional[bool] = Field(alias="auto-config", default=False)
     device_id: Optional[str] = Field(alias="device-id", default=None)
     home_only: Optional[bool] = Field(alias="home-only", default=False)
+    initial_eps_bearer_apn: Optional[str] = Field(
+        alias="initial-eps-bearer-apn", default=None
+    )
+    initial_eps_bearer_configure: Optional[bool] = Field(
+        alias="initial-eps-bearer-configure", default=False
+    )
+    initial_eps_bearer_noauth: Optional[bool] = Field(
+        alias="initial-eps-bearer-noauth", default=True
+    )
+    initial_eps_bearer_password: Optional[str] = Field(
+        alias="initial-eps-bearer-password", default=None
+    )
+    initial_eps_bearer_password_flags: Optional[int] = Field(
+        alias="initial-eps-bearer-password-flags",
+        default=NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    )
+    initial_eps_bearer_refuse_chap: Optional[bool] = Field(
+        alias="initial-eps-bearer-refuse-chap", default=False
+    )
+    initial_eps_bearer_refuse_eap: Optional[bool] = Field(
+        alias="initial-eps-bearer-refuse-eap", default=False
+    )
+    initial_eps_bearer_refuse_mschap: Optional[bool] = Field(
+        alias="initial-eps-bearer-refuse-mschap", default=False
+    )
+    initial_eps_bearer_refuse_mschapv2: Optional[bool] = Field(
+        alias="initial-eps-bearer-refuse-mschapv2", default=False
+    )
+    initial_eps_bearer_refuse_pap: Optional[bool] = Field(
+        alias="initial-eps-bearer-refuse-pap", default=False
+    )
+    initial_eps_bearer_username: Optional[str] = Field(
+        alias="initial-eps-bearer-username", default=None
+    )
     mtu: Optional[int] = Field(default=0)
     network_id: Optional[str] = Field(alias="network-id", default=None)
-    number: Optional[str] = None
+    number: Optional[str] = Field(
+        default=None,
+        deprecated=(
+            "Deprecated since version 1.16: "
+            "User-provided values for this setting are no longer used."
+        ),
+    )
     password: Optional[str] = None
     password_flags: Optional[int] = Field(
         alias="password-flags", default=NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE
@@ -799,6 +877,9 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     dad_timeout: Optional[int] = Field(
         alias="dad-timeout", default=NM_SETTING_IPCONFIG_DEFAULTS["dad-timeout"]
     )
+    dhcp_dscp: Optional[str] = Field(
+        alias="dhcp-dscp", default=None
+    )
     dhcp_hostname: Optional[str] = Field(alias="dhcp-hostname", default=None)
     dhcp_hostname_flags: Optional[int] = Field(
         alias="dhcp-hostname-flags",
@@ -812,6 +893,17 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     dhcp_send_hostname: Optional[bool] = Field(
         alias="dhcp-send-hostname",
         default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-send-hostname"],
+        deprecated=(
+            "Deprecated since version 1.52: use the new version of dhcp-send-hostname instead."
+        ),
+    )
+    dhcp_send_hostname_v2: Optional[int] = Field(
+        alias="dhcp-send-hostname-v2",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-send-hostname-v2"],
+    )
+    dhcp_send_release: Optional[bool] = Field(
+        alias="dhcp-send-release",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-send-release"],
     )
     dhcp_timeout: Optional[int] = Field(
         alias="dhcp-timeout", default=NM_SETTING_IPCONFIG_DEFAULTS["dhcp-timeout"]
@@ -841,6 +933,10 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     never_default: Optional[bool] = Field(
         alias="never-default", default=NM_SETTING_IPCONFIG_DEFAULTS["never-default"]
     )
+    replace_local_rule: Optional[bool] = Field(
+        alias="replace-local-rule",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["replace-local-rule"],
+    )
     required_timeout: Optional[int] = Field(
         alias="required-timeout",
         default=NM_SETTING_IPCONFIG_DEFAULTS["required-timeout"],
@@ -851,7 +947,19 @@ class ConnectionSettingsIPConfigModel(BaseModel):
     route_table: Optional[int] = Field(
         alias="route-table", default=NM_SETTING_IPCONFIG_DEFAULTS["route-table"]
     )
+    routed_dns: Optional[int] = Field(
+        alias="routed-dns",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["routed-dns"],
+    )
     routes: Optional[List[str]] = None
+    shared_dhcp_lease_time: Optional[int] = Field(
+        alias="shared-dhcp-lease-time",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["shared-dhcp-lease-time"],
+    )
+    shared_dhcp_range: Optional[str] = Field(
+        alias="shared-dhcp-range",
+        default=NM_SETTING_IPCONFIG_DEFAULTS["shared-dhcp-range"],
+    )
 
 
 class ConnectionSettingsIP4ConfigModel(ConnectionSettingsIPConfigModel):
@@ -859,6 +967,10 @@ class ConnectionSettingsIP4ConfigModel(ConnectionSettingsIPConfigModel):
 
     dhcp_client_id: Optional[str] = Field(alias="dhcp-client-id", default=None)
     dhcp_fqdn: Optional[str] = Field(alias="dhcp-fqdn", default=None)
+    dhcp_ipv6_only_preferred: Optional[int] = Field(
+        alias="dhcp-ipv6-only-preferred",
+        default=NM_SETTING_IP4CONFIG_DEFAULTS["dhcp-ipv6-only-preferred"],
+    )
     dhcp_vendor_class_identifier: Optional[str] = Field(
         alias="dhcp-vendor-class-identifier", default=None
     )
@@ -874,12 +986,23 @@ class ConnectionSettingsIP6ConfigModel(ConnectionSettingsIPConfigModel):
         alias="addr-gen-mode", default=NM_SETTING_IP6CONFIG_DEFAULTS["addr-gen-mode"]
     )
     dhcp_duid: Optional[str] = Field(alias="dhcp-duid", default=None)
+    dhcp_pd_hint: Optional[str] = Field(
+        alias="dhcp-pd-hint", default=NM_SETTING_IP6CONFIG_DEFAULTS["dhcp-pd-hint"]
+    )
     ip6_privacy: Optional[int] = Field(
         alias="ip6-privacy", default=NM_SETTING_IP6CONFIG_DEFAULTS["ip6-privacy"]
     )
     mtu: Optional[int] = Field(default=NM_SETTING_IP6CONFIG_DEFAULTS["mtu"])
     ra_timeout: Optional[int] = Field(
         alias="ra-timeout", default=NM_SETTING_IP6CONFIG_DEFAULTS["ra-timeout"]
+    )
+    temp_preferred_lifetime: Optional[int] = Field(
+        alias="temp-preferred-lifetime",
+        default=NM_SETTING_IP6CONFIG_DEFAULTS["temp-preferred-lifetime"],
+    )
+    temp_valid_lifetime: Optional[int] = Field(
+        alias="temp-valid-lifetime",
+        default=NM_SETTING_IP6CONFIG_DEFAULTS["temp-valid-lifetime"],
     )
     token: Optional[str] = None
 
@@ -903,6 +1026,10 @@ class ConnectionSettingsWiredModel(BaseModel):
     mac_address_blacklist: Optional[List[str]] = Field(
         alias="mac-address-blacklist",
         default=NM_SETTING_WIRED_DEFAULTS["mac-address-blacklist"],
+    )
+    mac_address_denylist: Optional[List[str]] = Field(
+        alias="mac-address-denylist",
+        default=NM_SETTING_WIRED_DEFAULTS["mac-address-denylist"],
     )
     mtu: Optional[int] = Field(default=NM_SETTING_WIRED_DEFAULTS["mtu"])
     port: Optional[str] = None
@@ -929,6 +1056,9 @@ class ConnectionSettingsWirelessModel(BaseModel):
     band: Optional[str] = None
     bssid: Optional[str] = None
     channel: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["channel"])
+    channel_width: Optional[int] = Field(
+        alias="channel-width", default=NM_SETTING_WIRELESS_DEFAULTS["channel-width"]
+    )
     cloned_mac_address: Optional[str] = Field(alias="cloned-mac-address", default=None)
     generate_mac_address_mask: Optional[str] = Field(
         alias="generate-mac-address-mask", default=None
@@ -939,20 +1069,39 @@ class ConnectionSettingsWirelessModel(BaseModel):
         alias="mac-address-blacklist",
         default=NM_SETTING_WIRELESS_DEFAULTS["mac-address-blacklist"],
     )
+    mac_address_denylist: Optional[List[str]] = Field(
+        alias="mac-address-denylist",
+        default=NM_SETTING_WIRELESS_DEFAULTS["mac-address-denylist"],
+    )
     mac_address_randomization: Optional[int] = Field(
         alias="mac-address-randomization",
         default=NM_SETTING_WIRELESS_DEFAULTS["mac-address-randomization"],
+        deprecated=(
+            "Deprecated since version 1.4: "
+            "Use the NM.SettingWireless :cloned-mac-address property instead."
+        ),
     )
     mode: Optional[str] = None
     mtu: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["mtu"])
     powersave: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["powersave"])
-    rate: Optional[int] = Field(default=NM_SETTING_WIRELESS_DEFAULTS["rate"])
+    rate: Optional[int] = Field(
+        default=NM_SETTING_WIRELESS_DEFAULTS["rate"],
+        deprecated=(
+            "Deprecated since version 1.44: "
+            "This property is not implemented and has no effect."
+        ),
+    )
     seen_bssids: Optional[List[str]] = Field(
         alias="seen-bssids", default=NM_SETTING_WIRELESS_DEFAULTS["seen-bssids"]
     )
     ssid: Optional[str] = None
     tx_power: Optional[int] = Field(
-        alias="tx-power", default=NM_SETTING_WIRELESS_DEFAULTS["tx-power"]
+        alias="tx-power",
+        default=NM_SETTING_WIRELESS_DEFAULTS["tx-power"],
+        deprecated=(
+            "Deprecated since version 1.44: "
+            "This property is not implemented and has no effect."
+        ),
     )
     wake_on_wlan: Optional[int] = Field(
         alias="wake-on-wlan", default=NM_SETTING_WIRELESS_DEFAULTS["wake-on-wlan"]
