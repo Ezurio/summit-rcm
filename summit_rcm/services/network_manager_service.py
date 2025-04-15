@@ -442,6 +442,59 @@ class NMDeviceStateReason(IntEnum):
     The Wi-Fi P2P peer could not be found
     """
 
+    NM_DEVICE_STATE_REASON_DEVICE_HANDLER_FAILED = 68
+    """
+    The device handler dispatcher returned an error. Since: 1.46
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_BY_DEFAULT = 69
+    """
+    The device is unmanaged because the device type is unmanaged by default. Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_EXTERNAL_DOWN = 70
+    """
+    The device is unmanaged because it is an external device and is unconfigured (down or without
+    addresses). Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_LINK_NOT_INIT = 71
+    """
+    The device is unmanaged because the link is not initialized by udev. Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_QUITTING = 72
+    """
+    The device is unmanaged because NetworkManager is quitting. Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_SLEEPING = 73
+    """
+    The device is unmanaged because networking is disabled or the system is suspended. Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_USER_CONF = 74
+    """
+    The device is unmanaged by user decision in NetworkManager.conf ('unmanaged' in a [device*]
+    section). Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_USER_EXPLICIT = 75
+    """
+    The device is unmanaged by explicit user decision (e.g. 'nmcli device set $DEV managed no').
+    Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_USER_SETTINGS = 76
+    """
+    The device is unmanaged by user decision via settings plugin ('unmanaged-devices' for keyfile or
+    'NM_CONTROLLED=no' for ifcfg-rh). Since: 1.48
+    """
+
+    NM_DEVICE_STATE_REASON_UNMANAGED_USER_UDEV = 77
+    """
+    The device is unmanaged via udev rule. Since: 1.48
+    """
 
 @unique
 class NMDeviceCapabilities(IntFlag):
@@ -689,12 +742,7 @@ class NM80211ApFlags(IntFlag):
     Access point supports PIN-based WPS
     """
 
-    NM_802_11_AP_FLAGS_OWE_IE = 0x00000010
-    """
-    Access point has OWE IE
-    """
-
-    NM_802_11_AP_FLAGS_P2P_IE = 0x00000020
+    NM_802_11_AP_FLAGS_P2P_IE = 0x00000010
     """
     Access point has P2P IE
     """
@@ -947,6 +995,16 @@ class NMDeviceType(IntEnum):
     NM_DEVICE_TYPE_LOOPBACK = 32
     """
     A loopback interface. Since: 1.42.
+    """
+
+    NM_DEVICE_TYPE_HSR = 33
+    """
+    A HSR/PRP device. Since: 1.46.
+    """
+
+    NM_DEVICE_TYPE_IPVLAN = 34
+    """
+    A IPVLAN device. Since: 1.52.
     """
 
 
@@ -1215,13 +1273,19 @@ class NMWepKeyType(IntEnum):
 NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "auth-retries": -1,
     "autoconnect": True,
+    "autoconnect-ports": -1,
     "autoconnect-priority": 0,
     "autoconnect-retries": -1,
     "autoconnect-slaves": NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT,
+    "controller": None,
     "dns-over-tls": -1,
+    "down-on-poweroff": -1,
     "gateway-ping-timeout": 0,
     "id": None,
     "interface-name": None,
+    "ip-ping-addresses": [],
+    "ip-ping-addresses-require-all": -1,
+    "ip-ping-timeout": 0,
     "lldp": -1,
     "llmnr": -1,
     "master": None,
@@ -1231,7 +1295,9 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "mud-url": None,
     "multi-connect": 0,
     "permissions": [],
-    "read-only": False,
+    "port-type": None,
+    "read-only": False,     # Deprecated since version 1.44: This property is deprecated and has no
+                            # meaning.
     "secondaries": [],
     "slave-type": None,
     "stable-id": None,
@@ -1252,11 +1318,15 @@ NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "addresses": None,
     "auto-route-ext-gw": NMTernary.NM_TERNARY_DEFAULT,
     "dad-timeout": -1,
+    "dhcp-dscp": None,
     "dhcp-hostname": None,
     "dhcp-hostname-flags": 0,
     "dhcp-iaid": None,
     "dhcp-reject-servers": [],
-    "dhcp-send-hostname": True,
+    "dhcp-send-hostname": True,     # Deprecated since version 1.52: use the new version of
+                                    # dhcp-send-hostname instead.
+    "dhcp-send-hostname-v2": -1,
+    "dhcp-send-release": NMTernary.NM_TERNARY_DEFAULT,
     "dhcp-timeout": 0,
     "dns": [],
     "dns-options": [],
@@ -1268,10 +1338,14 @@ NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "may-fail": True,
     "method": None,
     "never-default": False,
+    "replace-local-rule": NMTernary.NM_TERNARY_DEFAULT,
     "required-timeout": -1,
     "route-metric": -1,
     "route-table": 0,
+    "routed-dns": -1,
     "routes": None,
+    "shared-dhcp-lease-time": 0,
+    "shared-dhcp-range": None,
 }
 """
 Default values for the NM.SettingIPConfig settings. Values taken from:
@@ -1283,6 +1357,7 @@ NM_SETTING_IP4CONFIG_DEFAULTS: Dict[str, Any] = {
     **NM_SETTING_IPCONFIG_DEFAULTS,
     "dhcp-client-id": None,
     "dhcp-fqdn": None,
+    "dhcp-ipv6-only-preferred": -1,
     "dhcp-vendor-class-identifier": None,
     "link-local": 0,
 }
@@ -1296,9 +1371,12 @@ NM_SETTING_IP6CONFIG_DEFAULTS: Dict[str, Any] = {
     **NM_SETTING_IPCONFIG_DEFAULTS,
     "addr-gen-mode": NMSettingIP6ConfigAddrGenMode.NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT,
     "dhcp-duid": None,
+    "dhcp-pd-hint": None,
     "ip6-privacy": NMSettingIP6ConfigPrivacy.NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN,
     "mtu": 0,
     "ra-timeout": 0,
+    "temp-preferred-timeout": 0,
+    "temp-valid-lifetime": 0,
     "token": None,
 }
 """
@@ -1327,6 +1405,7 @@ NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
     "generate-mac-address-mask": None,
     "mac-address": None,
     "mac-address-blacklist": [],
+    "mac-address-denylist": [],
     "mtu": 0,
     "port": None,
     "s390-nettype": None,
@@ -1347,19 +1426,24 @@ NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
     "band": None,
     "bssid": None,
     "channel": 0,
+    "channel-width": 0,
     "cloned-mac-address": None,
     "generate-mac-address-mask": None,
     "hidden": False,
     "mac-address": None,
     "mac-address-blacklist": [],
-    "mac-address-randomization": 0,
+    "mac-address-denylist": [],
+    "mac-address-randomization": 0,     # Deprecated since version 1.4: Use the NM.SettingWireless
+                                        # :cloned-mac-address property instead.
     "mode": None,
     "mtu": 0,
     "powersave": 0,
-    "rate": 0,
+    "rate": 0,                          # Deprecated since version 1.44: This property is not
+                                        # implemented and has no effect.
     "seen-bssids": [],
     "ssid": None,
-    "tx-power": 0,
+    "tx-power": 0,                      # Deprecated since version 1.44: This property is not
+                                        # implemented and has no effect.
     "wake-on-wlan": 1,
 }
 """
@@ -1411,6 +1495,7 @@ NM_SETTING_8021X_DEFAULTS: Dict[str, Any] = {
     "domain-suffix-match": None,
     "eap": [],
     "identity": None,
+    "openssl-ciphers": None,
     "optional": False,
     "pac-file": None,
     "password": None,
@@ -1442,7 +1527,8 @@ NM_SETTING_8021X_DEFAULTS: Dict[str, Any] = {
     "private-key": None,
     "private-key-password": None,
     "private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "subject-match": None,
+    "subject-match": None,  # Deprecated since version 1.2: Use NM.Setting8021x
+                            # :phase2-domain-suffix-match instead.
     "system-ca-certs": False,
 }
 """

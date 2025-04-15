@@ -150,6 +150,8 @@ SUMMIT_RCM_DEVTYPE_TEXT = {
     NMDeviceType.NM_DEVICE_TYPE_WIFI_P2P: "WiFi P2P",
     NMDeviceType.NM_DEVICE_TYPE_VRF: "VRF",
     NMDeviceType.NM_DEVICE_TYPE_LOOPBACK: "Loopback",
+    NMDeviceType.NM_DEVICE_TYPE_HSR: "HSR/PRP",
+    NMDeviceType.NM_DEVICE_TYPE_IPVLAN: "IPVLAN",
 }
 
 # values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
