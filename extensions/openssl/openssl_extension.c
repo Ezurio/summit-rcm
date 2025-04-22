@@ -20,6 +20,10 @@
 #include <openssl/opensslv.h>
 #include <openssl/err.h>
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/provider.h>
+#endif
+
 #include <stdio.h>
 
 #define DATE_LEN	128
