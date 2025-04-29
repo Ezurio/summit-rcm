@@ -21,7 +21,7 @@ except ImportError as error:
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
 from summit_rcm.utils import Singleton, get_current_side, get_running_on_sd
-from summit_rcm.services.files_service import FWUPDATE_FILE_PATH
+from summit_rcm.services.files_service import FilesService
 
 
 FW_UPDATE_SCRIPT = "fw_update"
@@ -148,7 +148,7 @@ class FirmwareUpdateService(metaclass=Singleton):
                 "Could not open IPC channel with swupdate", return_code
             )
         if await get_running_on_sd() and self.url == "":
-            self.url = FWUPDATE_FILE_PATH
+            self.url = FilesService.get_fwupdate_file_path()
 
         if self.url:
             # A URL is provided, so pass it and the target 'image' to the fw_update helper script
@@ -255,6 +255,10 @@ class FirmwareUpdateService(metaclass=Singleton):
                     self.status = SummitRCMUpdateStatus.UPDATED
                 elif status == SwupdateStatus.FAILURE:
                     self.status = SummitRCMUpdateStatus.FAIL
+
+                fwupdate_file_path = FilesService.get_fwupdate_file_path()
+                if os.path.exists(fwupdate_file_path):
+                    os.remove(fwupdate_file_path)
 
                 # Close down the progress monitor after completion
                 self.stop_progress_monitor()
