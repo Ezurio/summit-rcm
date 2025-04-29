@@ -46,7 +46,8 @@ SUMMIT_RCM_DIR = "/etc/summit-rcm/"
 SUMMIT_RCM_CLIENT_SSL_DIR = "/etc/summit-rcm/client-ssl/"
 DATA_SECRET_NETWORKMANAGER_DIR = "/data/secret/NetworkManager"
 DATA_SECRET_SUMMIT_RCM_DIR = "/data/secret/summit-rcm"
-FWUPDATE_FILE_PATH = "/tmp/summit-rcm-update.swu"
+SECURED_FWUPDATE_FILE_PATH = "/data/summit-rcm-update.swu"
+UNSECURED_FWUPDATE_FILE_PATH = "/usr/share/summit-rcm-update.swu"
 PERSISTENT_LOG_PATH = "/var/log/journal/"
 VOLATILE_LOG_PATH = "/run/log/journal/"
 
@@ -69,6 +70,18 @@ class FilesService(metaclass=Singleton):
             return VOLATILE_LOG_PATH
 
         return PERSISTENT_LOG_PATH
+
+    @staticmethod
+    def get_fwupdate_file_path() -> str:
+        """Retrieve the path to where the firmware update file is stored"""
+        # For secured SD card builds, the /data path is present and writeable, so we can use it to
+        # temporarily store the .swu file. For unsecured builds, the whole rootfs is writeable, so
+        # we can use /usr/share to temporarily store the .swu file.
+        return (
+            SECURED_FWUPDATE_FILE_PATH
+            if os.path.exists("/data")
+            else UNSECURED_FWUPDATE_FILE_PATH
+        )
 
     @staticmethod
     async def handle_file_upload_bytes(data: bytes, path: str, mode: str = "wb") -> str:
@@ -143,7 +156,7 @@ class FilesService(metaclass=Singleton):
         Handle when a client uploads a software update file
         """
         return await FilesService.handle_file_upload_bytes(
-            incoming_data, FWUPDATE_FILE_PATH, mode
+            incoming_data, FilesService.get_fwupdate_file_path(), mode
         )
 
     @staticmethod

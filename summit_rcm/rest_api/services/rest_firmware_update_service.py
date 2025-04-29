@@ -13,7 +13,7 @@ from summit_rcm.services.firmware_update_service import (
     NoUpdateInProgressError,
 )
 from summit_rcm.utils import Singleton, get_running_on_sd
-from summit_rcm.services.files_service import FWUPDATE_FILE_PATH
+from summit_rcm.services.files_service import FilesService
 
 FILE_STREAMING_BUFFER_SIZE = 128 * 1024
 MEDIA_OCTET_STREAM = "application/octet-stream"
@@ -31,15 +31,18 @@ class RESTFirmwareUpdateService(FirmwareUpdateService, metaclass=Singleton):
             raise NoUpdateInProgressError("no update in progress")
 
         if running_on_sd:
+            # Get the path to the firmware update file
+            fwupdate_file_path = FilesService.get_fwupdate_file_path()
+
             # If running on SD, we need to create the file if it doesn't exist
             # and remove it if it does exist
-            if os.path.isfile(FWUPDATE_FILE_PATH):
-                os.remove(FWUPDATE_FILE_PATH)
+            if os.path.isfile(fwupdate_file_path):
+                os.remove(fwupdate_file_path)
             else:
-                os.mknod(FWUPDATE_FILE_PATH)
+                os.mknod(fwupdate_file_path)
 
             # Create the file and write the data to it
-            with open(FWUPDATE_FILE_PATH, "wb") as dest:
+            with open(fwupdate_file_path, "wb") as dest:
                 while True:
                     data_chunk = await stream.read(FILE_STREAMING_BUFFER_SIZE)
                     if not data_chunk:
