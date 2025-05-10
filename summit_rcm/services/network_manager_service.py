@@ -1276,7 +1276,9 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "autoconnect-ports": -1,
     "autoconnect-priority": 0,
     "autoconnect-retries": -1,
-    "autoconnect-slaves": NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT,
+    "autoconnect-slaves": (
+        NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT
+    ),
     "controller": None,
     "dns-over-tls": -1,
     "down-on-poweroff": -1,
@@ -1288,7 +1290,8 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "ip-ping-timeout": 0,
     "lldp": -1,
     "llmnr": -1,
-    "master": None,
+    "master": None,         # Deprecated since version 1.46: Use 'controller' instead, this is just
+                            # an alias.
     "mdns": -1,
     "metered": NMMetered.NM_METERED_UNKNOWN,
     "mptcp-flags": 0,
@@ -1299,7 +1302,8 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "read-only": False,     # Deprecated since version 1.44: This property is deprecated and has no
                             # meaning.
     "secondaries": [],
-    "slave-type": None,
+    "slave-type": None,     # Deprecated since version 1.46: Use 'port-type' instead, this is just
+                            # an alias.
     "stable-id": None,
     "timestamp": 0,
     "type": None,
@@ -1311,11 +1315,13 @@ NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
 """
 Default values for the NM.SettingConnection settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingConnection.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
 NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
-    "addresses": None,
+    "address-data": None,
+    "addresses": None,              # Deprecated
     "auto-route-ext-gw": NMTernary.NM_TERNARY_DEFAULT,
     "dad-timeout": -1,
     "dhcp-dscp": None,
@@ -1328,7 +1334,8 @@ NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "dhcp-send-hostname-v2": -1,
     "dhcp-send-release": NMTernary.NM_TERNARY_DEFAULT,
     "dhcp-timeout": 0,
-    "dns": [],
+    "dns": [],                      # Deprecated
+    "dns-data": [],
     "dns-options": [],
     "dns-priority": 0,
     "dns-search": [],
@@ -1340,16 +1347,19 @@ NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
     "never-default": False,
     "replace-local-rule": NMTernary.NM_TERNARY_DEFAULT,
     "required-timeout": -1,
+    "route-data": None,
     "route-metric": -1,
     "route-table": 0,
     "routed-dns": -1,
-    "routes": None,
+    "routes": None,                 # Deprecated
+    "routing-rules": None,
     "shared-dhcp-lease-time": 0,
     "shared-dhcp-range": None,
 }
 """
 Default values for the NM.SettingIPConfig settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIPConfig.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
@@ -1364,6 +1374,7 @@ NM_SETTING_IP4CONFIG_DEFAULTS: Dict[str, Any] = {
 """
 Default values for the NM.SettingIP4Config settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIP4Config.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
@@ -1375,13 +1386,14 @@ NM_SETTING_IP6CONFIG_DEFAULTS: Dict[str, Any] = {
     "ip6-privacy": NMSettingIP6ConfigPrivacy.NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN,
     "mtu": 0,
     "ra-timeout": 0,
-    "temp-preferred-timeout": 0,
+    "temp-preferred-lifetime": 0,
     "temp-valid-lifetime": 0,
     "token": None,
 }
 """
 Default values for the NM.SettingIP6Config settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIP6Config.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
@@ -1394,13 +1406,15 @@ NM_SETTING_PROXY_DEFAULTS: Dict[str, Any] = {
 """
 Default values for the NM.SettingProxy settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingProxy.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
 NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
     "accept-all-mac-addresses": NMTernary.NM_TERNARY_DEFAULT,
+    "assigned-mac-address": None,
     "auto-negotiate": False,
-    "cloned-mac-address": None,
+    "cloned-mac-address": None,     # Deprecated
     "duplex": None,
     "generate-mac-address-mask": None,
     "mac-address": None,
@@ -1409,7 +1423,7 @@ NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
     "mtu": 0,
     "port": None,
     "s390-nettype": None,
-    "s390-options": None,
+    "s390-options": {},
     "s390-subchannels": [],
     "speed": 0,
     "wake-on-lan": 1,
@@ -1418,16 +1432,18 @@ NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
 """
 Default values for the NM.SettingWired settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWired.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
 NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
     "ap-isolation": NMTernary.NM_TERNARY_DEFAULT,
+    "assigned-mac-address": None,
     "band": None,
     "bssid": None,
     "channel": 0,
     "channel-width": 0,
-    "cloned-mac-address": None,
+    "cloned-mac-address": None,         # Deprecated
     "generate-mac-address-mask": None,
     "hidden": False,
     "mac-address": None,
@@ -1440,6 +1456,8 @@ NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
     "powersave": 0,
     "rate": 0,                          # Deprecated since version 1.44: This property is not
                                         # implemented and has no effect.
+    "security": None,                   # Deprecated: This property is deprecated and has no
+                                        # effect.
     "seen-bssids": [],
     "ssid": None,
     "tx-power": 0,                      # Deprecated since version 1.44: This property is not
@@ -1449,6 +1467,7 @@ NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
 """
 Default values for the NM.SettingWireless settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWireless.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
@@ -1465,18 +1484,19 @@ NM_SETTING_WIRELESS_SECURITY_DEFAULTS: Dict[str, Any] = {
     "proto": [],
     "psk": None,
     "psk-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    "wep-key-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    "wep-key-type": NMWepKeyType.NM_WEP_KEY_TYPE_UNKNOWN,
     "wep-key0": None,
     "wep-key1": None,
     "wep-key2": None,
     "wep-key3": None,
-    "wep-key-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "wep-key-type": NMWepKeyType.NM_WEP_KEY_TYPE_UNKNOWN,
     "wep-tx-keyidx": 0,
     "wps-method": 0,
 }
 """
 Default values for the NM.SettingWirelessSecurity settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWirelessSecurity.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
@@ -1527,13 +1547,48 @@ NM_SETTING_8021X_DEFAULTS: Dict[str, Any] = {
     "private-key": None,
     "private-key-password": None,
     "private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "subject-match": None,  # Deprecated since version 1.2: Use NM.Setting8021x
-                            # :phase2-domain-suffix-match instead.
+    "subject-match": None,  # Deprecated since version 1.2: Use "phase2-domain-suffix-match" instead
     "system-ca-certs": False,
 }
 """
 Default values for the NM.Setting8021x settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/Setting8021x.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
+"""
+
+
+NM_SETTING_GSM_DEFAULTS: Dict[str, Any] = {
+    "apn": None,
+    "auto-config": False,
+    "device-id": None,
+    "home-only": False,
+    "initial-eps-bearer-apn": None,
+    "initial-eps-bearer-configure": False,
+    "initial-eps-bearer-noauth": True,
+    "initial-eps-bearer-password": None,
+    "initial-eps-bearer-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    "initial-eps-bearer-refuse-chap": False,
+    "initial-eps-bearer-refuse-eap": False,
+    "initial-eps-bearer-refuse-mschap": False,
+    "initial-eps-bearer-refuse-mschapv2": False,
+    "initial-eps-bearer-refuse-pap": False,
+    "initial-eps-bearer-username": None,
+    "mtu": 0,
+    "network-id": None,
+    "number": None,     # Deprecated since version 1.16: User-provided values for this setting are
+                        # no longer used.
+    "password": None,
+    "password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    "pin": None,
+    "pin-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+    "sim-id": None,
+    "sim-operator-id": None,
+    "username": None,
+}
+"""
+Default values for the NM.SettingGsm settings. Values taken from:
+https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingGsm.html
+https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 DBUS_FAST_TYPE_CONVERSION: Dict[type, str] = {
