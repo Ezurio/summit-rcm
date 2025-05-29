@@ -873,6 +873,25 @@ try:
                         if disable_certificate_expiry_verification
                         else ssl.CERT_REQUIRED
                     )
+
+                # Register custom loop exception handler
+                def custom_exception_handler(loop, context):
+                    """
+                    Custom exception handler for the event loop to catch and report SSL client
+                    authentication errors
+                    """
+
+                    exception = context.get("exception", None)
+                    if exception is not None and isinstance(exception, ssl.SSLError):
+                        syslog(f"SSL client authentication error: {exception.reason}")
+                        return
+
+                    # Call the default exception handler to ensure proper handling of other
+                    # exceptions
+                    loop.default_exception_handler(context)
+
+                asyncio.get_event_loop().set_exception_handler(custom_exception_handler)
+
             except Exception as exception:
                 syslog(
                     LOG_ERR,
