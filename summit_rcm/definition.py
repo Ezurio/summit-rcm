@@ -4,12 +4,6 @@
 #
 import os
 from enum import Enum, IntEnum
-from summit_rcm.services.network_manager_service import (
-    NM80211Mode,
-    NMActiveConnectionState,
-    NMDeviceState,
-    NMDeviceType,
-)
 
 # TODO - deal with directories for file retrieval (see FIELDIR_DICT and files.py)
 SYSTEM_CONF_DIR = "/etc"
@@ -116,97 +110,6 @@ USER_PERMISSION_TYPES = {
         ["", "", ""],
     ],
 }
-
-# values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
-SUMMIT_RCM_DEVTYPE_TEXT = {
-    NMDeviceType.NM_DEVICE_TYPE_UNKNOWN: "Unknown",
-    NMDeviceType.NM_DEVICE_TYPE_ETHERNET: "Ethernet",
-    NMDeviceType.NM_DEVICE_TYPE_WIFI: "Wi-Fi",
-    NMDeviceType.NM_DEVICE_TYPE_BT: "Bluetooth",
-    NMDeviceType.NM_DEVICE_TYPE_OLPC_MESH: "OLPC",
-    NMDeviceType.NM_DEVICE_TYPE_WIMAX: "WiMAX",
-    NMDeviceType.NM_DEVICE_TYPE_MODEM: "Modem",
-    NMDeviceType.NM_DEVICE_TYPE_INFINIBAND: "InfiniBand",
-    NMDeviceType.NM_DEVICE_TYPE_BOND: "Bond",
-    NMDeviceType.NM_DEVICE_TYPE_VLAN: "VLAN",
-    NMDeviceType.NM_DEVICE_TYPE_ADSL: "ADSL",
-    NMDeviceType.NM_DEVICE_TYPE_BRIDGE: "Bridge Master",
-    NMDeviceType.NM_DEVICE_TYPE_GENERIC: "Generic",
-    NMDeviceType.NM_DEVICE_TYPE_TEAM: "Team Master",
-    NMDeviceType.NM_DEVICE_TYPE_TUN: "TUN/TAP",
-    NMDeviceType.NM_DEVICE_TYPE_IP_TUNNEL: "IP Tunnel",
-    NMDeviceType.NM_DEVICE_TYPE_MACVLAN: "MACVLAN",
-    NMDeviceType.NM_DEVICE_TYPE_VXLAN: "VXLAN",
-    NMDeviceType.NM_DEVICE_TYPE_VETH: "VETH",
-    NMDeviceType.NM_DEVICE_TYPE_MACSEC: "MACsec",
-    NMDeviceType.NM_DEVICE_TYPE_DUMMY: "dummy",
-    NMDeviceType.NM_DEVICE_TYPE_PPP: "PPP",
-    NMDeviceType.NM_DEVICE_TYPE_OVS_INTERFACE: "Open vSwitch interface",
-    NMDeviceType.NM_DEVICE_TYPE_OVS_PORT: "Open vSwitch port",
-    NMDeviceType.NM_DEVICE_TYPE_OVS_BRIDGE: "Open vSwitch bridge",
-    NMDeviceType.NM_DEVICE_TYPE_WPAN: "WPAN",
-    NMDeviceType.NM_DEVICE_TYPE_6LOWPAN: "6LoWPAN",
-    NMDeviceType.NM_DEVICE_TYPE_WIREGUARD: "WireGuard",
-    NMDeviceType.NM_DEVICE_TYPE_WIFI_P2P: "WiFi P2P",
-    NMDeviceType.NM_DEVICE_TYPE_VRF: "VRF",
-    NMDeviceType.NM_DEVICE_TYPE_LOOPBACK: "Loopback",
-    NMDeviceType.NM_DEVICE_TYPE_HSR: "HSR/PRP",
-    NMDeviceType.NM_DEVICE_TYPE_IPVLAN: "IPVLAN",
-}
-
-# values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
-SUMMIT_RCM_STATE_TEXT = {
-    NMDeviceState.NM_DEVICE_STATE_UNKNOWN: "Unknown",
-    NMDeviceState.NM_DEVICE_STATE_UNMANAGED: "Unmanaged",
-    NMDeviceState.NM_DEVICE_STATE_UNAVAILABLE: "Unavailable",
-    NMDeviceState.NM_DEVICE_STATE_DISCONNECTED: "Disconnected",
-    NMDeviceState.NM_DEVICE_STATE_PREPARE: "Prepare",
-    NMDeviceState.NM_DEVICE_STATE_CONFIG: "Config",
-    NMDeviceState.NM_DEVICE_STATE_NEED_AUTH: "Need Auth",
-    NMDeviceState.NM_DEVICE_STATE_IP_CONFIG: "IP Config",
-    NMDeviceState.NM_DEVICE_STATE_IP_CHECK: "IP Check",
-    NMDeviceState.NM_DEVICE_STATE_SECONDARIES: "Secondaries",
-    NMDeviceState.NM_DEVICE_STATE_ACTIVATED: "Activated",
-    NMDeviceState.NM_DEVICE_STATE_DEACTIVATING: "Deactivating",
-    NMDeviceState.NM_DEVICE_STATE_FAILED: "Failed",
-}
-
-# values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
-SUMMIT_RCM_METERED_TEXT = {
-    0: "Unknown",
-    1: "Metered",
-    2: "Not metered",
-    3: "Metered (guessed)",
-    4: "Not metered (guessed)",
-}
-
-# values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
-SUMMIT_RCM_CONNECTIVITY_STATE_TEXT = {
-    0: "Unknown",
-    1: "None",
-    2: "Portal",
-    3: "Limited",
-    4: "Full",
-}
-
-# values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
-SUMMIT_RCM_802_11_MODE_STATE_TEXT = {
-    NM80211Mode.NM_802_11_MODE_UNKNOWN: "Unknown",
-    NM80211Mode.NM_802_11_MODE_ADHOC: "Ad-Hoc",
-    NM80211Mode.NM_802_11_MODE_INFRA: "Infrastructure",
-    NM80211Mode.NM_802_11_MODE_AP: "Acces point",
-    NM80211Mode.NM_802_11_MODE_MESH: "Mesh",
-}
-
-# values from https://lazka.github.io/pgi-docs/#NM-1.0/enums.html
-SUMMIT_RCM_NM_ACTIVE_CONNECTION_STATE_TEXT = {
-    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_UNKNOWN: "Unknown",
-    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_ACTIVATING: "Activating",
-    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_ACTIVATED: "Activated",
-    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_DEACTIVATING: "Deactivating",
-    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_DEACTIVATED: "Deactivated",
-}
-
 
 SUMMIT_RCM_NM_DEVICE_TYPE_WIRED_TEXT = "802-3-ethernet"
 SUMMIT_RCM_NM_DEVICE_TYPE_WIRELESS_TEXT = "802-11-wireless"
