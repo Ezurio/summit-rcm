@@ -6,7 +6,7 @@
 
 import base64
 import json
-from re import sub
+from re import sub, match
 import shlex
 from typing import Any
 import os
@@ -36,22 +36,21 @@ class InProgressException(Exception):
     """
 
 
+def is_camel_case(string: str) -> bool:
+    """
+    Return whether the given string is formatted as camelCase.
+    """
+    return bool(match(r"^[a-z]+(?:[A-Z][a-z]+)*$", string))
+
+
 def to_camel_case(string: str) -> str:
     """
     Return the given string formatted as camelCase.
     """
+    if is_camel_case(string):
+        return string
     string = sub(r"(_|-)+", " ", string).title().replace(" ", "")
     return "".join([string[0].lower(), string[1:]])
-
-
-def camel_case_keys(original_dict: dict) -> dict:
-    """
-    Return a copy of the given dictionary with the keys formatted as camelCase.
-    """
-    new_dict = {}
-    for key in original_dict.keys():
-        new_dict[to_camel_case(key)] = original_dict[key]
-    return new_dict
 
 
 def variant_to_python(data: Any) -> Any:
