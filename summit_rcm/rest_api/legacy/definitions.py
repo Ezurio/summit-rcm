@@ -14,6 +14,10 @@ from summit_rcm.rest_api.services.spectree_service import (
     SpectreeService,
 )
 from summit_rcm import definition
+from summit_rcm.services.network_manager_service import (
+    SUMMIT_RCM_DEVTYPE_TEXT,
+    SUMMIT_RCM_STATE_TEXT,
+)
 
 try:
     if not ServerConfig().rest_api_docs_enabled:
@@ -71,8 +75,8 @@ class DefinitionsResource(object):
                 "Definitions": {
                     "SDCERR": definition.SUMMIT_RCM_ERRORS,
                     "PERMISSIONS": definition.USER_PERMISSION_TYPES,
-                    "DEVICE_TYPES": definition.SUMMIT_RCM_DEVTYPE_TEXT,
-                    "DEVICE_STATES": definition.SUMMIT_RCM_STATE_TEXT,
+                    "DEVICE_TYPES": SUMMIT_RCM_DEVTYPE_TEXT,
+                    "DEVICE_STATES": SUMMIT_RCM_STATE_TEXT,
                     "PLUGINS": plugins,
                     "SETTINGS": settings,
                 },

@@ -22,6 +22,7 @@ except ImportError as error:
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
 
+from summit_rcm.services.network_manager_service import NetworkManagerService
 from summit_rcm.utils import Singleton
 from summit_rcm.services.date_time_service import DateTimeService
 from summit_rcm.settings import ServerConfig, SystemSettingsManage
@@ -983,6 +984,8 @@ async def start():
     signal.signal(signal.SIGTERM, signal_handler)
 
     tasks = []
+
+    tasks.append(asyncio.create_task(NetworkManagerService().subscribe()))
 
     if ATInterface:
         tasks.append(asyncio.create_task(start_at_interface()))

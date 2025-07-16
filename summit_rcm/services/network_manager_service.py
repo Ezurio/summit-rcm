@@ -2,22 +2,49 @@
 # SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 # Copyright (C) 2024 Ezurio LLC.
 #
-from asyncio import wait_for
-from socket import inet_pton, AF_INET, AF_INET6
+from asyncio import wait_for, Lock
+from socket import inet_pton, inet_ntop, AF_INET, AF_INET6
 from sys import byteorder
-from typing import Any, Dict, List, Optional
+from syslog import LOG_ERR, syslog
+from typing import Any, Dict, List, Optional, Tuple
 from enum import IntFlag, IntEnum, unique
 import os
 
 try:
     from dbus_fast import Message, MessageType, Variant
+    from dbus_fast.aio.proxy_object import ProxyInterface, ProxyObject
     from summit_rcm.dbus_manager import DBusManager
+    from pyroute2.iwutil import IW
+    from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
+    from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
 except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
-import summit_rcm.definition
-from summit_rcm.utils import Singleton
+
+    class nl80211cmd:
+        """Dummy nl80211cmd class for documentation generation"""
+
+        class STAInfo:
+            """Dummy STAInfo class for documentation generation"""
+
+            class rate_info:
+                """Dummy rate_info class for documentation generation"""
+
+            class bss_param:
+                """Dummy bss_param class for documentation generation"""
+
+
+from summit_rcm.definition import FILEDIR_DICT, INVALID_RSSI
+from summit_rcm.utils import (
+    Singleton,
+    frequency_to_channel,
+    variant_to_python,
+    to_camel_case,
+)
+from summit_rcm.services.network_manager_systemd_service import (
+    NetworkManagerSystemdService,
+)
 
 
 @unique
@@ -1213,6 +1240,88 @@ class NMWepKeyType(IntEnum):
     """
 
 
+@unique
+class NMRadioFlags(IntFlag):
+    """
+    Flags related to radio interfaces.
+
+    Since: 1.38
+    """
+
+    NM_RADIO_FLAG_NONE = 0
+    """
+    An alias for numeric zero, no flags set.
+    """
+
+    NM_RADIO_FLAG_WLAN_AVAILABLE = 0x1
+    """
+    A Wireless LAN device or rfkill switch is detected in the system.
+    """
+
+    NM_RADIO_FLAG_WWAN_AVAILABLE = 0x2
+    """
+    A Wireless WAN device or rfkill switch is detected in the system.
+    """
+
+
+@unique
+class NMState(IntEnum):
+    """
+    NMState values indicate the current overall networking state.
+    """
+
+    NM_STATE_UNKNOWN = 0
+    """
+    Networking state is unknown. This indicates a daemon error that makes it unable to reasonably
+    assess the state. In such event the applications are expected to assume Internet connectivity
+    might be present and not disable controls that require network access. The graphical shells may
+    hide the network accessibility indicator altogether since no meaningful status indication can be
+    provided.
+    """
+
+    NM_STATE_ASLEEP = 10
+    """
+    Networking is not enabled, the system is being suspended or resumed from suspend.
+    """
+
+    NM_STATE_DISCONNECTED = 20
+    """
+    There is no active network connection. The graphical shell should indicate no network
+    connectivity and the applications should not attempt to access the network.
+    """
+
+    NM_STATE_DISCONNECTING = 30
+    """
+    Network connections are being cleaned up. The applications should tear down their network
+    sessions.
+    """
+
+    NM_STATE_CONNECTING = 40
+    """
+    A network connection is being started. The graphical shell should indicate the network is being
+    connected while the applications should still make no attempts to connect the network.
+    """
+
+    NM_STATE_CONNECTED_LOCAL = 50
+    """
+    There is only local IPv4 and/or IPv6 connectivity, but no default route to access the Internet.
+    The graphical shell should indicate no network connectivity.
+    """
+
+    NM_STATE_CONNECTED_SITE = 60
+    """
+    There is only site-wide IPv4 and/or IPv6 connectivity. This means a default route is available,
+    but the Internet connectivity check (see "Connectivity" property) did not succeed. The graphical
+    shell should indicate limited network connectivity.
+    """
+
+    NM_STATE_CONNECTED_GLOBAL = 70
+    """
+    There is global IPv4 and/or IPv6 Internet connectivity. This means the Internet connectivity
+    check succeeded, the graphical shell should indicate full network connectivity.
+    """
+
+
 NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "auth-retries": -1,
     "autoconnect": True,
@@ -1451,6 +1560,106 @@ Default values for the NM.Setting8021x settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/Setting8021x.html
 """
 
+SUMMIT_RCM_DEVTYPE_TEXT = {
+    NMDeviceType.NM_DEVICE_TYPE_UNKNOWN: "Unknown",
+    NMDeviceType.NM_DEVICE_TYPE_ETHERNET: "Ethernet",
+    NMDeviceType.NM_DEVICE_TYPE_WIFI: "Wi-Fi",
+    NMDeviceType.NM_DEVICE_TYPE_BT: "Bluetooth",
+    NMDeviceType.NM_DEVICE_TYPE_OLPC_MESH: "OLPC",
+    NMDeviceType.NM_DEVICE_TYPE_WIMAX: "WiMAX",
+    NMDeviceType.NM_DEVICE_TYPE_MODEM: "Modem",
+    NMDeviceType.NM_DEVICE_TYPE_INFINIBAND: "InfiniBand",
+    NMDeviceType.NM_DEVICE_TYPE_BOND: "Bond",
+    NMDeviceType.NM_DEVICE_TYPE_VLAN: "VLAN",
+    NMDeviceType.NM_DEVICE_TYPE_ADSL: "ADSL",
+    NMDeviceType.NM_DEVICE_TYPE_BRIDGE: "Bridge Master",
+    NMDeviceType.NM_DEVICE_TYPE_GENERIC: "Generic",
+    NMDeviceType.NM_DEVICE_TYPE_TEAM: "Team Master",
+    NMDeviceType.NM_DEVICE_TYPE_TUN: "TUN/TAP",
+    NMDeviceType.NM_DEVICE_TYPE_IP_TUNNEL: "IP Tunnel",
+    NMDeviceType.NM_DEVICE_TYPE_MACVLAN: "MACVLAN",
+    NMDeviceType.NM_DEVICE_TYPE_VXLAN: "VXLAN",
+    NMDeviceType.NM_DEVICE_TYPE_VETH: "VETH",
+    NMDeviceType.NM_DEVICE_TYPE_MACSEC: "MACsec",
+    NMDeviceType.NM_DEVICE_TYPE_DUMMY: "dummy",
+    NMDeviceType.NM_DEVICE_TYPE_PPP: "PPP",
+    NMDeviceType.NM_DEVICE_TYPE_OVS_INTERFACE: "Open vSwitch interface",
+    NMDeviceType.NM_DEVICE_TYPE_OVS_PORT: "Open vSwitch port",
+    NMDeviceType.NM_DEVICE_TYPE_OVS_BRIDGE: "Open vSwitch bridge",
+    NMDeviceType.NM_DEVICE_TYPE_WPAN: "WPAN",
+    NMDeviceType.NM_DEVICE_TYPE_6LOWPAN: "6LoWPAN",
+    NMDeviceType.NM_DEVICE_TYPE_WIREGUARD: "WireGuard",
+    NMDeviceType.NM_DEVICE_TYPE_WIFI_P2P: "WiFi P2P",
+    NMDeviceType.NM_DEVICE_TYPE_VRF: "VRF",
+    NMDeviceType.NM_DEVICE_TYPE_LOOPBACK: "Loopback",
+}
+"""
+Values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
+"""
+
+SUMMIT_RCM_STATE_TEXT = {
+    NMDeviceState.NM_DEVICE_STATE_UNKNOWN: "Unknown",
+    NMDeviceState.NM_DEVICE_STATE_UNMANAGED: "Unmanaged",
+    NMDeviceState.NM_DEVICE_STATE_UNAVAILABLE: "Unavailable",
+    NMDeviceState.NM_DEVICE_STATE_DISCONNECTED: "Disconnected",
+    NMDeviceState.NM_DEVICE_STATE_PREPARE: "Prepare",
+    NMDeviceState.NM_DEVICE_STATE_CONFIG: "Config",
+    NMDeviceState.NM_DEVICE_STATE_NEED_AUTH: "Need Auth",
+    NMDeviceState.NM_DEVICE_STATE_IP_CONFIG: "IP Config",
+    NMDeviceState.NM_DEVICE_STATE_IP_CHECK: "IP Check",
+    NMDeviceState.NM_DEVICE_STATE_SECONDARIES: "Secondaries",
+    NMDeviceState.NM_DEVICE_STATE_ACTIVATED: "Activated",
+    NMDeviceState.NM_DEVICE_STATE_DEACTIVATING: "Deactivating",
+    NMDeviceState.NM_DEVICE_STATE_FAILED: "Failed",
+}
+"""
+Values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
+"""
+
+SUMMIT_RCM_METERED_TEXT = {
+    0: "Unknown",
+    1: "Metered",
+    2: "Not metered",
+    3: "Metered (guessed)",
+    4: "Not metered (guessed)",
+}
+"""
+Values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
+"""
+
+SUMMIT_RCM_CONNECTIVITY_STATE_TEXT = {
+    0: "Unknown",
+    1: "None",
+    2: "Portal",
+    3: "Limited",
+    4: "Full",
+}
+"""
+Values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
+"""
+
+SUMMIT_RCM_802_11_MODE_STATE_TEXT = {
+    NM80211Mode.NM_802_11_MODE_UNKNOWN: "Unknown",
+    NM80211Mode.NM_802_11_MODE_ADHOC: "Ad-Hoc",
+    NM80211Mode.NM_802_11_MODE_INFRA: "Infrastructure",
+    NM80211Mode.NM_802_11_MODE_AP: "Access point",
+    NM80211Mode.NM_802_11_MODE_MESH: "Mesh",
+}
+"""
+Values from https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html
+"""
+
+SUMMIT_RCM_NM_ACTIVE_CONNECTION_STATE_TEXT = {
+    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_UNKNOWN: "Unknown",
+    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_ACTIVATING: "Activating",
+    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_ACTIVATED: "Activated",
+    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_DEACTIVATING: "Deactivating",
+    NMActiveConnectionState.NM_ACTIVE_CONNECTION_STATE_DEACTIVATED: "Deactivated",
+}
+"""
+Values from https://lazka.github.io/pgi-docs/#NM-1.0/enums.html
+"""
+
 DBUS_FAST_TYPE_CONVERSION: Dict[type, str] = {
     bool: "b",
     int: "i",
@@ -1463,6 +1672,539 @@ DBUS_FAST_TYPE_CONVERSION: Dict[type, str] = {
 """
 Dictionary used to convert from a Python type to the proper DBus token signature.
 """
+
+
+class NetworkManagerPropertyConverter:
+    """
+    Class to handle conversion between legacy and non-legacy property names for NetworkManager.
+    """
+
+    legacy: str = None
+    non_legacy: str = None
+
+    def __init__(self, legacy: str, non_legacy: str):
+        self.legacy = legacy
+        self.non_legacy = non_legacy
+
+
+NM_PROPERTY_CONVERTER_NAMES: Dict[str, NetworkManagerPropertyConverter] = {
+    "Ssid": NetworkManagerPropertyConverter(legacy="Ssid", non_legacy="ssid"),
+    "HwAddress": NetworkManagerPropertyConverter(
+        legacy="HwAddress", non_legacy="hwAddress"
+    ),
+    "MaxBitrate": NetworkManagerPropertyConverter(
+        legacy="Maxbitrate", non_legacy="maxBitrate"
+    ),
+    "Flags": NetworkManagerPropertyConverter(legacy="Flags", non_legacy="flags"),
+    "WpaFlags": NetworkManagerPropertyConverter(
+        legacy="Wpaflags", non_legacy="wpaFlags"
+    ),
+    "RsnFlags": NetworkManagerPropertyConverter(
+        legacy="Rsnflags", non_legacy="rsnFlags"
+    ),
+    "Bandwidth": NetworkManagerPropertyConverter(
+        legacy="Bandwidth", non_legacy="bandwidth"
+    ),
+    "Strength": NetworkManagerPropertyConverter(
+        legacy="Strength", non_legacy="strength"
+    ),
+    "Frequency": NetworkManagerPropertyConverter(
+        legacy="Frequency", non_legacy="frequency"
+    ),
+    "Signal": NetworkManagerPropertyConverter(legacy="Signal", non_legacy="signal"),
+    "Channel": NetworkManagerPropertyConverter(legacy="Channel", non_legacy="channel"),
+    "State": NetworkManagerPropertyConverter(legacy="State", non_legacy="state"),
+    "StateText": NetworkManagerPropertyConverter(
+        legacy="StateText", non_legacy="stateText"
+    ),
+    "Mtu": NetworkManagerPropertyConverter(legacy="Mtu", non_legacy="mtu"),
+    "DeviceType": NetworkManagerPropertyConverter(
+        legacy="DeviceType", non_legacy="deviceType"
+    ),
+    "DeviceTypeText": NetworkManagerPropertyConverter(
+        legacy="DeviceTypeText", non_legacy="deviceTypeText"
+    ),
+    "Addresses": NetworkManagerPropertyConverter(
+        legacy="Addresses", non_legacy="addresses"
+    ),
+    "AddressData": NetworkManagerPropertyConverter(
+        legacy="AddressData", non_legacy="addressData"
+    ),
+    "next-hop": NetworkManagerPropertyConverter(
+        legacy="next_hop", non_legacy="nextHop"
+    ),
+    "Routes": NetworkManagerPropertyConverter(legacy="Routes", non_legacy="routes"),
+    "RouteData": NetworkManagerPropertyConverter(
+        legacy="RouteData", non_legacy="routeData"
+    ),
+    "Gateway": NetworkManagerPropertyConverter(legacy="Gateway", non_legacy="gateway"),
+    "Domains": NetworkManagerPropertyConverter(legacy="Domains", non_legacy="domains"),
+    "NameserverData": NetworkManagerPropertyConverter(
+        legacy="NameserverData", non_legacy="nameservers"
+    ),
+    "WinsServerData": NetworkManagerPropertyConverter(
+        legacy="WinsServerData", non_legacy="winsServers"
+    ),
+    "Options": NetworkManagerPropertyConverter(legacy="Options", non_legacy="options"),
+    "PermHwAddress": NetworkManagerPropertyConverter(
+        legacy="PermHwAddress", non_legacy="permHwAddress"
+    ),
+    "Speed": NetworkManagerPropertyConverter(legacy="Speed", non_legacy="speed"),
+    "Carrier": NetworkManagerPropertyConverter(legacy="Carrier", non_legacy="carrier"),
+    "Bitrate": NetworkManagerPropertyConverter(legacy="Bitrate", non_legacy="bitrate"),
+    "Mode": NetworkManagerPropertyConverter(legacy="Mode", non_legacy="mode"),
+    "RegDomain": NetworkManagerPropertyConverter(
+        legacy="RegDomain", non_legacy="regDomain"
+    ),
+    "LastScan": NetworkManagerPropertyConverter(
+        legacy="LastScan", non_legacy="lastScan"
+    ),
+    "interface-name": NetworkManagerPropertyConverter(
+        legacy="interface-name", non_legacy="interfaceName"
+    ),
+    "connection_active": NetworkManagerPropertyConverter(
+        legacy="connection_active", non_legacy="activeConnection"
+    ),
+    "Ip4Config": NetworkManagerPropertyConverter(
+        legacy="ip4config", non_legacy="ip4Config"
+    ),
+    "Ip6Config": NetworkManagerPropertyConverter(
+        legacy="ip6config", non_legacy="ip6Config"
+    ),
+    "Dhcp4Config": NetworkManagerPropertyConverter(
+        legacy="dhcp4config", non_legacy="dhcp4Config"
+    ),
+    "Dhcp6Config": NetworkManagerPropertyConverter(
+        legacy="dhcp6config", non_legacy="dhcp6Config"
+    ),
+    "ActiveAccessPoint": NetworkManagerPropertyConverter(
+        legacy="activeaccesspoint", non_legacy="activeAccessPoint"
+    ),
+    "available_connections": NetworkManagerPropertyConverter(
+        legacy="available_connections", non_legacy="availableConnections"
+    ),
+    "IpInterface": NetworkManagerPropertyConverter(
+        legacy="ip_interface", non_legacy="ipInterface"
+    ),
+    "DriverVersion": NetworkManagerPropertyConverter(
+        legacy="driver_version", non_legacy="driverVersion"
+    ),
+    "FirmwareVersion": NetworkManagerPropertyConverter(
+        legacy="firmware_version", non_legacy="firmwareVersion"
+    ),
+    "StateReason": NetworkManagerPropertyConverter(
+        legacy="state_reason", non_legacy="stateReason"
+    ),
+    "FirmwareMissing": NetworkManagerPropertyConverter(
+        legacy="firmware_missing", non_legacy="firmwareMissing"
+    ),
+    "NmPluginMissing": NetworkManagerPropertyConverter(
+        legacy="nm_plugin_missing", non_legacy="nmPluginMissing"
+    ),
+    "PhysicalPortId": NetworkManagerPropertyConverter(
+        legacy="physical_port_id", non_legacy="physicalPortId"
+    ),
+    "MeteredText": NetworkManagerPropertyConverter(
+        legacy="metered_text", non_legacy="meteredText"
+    ),
+    "LldpNeighbors": NetworkManagerPropertyConverter(
+        legacy="lldp_neighbors", non_legacy="lldpNeighbors"
+    ),
+    "Ip4Connectivity": NetworkManagerPropertyConverter(
+        legacy="ip4connectivity", non_legacy="ip4Connectivity"
+    ),
+    "Ip4ConnectivityText": NetworkManagerPropertyConverter(
+        legacy="ip4connectivity_text", non_legacy="ip4ConnectivityText"
+    ),
+    "Ip6Connectivity": NetworkManagerPropertyConverter(
+        legacy="ip6connectivity", non_legacy="ip6Connectivity"
+    ),
+    "Ip6ConnectivityText": NetworkManagerPropertyConverter(
+        legacy="ip6connectivity_text", non_legacy="ip6ConnectivityText"
+    ),
+    "InterfaceFlags": NetworkManagerPropertyConverter(
+        legacy="interface_flags", non_legacy="interfaceFlags"
+    ),
+}
+"""
+Dictionary used to convert property names from NetworkManager name to the legacy or non-legacy name.
+This is used to ensure compatibility with both legacy and non-legacy property names.
+For example, the property "MaxBitrate" can be accessed as "Maxbitrate" in legacy code or
+"maxBitrate" in non-legacy code.
+"""
+
+
+def convert_nm_property_name(property_name: str, is_legacy: bool = False) -> str:
+    """
+    Convert a NetworkManager property name to either legacy or non-legacy format.
+
+    :param name: The property name to convert.
+    :param is_legacy: If True, convert to legacy format; if False, convert to non-legacy format.
+    :return: The converted property name.
+    """
+    converter = NM_PROPERTY_CONVERTER_NAMES.get(property_name)
+    if converter:
+        return converter.legacy if is_legacy else converter.non_legacy
+
+    # Return the original name camel-cased if no conversion is found
+    return to_camel_case(property_name)
+
+
+class NetworkManagerPropertiesWatcher:
+    """
+    Class to watch for changes in NetworkManager IP configuration. This class is used to monitor
+    the state of NetworkManager IP configurations and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        self.property_obj_path = property_obj_path
+        self.device_interface_name = device_interface_name
+        self.bus = None
+        self.proxy_object = None
+        self.interface = None
+        self.subscribed = False
+        self.properties = {}
+        self._dev_lock = dev_lock
+        self.interface_name: str = ""
+
+    async def subscribe(self) -> None:
+        """
+        Subscribe to NetworkManager property signals.
+        """
+        self.bus = await DBusManager().get_bus()
+        self.proxy_object = self.bus.get_proxy_object(
+            NetworkManagerService.NM_BUS_NAME,
+            self.property_obj_path,
+            await self.bus.introspect(
+                NetworkManagerService.NM_BUS_NAME, self.property_obj_path
+            ),
+        )
+        self.interface = self.proxy_object.get_interface(
+            NetworkManagerService.DBUS_PROP_IFACE
+        )
+        if self.interface_name:
+            self.properties.update(
+                await NetworkManagerService().get_obj_properties(
+                    self.property_obj_path, self.interface_name
+                )
+            )
+        self.interface.on_properties_changed(self.on_properties_changed)
+        self.subscribed = True
+
+    async def unsubscribe(self) -> None:
+        """
+        Unsubscribe from NetworkManager property signals.
+        """
+        if not self.subscribed:
+            return
+
+        if self.interface:
+            self.interface.off_properties_changed(self.on_properties_changed)
+
+        self.subscribed = False
+        self.bus = None
+        self.proxy_object = None
+        self.interface = None
+
+    async def on_properties_changed(
+        self, _iface: str, changed_props: dict, _invalidated_props: list
+    ) -> None:
+        """
+        Callback for property changes signal. This method is called when the
+        properties of a NetworkManager configuration change.
+        """
+
+        async with self._dev_lock:
+            self.properties.update(variant_to_python(changed_props))
+
+
+class NetworkManagerIp4ConfigWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager IPv4 configuration. This class is used to monitor
+    the state of NetworkManager IPv4 configurations and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_IP4CONFIG_IFACE
+
+
+class NetworkManagerIp6ConfigWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager IPv6 configuration. This class is used to monitor
+    the state of NetworkManager IPv6 configurations and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_IP6CONFIG_IFACE
+
+
+class NetworkManagerDhcp4ConfigWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager DHCP4 configuration. This class is used to monitor
+    the state of NetworkManager DHCP4 configurations and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_DHCP4CONFIG_IFACE
+
+
+class NetworkManagerDhcp6ConfigWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager DHCP6 configuration. This class is used to monitor
+    the state of NetworkManager DHCP6 configurations and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_DHCP6CONFIG_IFACE
+
+
+class NetworkManagerActiveConnectionWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager active connections. This class is used to monitor
+    the state of NetworkManager active connections and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_CONNECTION_ACTIVE_IFACE
+
+
+class NetworkManagerActiveAccessPointWatcher(NetworkManagerPropertiesWatcher):
+    """
+    Class to watch for changes in NetworkManager active access points. This class is used to monitor
+    the state of NetworkManager active access points and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, property_obj_path: str, device_interface_name: str, dev_lock: Lock
+    ) -> None:
+        super().__init__(property_obj_path, device_interface_name, dev_lock)
+        self.interface_name = NetworkManagerService.NM_ACCESS_POINT_IFACE
+
+
+class NetworkManagerDeviceWatcher:
+    """
+    Class to watch for changes in NetworkManager devices. This class is used to monitor the state
+    of NetworkManager devices and trigger actions when the state changes.
+    """
+
+    def __init__(
+        self, device_obj_path: str, device_interface_name: str, device_properties: dict
+    ) -> None:
+        self.device_obj_path = device_obj_path
+        self.device_interface_name = device_interface_name
+        self.device_properties = device_properties
+        self.bus = None
+        self.proxy_object: Optional[ProxyObject] = None
+        self.interface: Optional[ProxyInterface] = None
+        self.subscribed = False
+        self.dev_lock = Lock()
+        self.ip4_config: Optional[NetworkManagerIp4ConfigWatcher] = None
+        self.ip6_config: Optional[NetworkManagerIp6ConfigWatcher] = None
+        self.dhcp4_config: Optional[NetworkManagerDhcp4ConfigWatcher] = None
+        self.dhcp6_config: Optional[NetworkManagerDhcp6ConfigWatcher] = None
+        self.active_connection: Optional[NetworkManagerActiveConnectionWatcher] = None
+        self.active_access_point: Optional[NetworkManagerActiveAccessPointWatcher] = (
+            None
+        )
+
+    async def subscribe(self) -> None:
+        """
+        Subscribe to NetworkManager device signals.
+        """
+        self.bus = await DBusManager().get_bus()
+        self.proxy_object = self.bus.get_proxy_object(
+            NetworkManagerService.NM_BUS_NAME,
+            self.device_obj_path,
+            await self.bus.introspect(
+                NetworkManagerService.NM_BUS_NAME, self.device_obj_path
+            ),
+        )
+        self.interface = self.proxy_object.get_interface(
+            NetworkManagerService.DBUS_PROP_IFACE
+        )
+        self.interface.on_properties_changed(self.on_device_properties_changed)
+
+        ip4_config_obj_path = self.device_properties.get("Ip4Config", "/")
+        if ip4_config_obj_path != "/":
+            self.ip4_config = NetworkManagerIp4ConfigWatcher(
+                ip4_config_obj_path, self.device_interface_name, self.dev_lock
+            )
+            await self.ip4_config.subscribe()
+
+        ip6_config_obj_path = self.device_properties.get("Ip6Config", "/")
+        if ip6_config_obj_path != "/":
+            self.ip6_config = NetworkManagerIp6ConfigWatcher(
+                ip6_config_obj_path, self.device_interface_name, self.dev_lock
+            )
+            await self.ip6_config.subscribe()
+
+        dhcp4_config_obj_path = self.device_properties.get("Dhcp4Config", "/")
+        if dhcp4_config_obj_path != "/":
+            self.dhcp4_config = NetworkManagerDhcp4ConfigWatcher(
+                dhcp4_config_obj_path, self.device_interface_name, self.dev_lock
+            )
+            await self.dhcp4_config.subscribe()
+
+        dhcp6_config_obj_path = self.device_properties.get("Dhcp6Config", "/")
+        if dhcp6_config_obj_path != "/":
+            self.dhcp6_config = NetworkManagerDhcp6ConfigWatcher(
+                dhcp6_config_obj_path, self.device_interface_name, self.dev_lock
+            )
+            await self.dhcp6_config.subscribe()
+
+        active_connection_obj_path = self.device_properties.get("ActiveConnection", "/")
+        if active_connection_obj_path != "/":
+            self.active_connection = NetworkManagerActiveConnectionWatcher(
+                active_connection_obj_path, self.device_interface_name, self.dev_lock
+            )
+            await self.active_connection.subscribe()
+
+        if (
+            self.device_properties.get(
+                "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+            )
+            == NMDeviceType.NM_DEVICE_TYPE_WIFI
+        ):
+            active_access_point_obj_path = self.device_properties.get(
+                "ActiveAccessPoint", "/"
+            )
+            if active_access_point_obj_path != "/":
+                self.active_access_point = NetworkManagerActiveAccessPointWatcher(
+                    active_access_point_obj_path,
+                    self.device_interface_name,
+                    self.dev_lock,
+                )
+                await self.active_access_point.subscribe()
+
+        self.subscribed = True
+
+    async def unsubscribe(self) -> None:
+        """
+        Unsubscribe from NetworkManager device signals.
+        """
+        if not self.subscribed:
+            return
+
+        if self.interface:
+            self.interface.off_properties_changed(self.on_device_properties_changed)
+
+        self.subscribed = False
+        self.bus = None
+        self.proxy_object = None
+        self.interface = None
+
+    async def on_device_properties_changed(
+        self, _iface: str, changed_props: dict, _invalidated_props: list
+    ) -> None:
+        """
+        Callback for device properties changed signal. This method is called when the properties
+        of a NetworkManager device change.
+        """
+
+        async with self.dev_lock:
+            changed_props = variant_to_python(changed_props)
+            self.device_properties.update(changed_props)
+
+            if "Ip4Config" in changed_props:
+                if self.ip4_config is not None:
+                    await self.ip4_config.unsubscribe()
+                    self.ip4_config = None
+                if changed_props.get("Ip4Config", "/") != "/":
+                    # New Ip4Config object path is a valid object path, subscribe to it
+                    self.ip4_config = NetworkManagerIp4ConfigWatcher(
+                        changed_props["Ip4Config"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.ip4_config.subscribe()
+
+            if "Ip6Config" in changed_props:
+                if self.ip6_config is not None:
+                    await self.ip6_config.unsubscribe()
+                    self.ip6_config = None
+                if changed_props.get("Ip6Config", "/") != "/":
+                    # New Ip6Config object path is a valid object path, subscribe to it
+                    self.ip6_config = NetworkManagerIp6ConfigWatcher(
+                        changed_props["Ip6Config"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.ip6_config.subscribe()
+
+            if "Dhcp4Config" in changed_props:
+                if self.dhcp4_config is not None:
+                    await self.dhcp4_config.unsubscribe()
+                    self.dhcp4_config = None
+                if changed_props.get("Dhcp4Config", "/") != "/":
+                    # New Dhcp4Config object path is a valid object path, subscribe to it
+                    self.dhcp4_config = NetworkManagerDhcp4ConfigWatcher(
+                        changed_props["Dhcp4Config"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.dhcp4_config.subscribe()
+
+            if "Dhcp6Config" in changed_props:
+                if self.dhcp6_config is not None:
+                    await self.dhcp6_config.unsubscribe()
+                    self.dhcp6_config = None
+                if changed_props.get("Dhcp6Config", "/") != "/":
+                    # New Dhcp6Config object path is a valid object path, subscribe to it
+                    self.dhcp6_config = NetworkManagerDhcp6ConfigWatcher(
+                        changed_props["Dhcp6Config"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.dhcp6_config.subscribe()
+
+            if "ActiveConnection" in changed_props:
+                if self.active_connection is not None:
+                    await self.active_connection.unsubscribe()
+                    self.active_connection = None
+                if changed_props.get("ActiveConnection", "/") != "/":
+                    # New ActiveConnection object path is a valid object path, subscribe to it
+                    self.active_connection = NetworkManagerActiveConnectionWatcher(
+                        changed_props["ActiveConnection"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.active_connection.subscribe()
+
+            if (
+                self.device_properties.get(
+                    "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                )
+                == NMDeviceType.NM_DEVICE_TYPE_WIFI
+                and "ActiveAccessPoint" in changed_props
+            ):
+                if self.active_access_point is not None:
+                    await self.active_access_point.unsubscribe()
+                    self.active_access_point = None
+                if changed_props.get("ActiveAccessPoint", "/") != "/":
+                    # New ActiveAccessPoint object path is a valid object path, subscribe to it
+                    self.active_access_point = NetworkManagerActiveAccessPointWatcher(
+                        changed_props["ActiveAccessPoint"],
+                        self.device_interface_name,
+                        self.dev_lock,
+                    )
+                    await self.active_access_point.subscribe()
 
 
 class NetworkManagerService(object, metaclass=Singleton):
@@ -1494,6 +2236,1016 @@ class NetworkManagerService(object, metaclass=Singleton):
     NM_DHCP6CONFIG_IFACE = "org.freedesktop.NetworkManager.DHCP6Config"
 
     NM_ACCESS_POINT_IFACE = "org.freedesktop.NetworkManager.AccessPoint"
+
+    subscribed: bool = False
+    nm_devices: List[NetworkManagerDeviceWatcher] = []
+    nm_systemd_service_state: str = "inactive"
+    subscribed_to_nm_systemd_service_state: bool = False
+    interface: Optional[ProxyInterface] = None
+    lock: Lock = Lock()
+
+    async def on_properties_changed(
+        self, iface: str, changed_props: dict, _invalidated_props: list
+    ) -> None:
+        """
+        Callback for NetworkManager properties changed signal. This method is called when the
+        properties of NetworkManager itself change.
+        """
+        if not self.subscribed:
+            # If not subscribed, ignore the signal. This can happen if the NetworkManager systemd
+            # service itself is going up/down.
+            syslog(
+                "NetworkManagerService: Not subscribed, ignoring PropertiesChanged signal"
+            )
+            return
+
+        # Handle changes to devices
+        if iface == self.NM_CONNECTION_MANAGER_IFACE:
+            changed_props = variant_to_python(changed_props)
+            if "Devices" in changed_props:
+                new_devices = changed_props["Devices"]
+                current_device_paths = {dev.device_obj_path for dev in self.nm_devices}
+
+                # Unsubscribe from devices that are no longer present
+                for device in self.nm_devices:
+                    if device.device_obj_path not in new_devices:
+                        await device.unsubscribe()
+                        self.nm_devices.remove(device)
+
+                # Subscribe to new devices
+                for dev_obj_path in new_devices:
+                    if dev_obj_path not in current_device_paths:
+                        dev_properties = await self.get_obj_properties(
+                            dev_obj_path, self.NM_DEVICE_IFACE, timeout=10.0
+                        )
+
+                        # No need to check for "State" here, because "new" devices (e.g., a virtual
+                        # interface to be used for AP+STA mode) may not have a valid/managed state
+                        # at the time the PropertiesChanged signal is emitted.
+
+                        interface_name = dev_properties.get("Interface", None)
+                        if interface_name is None:
+                            continue
+
+                        if (
+                            dev_properties.get(
+                                "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                            )
+                            == NMDeviceType.NM_DEVICE_TYPE_WIFI
+                        ):
+                            # Read the wireless properties
+                            dev_properties.update(
+                                await self.get_obj_properties(
+                                    dev_obj_path, self.NM_DEVICE_WIRELESS_IFACE
+                                )
+                            )
+
+                        if (
+                            dev_properties.get(
+                                "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                            )
+                            == NMDeviceType.NM_DEVICE_TYPE_ETHERNET
+                        ):
+                            # Read the wired properties
+                            dev_properties.update(
+                                await self.get_obj_properties(
+                                    dev_obj_path, self.NM_DEVICE_WIRED_IFACE
+                                )
+                            )
+
+                        new_device = NetworkManagerDeviceWatcher(
+                            device_obj_path=dev_obj_path,
+                            device_interface_name=interface_name,
+                            device_properties=dev_properties,
+                        )
+                        self.nm_devices.append(new_device)
+                        await new_device.subscribe()
+
+    async def nm_systemd_service_state_changed(self, new_state: str) -> None:
+        """
+        Callback for NetworkManager systemd service state changes. This method is called when the
+        state of the NetworkManager systemd service changes.
+        """
+        # Use a lock to ensure thread safety when the state changes
+        async with self.lock:
+            current_state = self.nm_systemd_service_state
+            self.nm_systemd_service_state = new_state
+
+        if new_state == "active" and current_state == "activating":
+            # Re-subscribe to NetworkManager signals
+            await self.subscribe()
+        elif new_state == "deactivating":
+            # Unsubscribe from NetworkManager signals
+            await self.unsubscribe()
+
+    async def subscribe(self) -> None:
+        """
+        Subscribe to NetworkManager signals. This method should be called once to set up the
+        subscription.
+        """
+        async with self.lock:
+            syslog("NetworkManagerService: Subscribing to NetworkManager signals")
+            if self.subscribed:
+                syslog("NetworkManagerService: Already subscribed")
+                return
+
+            if not self.subscribed_to_nm_systemd_service_state:
+                await NetworkManagerSystemdService().subscribe(
+                    self.nm_systemd_service_state_changed
+                )
+                self.subscribed_to_nm_systemd_service_state = True
+
+            bus = await DBusManager().get_bus()
+            proxy_object = bus.get_proxy_object(
+                self.NM_BUS_NAME,
+                self.NM_CONNECTION_MANAGER_OBJ_PATH,
+                await bus.introspect(
+                    self.NM_BUS_NAME, self.NM_CONNECTION_MANAGER_OBJ_PATH
+                ),
+            )
+            self.interface = proxy_object.get_interface(self.DBUS_PROP_IFACE)
+            self.interface.on_properties_changed(self.on_properties_changed)
+            self.subscribed = True
+
+            for dev_obj_path in await self.get_all_devices():
+                dev_properties = await self.get_obj_properties(
+                    dev_obj_path,
+                    self.NM_DEVICE_IFACE,
+                    timeout=10.0,
+                )
+                dev_state = dev_properties.get(
+                    "State", NMDeviceState.NM_DEVICE_STATE_UNKNOWN
+                )
+                if dev_state in [
+                    NMDeviceState.NM_DEVICE_STATE_UNMANAGED,
+                    NMDeviceState.NM_DEVICE_STATE_UNKNOWN,
+                ]:
+                    continue
+
+                interface_name = dev_properties.get("Interface", None)
+                if interface_name is None:
+                    continue
+
+                if (
+                    dev_properties.get(
+                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                    )
+                    == NMDeviceType.NM_DEVICE_TYPE_WIFI
+                ):
+                    # Read the wireless properties
+                    dev_properties.update(
+                        await self.get_obj_properties(
+                            dev_obj_path, self.NM_DEVICE_WIRELESS_IFACE
+                        )
+                    )
+
+                if (
+                    dev_properties.get(
+                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                    )
+                    == NMDeviceType.NM_DEVICE_TYPE_ETHERNET
+                ):
+                    # Read the wired properties
+                    dev_properties.update(
+                        await self.get_obj_properties(
+                            dev_obj_path, self.NM_DEVICE_WIRED_IFACE
+                        )
+                    )
+
+                new_device = NetworkManagerDeviceWatcher(
+                    device_obj_path=dev_obj_path,
+                    device_interface_name=interface_name,
+                    device_properties=dev_properties,
+                )
+                self.nm_devices.append(new_device)
+                await new_device.subscribe()
+                syslog(
+                    f"NetworkManagerService: Subscribed to device {interface_name} ({dev_obj_path})"
+                )
+
+            syslog("NetworkManagerService: Subscribed to NetworkManager signals")
+
+    async def unsubscribe(self) -> None:
+        """
+        Unsubscribe from NetworkManager signals.
+        """
+        async with self.lock:
+            syslog("NetworkManagerService: Unsubscribing from NetworkManager signals")
+            if not self.subscribed:
+                syslog("NetworkManagerService: Not subscribed, nothing to do")
+                return
+
+            if self.interface:
+                self.interface.off_properties_changed(self.on_properties_changed)
+
+            for device in self.nm_devices:
+                try:
+                    await device.unsubscribe()
+                except Exception as e:
+                    syslog(
+                        f"Error unsubscribing from device {device.device_interface_name}: {e}"
+                    )
+            self.nm_devices = []
+            self.subscribed = False
+            self.interface = None
+            syslog("NetworkManagerService: Unsubscribed from NetworkManager signals")
+
+    @staticmethod
+    def get_active_ap_rssi(ifname: Optional[str] = "wlan0") -> Tuple[bool, float]:
+        """
+        Retrieve the signal strength in dBm for the active accesspoint on the specified interface
+        (default is wlan0).
+
+        The return value is a tuple in the form of: (success, rssi)
+        """
+        iw = IW()
+        try:
+            for interface in iw.get_interfaces_dump():
+                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                    continue
+
+                msg = nl80211cmd()
+                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_STATION"]
+                msg["attrs"] = [
+                    ["NL80211_ATTR_IFINDEX", interface.get_attr("NL80211_ATTR_IFINDEX")]
+                ]
+
+                res = iw.nlm_request(
+                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
+                )
+                return (
+                    True,
+                    float(
+                        res[0]
+                        .get_attr("NL80211_ATTR_STA_INFO")
+                        .get_attr("NL80211_STA_INFO_SIGNAL")
+                    ),
+                )
+
+            # If not found, raise exception
+            raise Exception("interface not found")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read RSSI value: {str(exception)}")
+            return (False, INVALID_RSSI)
+        finally:
+            iw.close()
+
+    @staticmethod
+    def get_reg_domain_info() -> str:
+        """
+        Retrieve the radio's regulatory domain using 'netlink' (pyroute2)
+        """
+        iw = IW()
+        try:
+            res = iw.get_regulatory_domain()
+
+            for phy in res:
+                phy_name = phy.get_attr("NL80211_ATTR_WIPHY")
+                if phy_name is None or phy_name != 0:
+                    continue
+
+                return str(phy.get_attr("NL80211_ATTR_REG_ALPHA2"))
+
+            # If not found, raise exception
+            raise Exception("interface not found")
+        except Exception as exception:
+            print(f"Unable to read reg domain: {str(exception)}")
+            return "WW"
+        finally:
+            iw.close()
+
+    @staticmethod
+    def get_frequency_info(interface: str, frequency: int) -> int:
+        """
+        Retrieve the current frequency used by the given 'interface' as an int using 'frequency' as
+        a default
+        """
+        iw = IW()
+        try:
+            for iface in iw.get_interfaces_dump():
+                if str(iface.get_attr("NL80211_ATTR_IFNAME")) != interface:
+                    continue
+
+                return int(iface.get_attr("NL80211_ATTR_WIPHY_FREQ"))
+
+            # If not found, raise exception
+            raise Exception("interface not found")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read frequency value: {str(exception)}")
+            return frequency
+        finally:
+            iw.close()
+
+    @staticmethod
+    def get_ap_properties(
+        wireless_properties: dict,
+        ap_props: Optional[dict],
+        interface_name: str,
+    ) -> dict:
+        """
+        Retrieve a dictionary of properties for an access point from the provided properities
+        dictionaries and interface name
+        """
+        try:
+            if not ap_props:
+                return {}
+            ap_properties = {}
+
+            ssid = ap_props.get("Ssid", None)
+            ap_properties["Ssid"] = ssid.decode("utf-8") if ssid is not None else ""
+            ap_properties["HwAddress"] = ap_props.get("HwAddress", "")
+            ap_properties["MaxBitrate"] = ap_props.get("MaxBitrate", 0)
+            ap_properties["Flags"] = ap_props.get(
+                "Flags", NM80211ApFlags.NM_802_11_AP_FLAGS_NONE
+            )
+            ap_properties["WpaFlags"] = ap_props.get(
+                "WpaFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+            )
+            ap_properties["RsnFlags"] = ap_props.get(
+                "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+            )
+            ap_properties["Bandwidth"] = ap_props.get("Bandwidth", 0)
+            mode = int(
+                wireless_properties.get("Mode", NM80211Mode.NM_802_11_MODE_UNKNOWN)
+            )
+            if mode == NM80211Mode.NM_802_11_MODE_AP:
+                ap_properties["Strength"] = 100
+                ap_properties["Frequency"] = NetworkManagerService().get_frequency_info(
+                    interface_name, ap_props.get("Frequency", 0)
+                )
+                ap_properties["Signal"] = INVALID_RSSI
+            else:
+                ap_properties["Strength"] = ap_props.get("Strength", 0)
+                ap_properties["Frequency"] = ap_props.get("Frequency", 0)
+                (success, signal) = NetworkManagerService().get_active_ap_rssi(
+                    interface_name
+                )
+                ap_properties["Signal"] = signal if success else INVALID_RSSI
+            ap_properties["Channel"] = frequency_to_channel(ap_properties["Frequency"])
+        except Exception as exception:
+            syslog(f"Could not read AP properties: {str(exception)}")
+            return {}
+
+        return ap_properties
+
+    @staticmethod
+    async def get_dev_status(dev_properties: dict) -> dict:
+        """
+        Retrieve device status info from the provided dev_properties dictionary
+        """
+        status = {}
+        status["State"] = int(
+            dev_properties.get("State", NMDeviceState.NM_DEVICE_STATE_UNKNOWN)
+        )
+        try:
+            status["StateText"] = SUMMIT_RCM_STATE_TEXT.get(status["State"])
+        except Exception:
+            status["StateText"] = "Unknown"
+            syslog(
+                f"unknown device state value {status['State']}."
+                "See https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html"
+            )
+        status["Mtu"] = dev_properties.get("Mtu", 0)
+        status["DeviceType"] = int(
+            dev_properties.get("DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN)
+        )
+        try:
+            status["DeviceTypeText"] = SUMMIT_RCM_DEVTYPE_TEXT.get(status["DeviceType"])
+        except Exception:
+            status["DeviceTypeText"] = "Unknown"
+            syslog(
+                f"unknown device type value {status['DeviceType']}."
+                "See https://developer-old.gnome.org/NetworkManager/stable/nm-dbus-types.html"
+            )
+        return status
+
+    @staticmethod
+    async def get_ip4config_properties(props: dict, is_legacy: bool = False) -> dict:
+        """
+        Retrieve a dictionary of the IPv4 configuration properties (NM IP4Config) from the given
+        dictionary
+        """
+        ipconfig_properties = {}
+
+        try:
+            addresses = {}
+            address_data = []
+            i = 0
+            props_addresses = props.get("AddressData", None)
+            if props_addresses is not None:
+                for addr in props_addresses:
+                    data = {}
+                    data["address"] = (
+                        addr["address"].value
+                        if addr.get("address", None) is not None
+                        else ""
+                    )
+                    data["prefix"] = (
+                        addr["prefix"].value
+                        if addr.get("prefix", None) is not None
+                        else 0
+                    )
+                    address_data.append(data)
+                    addresses[i] = data["address"] + "/" + str(data["prefix"])
+                    i += 1
+            if is_legacy:
+                ipconfig_properties["Addresses"] = addresses
+            ipconfig_properties["AddressData"] = address_data
+
+            routes = {}
+            route_data = []
+            i = 0
+            props_routes = props.get("RouteData", None)
+            if props_routes is not None:
+                for route in props_routes:
+                    data = {}
+                    data["dest"] = (
+                        route["dest"].value
+                        if route.get("dest", None) is not None
+                        else ""
+                    )
+                    data["prefix"] = (
+                        route["prefix"].value
+                        if route.get("prefix", None) is not None
+                        else 0
+                    )
+                    data["metric"] = (
+                        route["metric"].value
+                        if route.get("metric", None) is not None
+                        else -1
+                    )
+                    data["next-hop"] = (
+                        route["next-hop"].value
+                        if route.get("next-hop", None) is not None
+                        else ""
+                    )
+                    route_data.append(data)
+                    routes[i] = (
+                        data["dest"]
+                        + "/"
+                        + str(data["prefix"])
+                        + " metric "
+                        + str(data["metric"])
+                    )
+                    i += 1
+            if is_legacy:
+                ipconfig_properties["Routes"] = routes
+            ipconfig_properties["RouteData"] = route_data
+            ipconfig_properties["Gateway"] = props.get("Gateway", "")
+            ipconfig_properties["Domains"] = []
+            props_domains = (
+                props["Domains"] if props.get("Domains", None) is not None else []
+            )
+            for domain in props_domains:
+                ipconfig_properties["Domains"].append(domain)
+
+            ipconfig_properties["NameserverData"] = []
+            props_nameserver_data = (
+                props["NameserverData"]
+                if props.get("NameserverData", None) is not None
+                else []
+            )
+            for nameserver in props_nameserver_data:
+                ipconfig_properties["NameserverData"].append(
+                    nameserver["address"].value
+                )
+            ipconfig_properties["WinsServerData"] = []
+            props_wins_server_data = (
+                props["WinsServerData"]
+                if props.get("WinsServerData", None) is not None
+                else []
+            )
+            for wins_server in props_wins_server_data:
+                ipconfig_properties["WinsServerData"].append(wins_server)
+        except Exception as exception:
+            syslog(f"Could not retrieve IPv4 configuration - {str(exception)}")
+            return {}
+
+        return ipconfig_properties
+
+    @staticmethod
+    async def get_ip6config_properties(props: dict, is_legacy: bool = False) -> dict:
+        """
+        Retrieve a dictionary of the IPv6 configuration properties (NM IP6Config) from the given
+        dictionary
+        """
+        ipconfig_properties = {}
+
+        try:
+            addresses = {}
+            address_data = []
+            i = 0
+            props_addresses = props.get("AddressData", None)
+            if props_addresses is not None:
+                for addr in props_addresses:
+                    data = {}
+                    data["address"] = (
+                        addr["address"].value
+                        if addr.get("address", None) is not None
+                        else ""
+                    )
+                    data["prefix"] = (
+                        addr["prefix"].value
+                        if addr.get("prefix", None) is not None
+                        else 0
+                    )
+                    address_data.append(data)
+                    addresses[i] = data["address"] + "/" + str(data["prefix"])
+                    i += 1
+            if is_legacy:
+                ipconfig_properties["Addresses"] = addresses
+            ipconfig_properties["AddressData"] = address_data
+
+            routes = {}
+            route_data = []
+            i = 0
+            props_routes = props.get("RouteData", None)
+            if props_routes is not None:
+                for route in props_routes:
+                    data = {}
+                    data["dest"] = (
+                        route["dest"].value
+                        if route.get("dest", None) is not None
+                        else ""
+                    )
+                    data["prefix"] = (
+                        route["prefix"].value
+                        if route.get("prefix", None) is not None
+                        else 0
+                    )
+                    data["metric"] = (
+                        route["metric"].value
+                        if route.get("metric", None) is not None
+                        else -1
+                    )
+                    data["next-hop"] = (
+                        route["next-hop"].value
+                        if route.get("next-hop", None) is not None
+                        else ""
+                    )
+                    route_data.append(data)
+                    routes[i] = (
+                        data["dest"]
+                        + "/"
+                        + str(data["prefix"])
+                        + " metric "
+                        + str(data["metric"])
+                    )
+                    i += 1
+            if is_legacy:
+                ipconfig_properties["Routes"] = routes
+            ipconfig_properties["RouteData"] = route_data
+            ipconfig_properties["Gateway"] = props.get("Gateway", "")
+            ipconfig_properties["Domains"] = []
+            props_domains = (
+                props["Domains"] if props.get("Domains", None) is not None else []
+            )
+            for domain in props_domains:
+                ipconfig_properties["Domains"].append(domain)
+            ipconfig_properties["NameserverData"] = []
+            props_nameservers = (
+                props["Nameservers"]
+                if props.get("Nameservers", None) is not None
+                else []
+            )
+            for nameserver in props_nameservers:
+                ipconfig_properties["NameserverData"].append(
+                    inet_ntop(AF_INET6, nameserver)
+                )
+            if is_legacy:
+                # Legacy WebLCM included a 'WinsServerData' entry, but this data is not exposed via
+                # D-Bus by NetworkManager. So, only add this property for legacy requests.
+                #
+                # See below for more info:
+                # https://people.freedesktop.org/~lkundrak/nm-docs/gdbus-org.freedesktop.NetworkManager.IP6Config.html
+                ipconfig_properties["WinsServerData"] = []
+        except Exception as exception:
+            syslog(f"Could not retrieve IPv6 configuration - {str(exception)}")
+            return {}
+
+        return ipconfig_properties
+
+    @staticmethod
+    async def get_dhcp_config_properties(props: dict, is_legacy: bool = False) -> dict:
+        """
+        Retrieve a dictionary of the DHCP configuration properties (IPv4 or IPv6 baed on
+        'interface') from the given dictionary
+        """
+        dhcpconfig_properties = {}
+
+        try:
+            options = props.get("Options", None)
+            if options is not None:
+                dhcpconfig_properties["Options"] = {}
+                for option in options:
+                    dhcpconfig_properties["Options"][
+                        option if is_legacy else to_camel_case(option)
+                    ] = options[option].value
+        except Exception as ex:
+            syslog(f"Error retrieving DHCP config properties: {str(ex)}")
+            return {}
+
+        return dhcpconfig_properties
+
+    @staticmethod
+    def get_wired_properties(wired_properties: dict) -> dict:
+        """
+        Retrieve a dictionary of properties for a wired (Ethernet) device with the provided
+        dictionary
+        """
+        wired = {}
+        wired["HwAddress"] = wired_properties.get("HwAddress", "")
+        wired["PermHwAddress"] = wired_properties.get("PermHwAddress", "")
+        wired["Speed"] = wired_properties.get("Speed", 0)
+        wired["Carrier"] = wired_properties.get("Carrier", False)
+        wired["S390Subchannels"] = wired_properties.get("S390Subchannels", [])
+        return wired
+
+    @staticmethod
+    def get_wifi_properties(wireless_properties: dict) -> dict:
+        """
+        Retrieve a dictionary of properties for a wireless (Wi-Fi) device with the provided
+        dictionary
+        """
+        wireless = {}
+        wireless["Bitrate"] = wireless_properties.get("Bitrate", 0)
+        wireless["HwAddress"] = wireless_properties.get("HwAddress", "")
+        wireless["PermHwAddress"] = wireless_properties.get("PermHwAddress", "")
+        wireless["Mode"] = int(
+            wireless_properties.get("Mode", NM80211Mode.NM_802_11_MODE_UNKNOWN)
+        )
+        wireless["RegDomain"] = NetworkManagerService().get_reg_domain_info()
+        wireless["LastScan"] = int(wireless_properties.get("LastScan", -1))
+        return wireless
+
+    @staticmethod
+    async def get_active_connection(dev_props: dict) -> dict:
+        """
+        Retrieve the 'connection' settings for the 'ActiveConnection' of the provided device
+        """
+        # Retrieve the active connection object path from the provided device's properties
+        active_connection_obj_path = dev_props.get("ActiveConnection", None)
+        if not active_connection_obj_path:
+            return {}
+
+        # Retrieve the active connection's properties
+        try:
+            active_connection_props = await NetworkManagerService().get_obj_properties(
+                active_connection_obj_path,
+                NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
+            )
+        except Exception:
+            return {}
+
+        # Retrive the active connection's 'Connection' object path
+        active_connection_conn_obj_path = active_connection_props.get("Connection", "")
+        if active_connection_conn_obj_path == "":
+            return {}
+
+        # Retrieve the active connection's 'Connection' properties
+        active_connection_conn_props = (
+            await NetworkManagerService().get_connection_settings(
+                active_connection_conn_obj_path
+            )
+        )
+
+        # Retrieve the 'connection' settings property
+        setting_connection = active_connection_conn_props.get("connection", None)
+        if setting_connection is None:
+            return {}
+
+        # Retrieve the Pythonic value for each parameter
+        for param in setting_connection:
+            setting_connection[param] = setting_connection[param].value
+
+        return setting_connection
+
+    @staticmethod
+    async def get_available_connections(dev_props: dict) -> list:
+        """
+        Retrieve a list of 'Connection' settings for the available connections on the given device
+        """
+        # Retrieve the list of object paths for the available connections
+        available_connections = dev_props.get("AvailableConnections", [])
+
+        connections = []
+        for connection_obj_path in available_connections:
+            # Retrieve the connection's properties
+            connection_conn_props = (
+                await NetworkManagerService().get_connection_settings(
+                    connection_obj_path
+                )
+            )
+
+            # Retrieve the 'connection' settings property
+            setting_connection = connection_conn_props.get("connection", None)
+            if setting_connection is None:
+                continue
+
+            # Retrieve the Pythonic value for each parameter
+            for param in setting_connection:
+                setting_connection[param] = setting_connection[param].value
+
+            connections.append(setting_connection)
+
+        return connections
+
+    def convert_property_names(self, status: dict, is_legacy: bool = False) -> dict:
+        """
+        Convert property names in the status dictionary to either legacy or non-legacy format.
+        :param status: The status dictionary containing property names to convert.
+        :param is_legacy: If True, convert to legacy format; if False, convert to non-legacy format.
+        :return: A new dictionary with converted property names.
+        """
+        converted_dict = {}
+        for key, value in status.items():
+            if isinstance(value, dict):
+                try:
+                    converted_dict[convert_nm_property_name(key, is_legacy)] = (
+                        self.convert_property_names(value, is_legacy)
+                    )
+                except Exception:
+                    converted_dict[key] = value
+            elif isinstance(value, list):
+                converted_list = []
+                for item in value:
+                    if isinstance(item, dict):
+                        converted_list.append(
+                            self.convert_property_names(item, is_legacy)
+                        )
+                    else:
+                        converted_list.append(item)
+                try:
+                    converted_dict[convert_nm_property_name(key, is_legacy)] = (
+                        converted_list
+                    )
+                except Exception:
+                    converted_dict[key] = converted_list
+            else:
+                try:
+                    converted_dict[convert_nm_property_name(key, is_legacy)] = value
+                except Exception:
+                    converted_dict[key] = value
+
+        return converted_dict
+
+    async def get_status(
+        self, is_legacy: bool = False, timeout: Optional[float] = None
+    ) -> dict:
+        """
+        Get the cached status of NetworkManager. This method retrieves the current status of
+        NetworkManager, including connectivity, devices, and active connections.
+        :param is_legacy: If True, format response in legacy format.
+        :param timeout: Optional timeout for the operation.
+        :return: A dictionary containing the status of NetworkManager.
+        """
+        status = {}
+
+        for device in self.nm_devices:
+            async with device.dev_lock:
+                dev_properties = device.device_properties
+                dev_state = dev_properties.get(
+                    "State", NMDeviceState.NM_DEVICE_STATE_UNKNOWN
+                )
+                status[device.device_interface_name] = {}
+
+                status[device.device_interface_name]["status"] = (
+                    await self.get_dev_status(dev_properties)
+                )
+
+                if dev_state == NMDeviceState.NM_DEVICE_STATE_ACTIVATED:
+                    if device.active_connection is not None:
+                        active_connection_connection_obj_path = (
+                            device.active_connection.properties.get("Connection", None)
+                        )
+                        if active_connection_connection_obj_path is not None:
+                            active_connection_connection_settings = (
+                                await self.get_connection_settings(
+                                    active_connection_connection_obj_path,
+                                    timeout=timeout,
+                                )
+                            )
+
+                            setting_connection = (
+                                active_connection_connection_settings.get(
+                                    "connection", None
+                                )
+                            )
+                            if setting_connection is not None:
+                                connection_active = {}
+                                connection_active["id"] = (
+                                    setting_connection["id"].value
+                                    if setting_connection.get("id", None) is not None
+                                    else ""
+                                )
+                                connection_active["interface-name"] = (
+                                    setting_connection["interface-name"].value
+                                    if setting_connection.get("interface-name", None)
+                                    is not None
+                                    else ""
+                                )
+                                connection_active["permissions"] = (
+                                    setting_connection["permissions"].value
+                                    if setting_connection.get("permissions", None)
+                                    is not None
+                                    else []
+                                )
+                                connection_active["type"] = (
+                                    setting_connection["type"].value
+                                    if setting_connection.get("type", None) is not None
+                                    else ""
+                                )
+                                connection_active["uuid"] = (
+                                    setting_connection["uuid"].value
+                                    if setting_connection.get("uuid", None) is not None
+                                    else ""
+                                )
+                                connection_active["zone"] = (
+                                    setting_connection["zone"].value
+                                    if setting_connection.get("zone", None) is not None
+                                    else ""
+                                )
+                                status[device.device_interface_name][
+                                    "connection_active"
+                                ] = connection_active
+
+                    status[device.device_interface_name]["Ip4Config"] = (
+                        await self.get_ip4config_properties(
+                            device.ip4_config.properties if device.ip4_config else {},
+                            is_legacy=is_legacy,
+                        )
+                    )
+
+                    status[device.device_interface_name]["Ip6Config"] = (
+                        await self.get_ip6config_properties(
+                            device.ip6_config.properties if device.ip6_config else {},
+                            is_legacy=is_legacy,
+                        )
+                    )
+
+                    status[device.device_interface_name]["Dhcp4Config"] = (
+                        await self.get_dhcp_config_properties(
+                            (
+                                device.dhcp4_config.properties
+                                if device.dhcp4_config
+                                else {}
+                            ),
+                            is_legacy=is_legacy,
+                        )
+                    )
+
+                    status[device.device_interface_name]["Dhcp6Config"] = (
+                        await self.get_dhcp_config_properties(
+                            (
+                                device.dhcp6_config.properties
+                                if device.dhcp6_config
+                                else {}
+                            ),
+                            is_legacy=is_legacy,
+                        )
+                    )
+
+                if (
+                    status[device.device_interface_name]["status"].get(
+                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                    )
+                    == NMDeviceType.NM_DEVICE_TYPE_ETHERNET
+                ):
+                    status[device.device_interface_name]["wired"] = (
+                        self.get_wired_properties(device.device_properties)
+                    )
+
+                if (
+                    status[device.device_interface_name]["status"].get(
+                        "DeviceType", NMDeviceType.NM_DEVICE_TYPE_UNKNOWN
+                    )
+                    == NMDeviceType.NM_DEVICE_TYPE_WIFI
+                ):
+                    status[device.device_interface_name]["wireless"] = (
+                        self.get_wifi_properties(
+                            device.device_properties,
+                        )
+                    )
+                    if dev_state == NMDeviceState.NM_DEVICE_STATE_ACTIVATED:
+                        status[device.device_interface_name]["ActiveAccessPoint"] = (
+                            self.get_ap_properties(
+                                device.device_properties,
+                                (
+                                    device.active_access_point.properties
+                                    if device.active_access_point
+                                    else {}
+                                ),
+                                device.device_interface_name,
+                            )
+                        )
+
+        return self.convert_property_names(status, is_legacy)
+
+    async def get_interface_status(
+        self, target_interface_name: str, is_legacy: bool = False
+    ) -> dict:
+        """
+        Get the status of a specific interface by its name.
+        :param target_interface_name: The name of the interface to retrieve status for.
+        :param is_legacy: If True, format response in legacy format.
+        :return: A dictionary containing the status of the specified interface.
+        """
+        dev_properties = {}
+
+        if target_interface_name not in [
+            device.device_interface_name for device in self.nm_devices
+        ]:
+            return {}
+
+        status = await self.get_status(is_legacy=is_legacy)
+
+        dev_properties = status.get(target_interface_name, {})
+
+        for device in self.nm_devices:
+            async with device.dev_lock:
+                if device.device_interface_name != target_interface_name:
+                    continue
+
+                # If the device is found, retrieve its properties
+                dev_props = device.device_properties
+
+                # Read all NM device properties
+                dev_properties["Udi"] = dev_props.get("Udi", "")
+                dev_properties["path"] = device.device_obj_path
+                dev_properties["interface"] = device.device_interface_name
+                dev_properties["IpInterface"] = dev_props.get("IpInterface", "")
+                dev_properties["Driver"] = dev_props.get("Driver", "")
+                dev_properties["DriverVersion"] = dev_props.get("DriverVersion", "")
+                dev_properties["FirmwareVersion"] = dev_props.get("FirmwareVersion", "")
+                dev_properties["Capabilities"] = dev_props.get(
+                    "Capabilities", NMDeviceCapabilities.NM_DEVICE_CAP_NONE
+                )
+                _, state_reason = dev_props.get(
+                    "StateReason",
+                    (
+                        NMDeviceState.NM_DEVICE_STATE_UNKNOWN,
+                        NMDeviceStateReason.NM_DEVICE_STATE_REASON_UNKNOWN,
+                    ),
+                )
+                dev_properties["StateReason"] = state_reason
+                dev_properties["connection_active"] = await self.get_active_connection(
+                    dev_props
+                )
+                dev_properties["managed"] = bool(dev_props.get("Managed", False))
+                dev_properties["Autoconnect"] = bool(
+                    dev_props.get("Autoconnect", False)
+                )
+                dev_properties["FirmwareMissing"] = bool(
+                    dev_props.get("FirmwareMissing", False)
+                )
+                dev_properties["NmPluginMissing"] = bool(
+                    dev_props.get("NmPluginMissing", False)
+                )
+                dev_properties["available_connections"] = (
+                    await self.get_available_connections(dev_props)
+                )
+                dev_properties["PhysicalPortId"] = dev_props.get("PhysicalPortId", "")
+                dev_properties["Metered"] = int(dev_props.get("Metered", 0))
+                dev_properties["MeteredText"] = SUMMIT_RCM_METERED_TEXT.get(
+                    dev_properties["Metered"]
+                )
+                try:
+                    lldp_neighbors = dev_props.get("LldpNeighbors", [])
+                    lldp_neighbors = [neighbor.value for neighbor in lldp_neighbors]
+                except Exception:
+                    lldp_neighbors = []
+                dev_properties["LldpNeighbors"] = lldp_neighbors
+                dev_properties["Real"] = bool(dev_props.get("Real", False))
+                dev_properties["Ip4Connectivity"] = int(
+                    dev_props.get(
+                        "Ip4Connectivity",
+                        NMConnectivityState.NM_CONNECTIVITY_UNKNOWN,
+                    )
+                )
+                dev_properties["Ip4ConnectivityText"] = (
+                    SUMMIT_RCM_CONNECTIVITY_STATE_TEXT.get(
+                        dev_properties["Ip4Connectivity"]
+                    )
+                )
+                dev_properties["Ip6Connectivity"] = int(
+                    dev_props.get(
+                        "Ip6Connectivity",
+                        NMConnectivityState.NM_CONNECTIVITY_UNKNOWN,
+                    )
+                )
+                dev_properties["Ip6ConnectivityText"] = (
+                    SUMMIT_RCM_CONNECTIVITY_STATE_TEXT.get(
+                        dev_properties["Ip6Connectivity"]
+                    )
+                )
+                dev_properties["InterfaceFlags"] = int(
+                    dev_props.get(
+                        "InterfaceFlags",
+                        NMDeviceInterfaceFlags.NM_DEVICE_INTERFACE_FLAG_NONE,
+                    )
+                )
+
+        return self.convert_property_names(dev_properties, is_legacy)
 
     async def get_all_devices(self, timeout: Optional[float] = None) -> List[str]:
         bus = await DBusManager().get_bus()
@@ -1746,11 +3498,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         and NUL terminated
         """
         return bytearray(
-            str(
-                "file://{0}{1}\x00".format(
-                    summit_rcm.definition.FILEDIR_DICT.get("cert"), cert_name
-                )
-            ),
+            str("file://{0}{1}\x00".format(FILEDIR_DICT.get("cert"), cert_name)),
             "utf-8",
         )
 
@@ -1842,7 +3590,7 @@ class NetworkManagerService(object, metaclass=Singleton):
                 # pac-file parameter provided, prepend path to certs
                 connection["802-1x"][
                     "pac-file"
-                ] = f"{summit_rcm.definition.FILEDIR_DICT.get('pac')}{connection['802-1x']['pac-file']}"
+                ] = f"{FILEDIR_DICT.get('pac')}{connection['802-1x']['pac-file']}"
 
             await self.prepare_setting("802-1x", connection, new_connection)
 
