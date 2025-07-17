@@ -63,6 +63,10 @@ class NetworkStatus:
                     del result["status"][dev]
             result["devices"] = len(result["status"])
             resp.media = result
+        except TimeoutError:
+            result["InfoMsg"] = "Network status request timed out"
+            result["SDCERR"] = 1
+            resp.media = result
         except Exception as e:
             result["InfoMsg"] = f"Could not read network status - {str(e)}"
             result["SDCERR"] = 1

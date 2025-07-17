@@ -72,6 +72,11 @@ NL80211_RRF_DFS = 1 << 4
 NL80211_RRF_NO_IR = 1 << 7
 NL80211_RRF_PASSIVE_SCAN = NL80211_RRF_NO_IR
 
+NETWORK_STATUS_DBUS_TIMEOUT = 10.0  # seconds
+"""
+This constant defines the timeout duration for network status DBus requests in seconds.
+"""
+
 
 class NetworkService(metaclass=Singleton):
     """
@@ -120,7 +125,7 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def get_ip4config_properties(
-        ipconfig_obj_path: str, is_legacy: bool = False
+        ipconfig_obj_path: str, is_legacy: bool = False, timeout: Optional[float] = None
     ) -> dict:
         """
         Retrieve a dictionary of the IPv4 configuration properties (NM IP4Config) from the given
@@ -132,7 +137,9 @@ class NetworkService(metaclass=Singleton):
 
         try:
             props = await NetworkManagerService().get_obj_properties(
-                ipconfig_obj_path, NetworkManagerService().NM_IP4CONFIG_IFACE
+                ipconfig_obj_path,
+                NetworkManagerService().NM_IP4CONFIG_IFACE,
+                timeout=timeout,
             )
 
             addresses = {}
@@ -240,7 +247,7 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def get_ip6config_properties(
-        ipconfig_obj_path: str, is_legacy: bool = False
+        ipconfig_obj_path: str, is_legacy: bool = False, timeout: Optional[float] = None
     ) -> dict:
         """
         Retrieve a dictionary of the IPv6 configuration properties (NM IP6Config) from the given
@@ -252,7 +259,9 @@ class NetworkService(metaclass=Singleton):
 
         try:
             props = await NetworkManagerService().get_obj_properties(
-                ipconfig_obj_path, NetworkManagerService().NM_IP6CONFIG_IFACE
+                ipconfig_obj_path,
+                NetworkManagerService().NM_IP6CONFIG_IFACE,
+                timeout=timeout,
             )
 
             addresses = {}
@@ -356,7 +365,10 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def get_dhcp_config_properties(
-        dhcpconfig_obj_path: str, interface: str, is_legacy: bool = False
+        dhcpconfig_obj_path: str,
+        interface: str,
+        is_legacy: bool = False,
+        timeout: Optional[float] = None,
     ) -> dict:
         """
         Retrieve a dictionary of the DHCP configuration properties (IPv4 or IPv6 baed on
@@ -368,7 +380,7 @@ class NetworkService(metaclass=Singleton):
 
         try:
             props = await NetworkManagerService().get_obj_properties(
-                dhcpconfig_obj_path, interface
+                dhcpconfig_obj_path, interface, timeout=timeout
             )
 
             dhcpconfig_properties["Options" if is_legacy else "options"] = {}
@@ -386,37 +398,49 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def get_dhcp4_config_properties(
-        dhcpconfig_obj_path: str, is_legacy: bool = False
+        dhcpconfig_obj_path: str,
+        is_legacy: bool = False,
+        timeout: Optional[float] = None,
     ) -> dict:
         """
         Retrieve a dictionary of the IPv4 DHCP configuration properties (NM DhcpConfig) from the
         given object path
         """
         return await NetworkService.get_dhcp_config_properties(
-            dhcpconfig_obj_path, NetworkManagerService().NM_DHCP4CONFIG_IFACE, is_legacy
+            dhcpconfig_obj_path,
+            NetworkManagerService().NM_DHCP4CONFIG_IFACE,
+            is_legacy,
+            timeout,
         )
 
     @staticmethod
     async def get_dhcp6_config_properties(
-        dhcpconfig_obj_path: str, is_legacy: bool = False
+        dhcpconfig_obj_path: str,
+        is_legacy: bool = False,
+        timeout: Optional[float] = None,
     ) -> dict:
         """
         Retrieve a dictionary of the IPv6 DHCP configuration properties (NM DhcpConfig) from the
         given object path
         """
         return await NetworkService.get_dhcp_config_properties(
-            dhcpconfig_obj_path, NetworkManagerService().NM_DHCP6CONFIG_IFACE, is_legacy
+            dhcpconfig_obj_path,
+            NetworkManagerService().NM_DHCP6CONFIG_IFACE,
+            is_legacy,
+            timeout,
         )
 
     @staticmethod
-    async def get_wired_properties(dev_obj_path: str, is_legacy: bool = False) -> dict:
+    async def get_wired_properties(
+        dev_obj_path: str, is_legacy: bool = False, timeout: Optional[float] = None
+    ) -> dict:
         """
         Retrieve a dictionary of properties for a wired (Ethernet) device with the provided object
         path
         """
         wired = {}
         wired_properties = await NetworkManagerService().get_obj_properties(
-            dev_obj_path, NetworkManagerService().NM_DEVICE_WIRED_IFACE
+            dev_obj_path, NetworkManagerService().NM_DEVICE_WIRED_IFACE, timeout=timeout
         )
         wired["PermHwAddress" if is_legacy else "permHwAddress"] = wired_properties.get(
             "PermHwAddress", ""
@@ -683,7 +707,10 @@ class NetworkService(metaclass=Singleton):
 
     @staticmethod
     async def get_ap_properties(
-        wireless_properties: dict, interface_name: str, is_legacy: bool = False
+        wireless_properties: dict,
+        interface_name: str,
+        is_legacy: bool = False,
+        timeout: Optional[float] = None,
     ) -> dict:
         """
         Retrieve a dictionary of properties for an access point from the provided properities
@@ -701,6 +728,7 @@ class NetworkService(metaclass=Singleton):
             ap_props = await NetworkManagerService().get_obj_properties(
                 active_access_point_obj_path,
                 NetworkManagerService().NM_ACCESS_POINT_IFACE,
+                timeout=timeout,
             )
             ap_properties = {}
 
@@ -762,10 +790,14 @@ class NetworkService(metaclass=Singleton):
         Retrieve the network status information
         """
         status = {}
-        dev_obj_paths = await NetworkManagerService().get_all_devices()
+        dev_obj_paths = await NetworkManagerService().get_all_devices(
+            timeout=NETWORK_STATUS_DBUS_TIMEOUT
+        )
         for dev_obj_path in dev_obj_paths:
             dev_properties = await NetworkManagerService().get_obj_properties(
-                dev_obj_path, NetworkManagerService().NM_DEVICE_IFACE
+                dev_obj_path,
+                NetworkManagerService().NM_DEVICE_IFACE,
+                timeout=NETWORK_STATUS_DBUS_TIMEOUT,
             )
             dev_state = dev_properties.get("State", None)
             if (
@@ -790,6 +822,7 @@ class NetworkService(metaclass=Singleton):
                         await NetworkManagerService().get_obj_properties(
                             dev_active_conn_obj_path,
                             NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
+                            timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                         )
                     )
                     active_connection_connection_obj_path = (
@@ -798,7 +831,8 @@ class NetworkService(metaclass=Singleton):
                     if active_connection_connection_obj_path is not None:
                         active_connection_connection_settings = (
                             await NetworkManagerService().get_connection_settings(
-                                active_connection_connection_obj_path
+                                active_connection_connection_obj_path,
+                                timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                             )
                         )
 
@@ -845,25 +879,33 @@ class NetworkService(metaclass=Singleton):
                                 "connection_active" if is_legacy else "activeConnection"
                             ] = connection_active
 
-                status[interface_name][
-                    "ip4config" if is_legacy else "ip4Config"
-                ] = await NetworkService.get_ip4config_properties(
-                    dev_properties.get("Ip4Config", ""), is_legacy
+                status[interface_name]["ip4config" if is_legacy else "ip4Config"] = (
+                    await NetworkService.get_ip4config_properties(
+                        dev_properties.get("Ip4Config", ""),
+                        is_legacy,
+                        timeout=NETWORK_STATUS_DBUS_TIMEOUT,
+                    )
                 )
-                status[interface_name][
-                    "ip6config" if is_legacy else "ip6Config"
-                ] = await NetworkService.get_ip6config_properties(
-                    dev_properties.get("Ip6Config", ""), is_legacy
+                status[interface_name]["ip6config" if is_legacy else "ip6Config"] = (
+                    await NetworkService.get_ip6config_properties(
+                        dev_properties.get("Ip6Config", ""),
+                        is_legacy,
+                        timeout=NETWORK_STATUS_DBUS_TIMEOUT,
+                    )
                 )
                 status[interface_name][
                     "dhcp4config" if is_legacy else "dhcp4Config"
                 ] = await NetworkService.get_dhcp4_config_properties(
-                    dev_properties.get("Dhcp4Config", ""), is_legacy
+                    dev_properties.get("Dhcp4Config", ""),
+                    is_legacy,
+                    timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                 )
                 status[interface_name][
                     "dhcp6config" if is_legacy else "dhcp6Config"
                 ] = await NetworkService.get_dhcp6_config_properties(
-                    dev_properties.get("Dhcp6Config", ""), is_legacy
+                    dev_properties.get("Dhcp6Config", ""),
+                    is_legacy,
+                    timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                 )
 
             if (
@@ -873,9 +915,11 @@ class NetworkService(metaclass=Singleton):
                 )
                 == NMDeviceType.NM_DEVICE_TYPE_ETHERNET
             ):
-                status[interface_name][
-                    "wired"
-                ] = await NetworkService.get_wired_properties(dev_obj_path, is_legacy)
+                status[interface_name]["wired"] = (
+                    await NetworkService.get_wired_properties(
+                        dev_obj_path, is_legacy, timeout=NETWORK_STATUS_DBUS_TIMEOUT
+                    )
+                )
                 status[interface_name]["wired"][
                     "HwAddress" if is_legacy else "hwAddress"
                 ] = dev_properties.get("HwAddress", "")
@@ -888,7 +932,9 @@ class NetworkService(metaclass=Singleton):
                 == NMDeviceType.NM_DEVICE_TYPE_WIFI
             ):
                 wireless_properties = await NetworkManagerService().get_obj_properties(
-                    dev_obj_path, NetworkManagerService().NM_DEVICE_WIRELESS_IFACE
+                    dev_obj_path,
+                    NetworkManagerService().NM_DEVICE_WIRELESS_IFACE,
+                    timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                 )
                 status[interface_name][
                     "wireless"
@@ -902,7 +948,10 @@ class NetworkService(metaclass=Singleton):
                     status[interface_name][
                         "activeaccesspoint" if is_legacy else "activeAccessPoint"
                     ] = await NetworkService.get_ap_properties(
-                        wireless_properties, interface_name, is_legacy
+                        wireless_properties,
+                        interface_name,
+                        is_legacy,
+                        timeout=NETWORK_STATUS_DBUS_TIMEOUT,
                     )
 
         return status

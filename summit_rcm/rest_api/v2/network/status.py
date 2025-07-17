@@ -70,6 +70,9 @@ class NetworkStatusResource(object):
                     del result["status"][dev]
             result["devices"] = len(result["status"])
             resp.media = result
+        except TimeoutError:
+            syslog(LOG_ERR, "Network status retrieval timed out")
+            resp.status = falcon.HTTP_500
         except Exception as e:
             syslog(LOG_ERR, f"Could not retrieve network status - {str(e)}")
             resp.status = falcon.HTTP_500

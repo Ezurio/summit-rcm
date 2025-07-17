@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 # Copyright (C) 2024 Ezurio LLC.
 #
+from asyncio import wait_for
 from socket import inet_pton, AF_INET, AF_INET6
 from sys import byteorder
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from enum import IntFlag, IntEnum, unique
 import os
 
@@ -1635,16 +1636,19 @@ class NetworkManagerService(object, metaclass=Singleton):
 
     NM_ACCESS_POINT_IFACE = "org.freedesktop.NetworkManager.AccessPoint"
 
-    async def get_all_devices(self) -> List[str]:
+    async def get_all_devices(self, timeout: Optional[float] = None) -> List[str]:
         bus = await DBusManager().get_bus()
 
-        reply = await bus.call(
-            Message(
-                destination=self.NM_BUS_NAME,
-                path=self.NM_CONNECTION_MANAGER_OBJ_PATH,
-                interface=self.NM_CONNECTION_MANAGER_IFACE,
-                member="GetAllDevices",
-            )
+        reply = await wait_for(
+            bus.call(
+                Message(
+                    destination=self.NM_BUS_NAME,
+                    path=self.NM_CONNECTION_MANAGER_OBJ_PATH,
+                    interface=self.NM_CONNECTION_MANAGER_IFACE,
+                    member="GetAllDevices",
+                )
+            ),
+            timeout=timeout,
         )
 
         if reply.message_type == MessageType.ERROR:
@@ -1710,16 +1714,21 @@ class NetworkManagerService(object, metaclass=Singleton):
         if reply.message_type == MessageType.ERROR:
             raise Exception(reply.body[0])
 
-    async def get_connection_settings(self, connection_obj_path: str) -> dict:
+    async def get_connection_settings(
+        self, connection_obj_path: str, timeout: Optional[float] = None
+    ) -> dict:
         bus = await DBusManager().get_bus()
 
-        reply = await bus.call(
-            Message(
-                destination=self.NM_BUS_NAME,
-                path=connection_obj_path,
-                interface=self.NM_SETTINGS_CONNECTION_IFACE,
-                member="GetSettings",
-            )
+        reply = await wait_for(
+            bus.call(
+                Message(
+                    destination=self.NM_BUS_NAME,
+                    path=connection_obj_path,
+                    interface=self.NM_SETTINGS_CONNECTION_IFACE,
+                    member="GetSettings",
+                )
+            ),
+            timeout=timeout,
         )
 
         if reply.message_type == MessageType.ERROR:
@@ -1811,18 +1820,23 @@ class NetworkManagerService(object, metaclass=Singleton):
         if reply.message_type == MessageType.ERROR:
             raise Exception(reply.body[0])
 
-    async def get_obj_properties(self, obj_path: str, interface: str) -> dict:
+    async def get_obj_properties(
+        self, obj_path: str, interface: str, timeout: Optional[float] = None
+    ) -> dict:
         bus = await DBusManager().get_bus()
 
-        reply = await bus.call(
-            Message(
-                destination=self.NM_BUS_NAME,
-                path=obj_path,
-                interface=self.DBUS_PROP_IFACE,
-                member="GetAll",
-                signature="s",
-                body=[interface],
-            )
+        reply = await wait_for(
+            bus.call(
+                Message(
+                    destination=self.NM_BUS_NAME,
+                    path=obj_path,
+                    interface=self.DBUS_PROP_IFACE,
+                    member="GetAll",
+                    signature="s",
+                    body=[interface],
+                )
+            ),
+            timeout=timeout,
         )
 
         if reply.message_type == MessageType.ERROR:
