@@ -1990,6 +1990,20 @@ class NetworkService(metaclass=Singleton):
 
                         # Handle ip config special cases
                         if setting in ["ipv4", "ipv6"]:
+                            # Handle ipv6.dns special case - its value type is array of byte array.
+                            # ipv6.dns is marked as deprecated (in favor of ipv6.dns-data); however,
+                            # we still need to support it for backward compatibility.
+                            # https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html#id-1.2.9.4.20
+                            if setting == "ipv6" and property == "dns":
+                                new_dns = []
+                                for dns_value in settings[setting][property].value:
+                                    try:
+                                        dns_value = inet_ntop(AF_INET6, dns_value)
+                                    except Exception:
+                                        pass
+                                    new_dns.append(str(dns_value))
+                                settings[setting][property] = new_dns
+                                continue
                             # Handle address-data special case
                             if property == "address-data":
                                 address_data = settings[setting][property].value
