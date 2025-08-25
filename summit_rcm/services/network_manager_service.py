@@ -2788,12 +2788,12 @@ class NetworkManagerService(object, metaclass=Singleton):
                 for addr in props_addresses:
                     data = {}
                     data["address"] = (
-                        addr["address"].value
+                        variant_to_python(addr["address"])
                         if addr.get("address", None) is not None
                         else ""
                     )
                     data["prefix"] = (
-                        addr["prefix"].value
+                        variant_to_python(addr["prefix"])
                         if addr.get("prefix", None) is not None
                         else 0
                     )
@@ -2812,22 +2812,22 @@ class NetworkManagerService(object, metaclass=Singleton):
                 for route in props_routes:
                     data = {}
                     data["dest"] = (
-                        route["dest"].value
+                        variant_to_python(route["dest"])
                         if route.get("dest", None) is not None
                         else ""
                     )
                     data["prefix"] = (
-                        route["prefix"].value
+                        variant_to_python(route["prefix"])
                         if route.get("prefix", None) is not None
                         else 0
                     )
                     data["metric"] = (
-                        route["metric"].value
+                        variant_to_python(route["metric"])
                         if route.get("metric", None) is not None
                         else -1
                     )
                     data["next-hop"] = (
-                        route["next-hop"].value
+                        variant_to_python(route["next-hop"])
                         if route.get("next-hop", None) is not None
                         else ""
                     )
@@ -2859,7 +2859,7 @@ class NetworkManagerService(object, metaclass=Singleton):
             )
             for nameserver in props_nameserver_data:
                 ipconfig_properties["NameserverData"].append(
-                    nameserver["address"].value
+                    variant_to_python(nameserver["address"])
                 )
             ipconfig_properties["WinsServerData"] = []
             props_wins_server_data = (
@@ -2892,12 +2892,12 @@ class NetworkManagerService(object, metaclass=Singleton):
                 for addr in props_addresses:
                     data = {}
                     data["address"] = (
-                        addr["address"].value
+                        variant_to_python(addr["address"])
                         if addr.get("address", None) is not None
                         else ""
                     )
                     data["prefix"] = (
-                        addr["prefix"].value
+                        variant_to_python(addr["prefix"])
                         if addr.get("prefix", None) is not None
                         else 0
                     )
@@ -2916,22 +2916,22 @@ class NetworkManagerService(object, metaclass=Singleton):
                 for route in props_routes:
                     data = {}
                     data["dest"] = (
-                        route["dest"].value
+                        variant_to_python(route["dest"])
                         if route.get("dest", None) is not None
                         else ""
                     )
                     data["prefix"] = (
-                        route["prefix"].value
+                        variant_to_python(route["prefix"])
                         if route.get("prefix", None) is not None
                         else 0
                     )
                     data["metric"] = (
-                        route["metric"].value
+                        variant_to_python(route["metric"])
                         if route.get("metric", None) is not None
                         else -1
                     )
                     data["next-hop"] = (
-                        route["next-hop"].value
+                        variant_to_python(route["next-hop"])
                         if route.get("next-hop", None) is not None
                         else ""
                     )
@@ -2992,7 +2992,7 @@ class NetworkManagerService(object, metaclass=Singleton):
                 for option in options:
                     dhcpconfig_properties["Options"][
                         option if is_legacy else to_camel_case(option)
-                    ] = options[option].value
+                    ] = variant_to_python(options[option])
         except Exception as ex:
             syslog(f"Error retrieving DHCP config properties: {str(ex)}")
             return {}
