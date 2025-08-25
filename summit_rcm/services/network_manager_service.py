@@ -13,6 +13,7 @@ import os
 try:
     from dbus_fast import Message, MessageType, Variant
     from dbus_fast.aio.proxy_object import ProxyInterface, ProxyObject
+    from dbus_fast.errors import InterfaceNotFoundError
     from summit_rcm.dbus_manager import DBusManager
     from pyroute2.iwutil import IW
     from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
@@ -2024,9 +2025,17 @@ class NetworkManagerPropertiesWatcher:
                 NetworkManagerService.NM_BUS_NAME, self.property_obj_path
             ),
         )
-        self.interface = self.proxy_object.get_interface(
-            NetworkManagerService.DBUS_PROP_IFACE
-        )
+        try:
+            self.interface = self.proxy_object.get_interface(
+                NetworkManagerService.DBUS_PROP_IFACE
+            )
+        except InterfaceNotFoundError:
+            # This error can occur when the object at the given object path is "obsolete" (i.e.,
+            # does not implement the standard DBus properties interface) by the time Summit RCM
+            # attempts to access it. One example of this is the "ActiveAccessPoint" property of a
+            # "Wireless" device which changes rapidly when bringing up an AP connection.
+            self.subscribed = False
+            return
         if self.interface_name:
             self.properties.update(
                 await NetworkManagerService().get_obj_properties(
