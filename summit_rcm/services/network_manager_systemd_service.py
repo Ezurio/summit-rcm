@@ -7,7 +7,6 @@ Module to support interfacing with NetworkManager via systemd and D-Bus
 """
 
 
-from collections.abc import Awaitable, Callable
 from summit_rcm.dbus_manager import DBusManager
 from summit_rcm.definition import DBUS_PROP_IFACE, SYSTEMD_BUS_NAME
 from summit_rcm.systemd_unit import SystemdUnit
@@ -26,7 +25,7 @@ class NetworkManagerSystemdService(SystemdUnit, metaclass=Singleton):
 
     def __init__(self) -> None:
         super().__init__(NETWORK_MANAGER_SERVICE_FILE)
-        self.handlers: list[Callable[[str], Awaitable[None]]] = []
+        self.handlers: list = []
 
     async def properties_changed_handler(
         self,
@@ -42,7 +41,7 @@ class NetworkManagerSystemdService(SystemdUnit, metaclass=Singleton):
             for handler in self.handlers:
                 await handler(new_state)
 
-    async def subscribe(self, handler: Callable[[str], Awaitable[None]] = None):
+    async def subscribe(self, handler=None):
         """
         Subscribe to the 'PropertiesChanged' signal for the NetworkManager D-Bus interface
         """
