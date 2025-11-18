@@ -101,6 +101,8 @@ try:
                 "certificates",
                 "datetime",
                 "fips",
+                "reboot",
+                "factoryReset",
                 "/api/v2/network/interfaces",
                 "/api/v2/network/connections",
                 "/api/v2/network/accessPoints",
@@ -450,8 +452,6 @@ try:
                 add_route("/reboot", Reboot())
                 add_route("/factoryReset", FactoryReset())
                 add_route("/fips", Fips())
-                summit_rcm_plugins.append("factoryReset")
-                summit_rcm_plugins.append("reboot")
             except Exception as exception:
                 syslog(LOG_ERR, f"Could not load advanced endpoints - {str(exception)}")
                 raise exception
