@@ -28,9 +28,6 @@ async def get_legacy_routes():
         from summit_rcm_unauthenticated.rest_api.legacy.unauthenticated import (
             AllowUnauthenticatedResourceLegacy,
         )
-        from summit_rcm_unauthenticated.services.unauthenticated_service import (
-            UnauthenticatedService,
-        )
 
         summit_rcm.SessionCheckingMiddleware().paths.append(
             "/allowUnauthenticatedResetReboot"
@@ -38,11 +35,6 @@ async def get_legacy_routes():
         routes["/allowUnauthenticatedResetReboot"] = (
             AllowUnauthenticatedResourceLegacy()
         )
-        unauthenticated = UnauthenticatedService().get_allow_unauthenticated_enabled()
-        if "reboot" in summit_rcm.summit_rcm_plugins and unauthenticated:
-            summit_rcm.summit_rcm_plugins.remove("reboot")
-        if "factoryReset" in summit_rcm.summit_rcm_plugins and unauthenticated:
-            summit_rcm.summit_rcm_plugins.remove("factoryReset")
     except ImportError:
         pass
     except Exception as exception:
@@ -69,9 +61,6 @@ async def get_v2_routes():
         from summit_rcm_unauthenticated.rest_api.v2.system.unauthenticated import (
             AllowUnauthenticatedResource,
         )
-        from summit_rcm_unauthenticated.services.unauthenticated_service import (
-            UnauthenticatedService,
-        )
 
         summit_rcm.SessionCheckingMiddleware().paths.append(
             "/api/v2/system/allowUnauthenticatedResetReboot"
@@ -79,12 +68,6 @@ async def get_v2_routes():
         routes["/api/v2/system/allowUnauthenticatedResetReboot"] = (
             AllowUnauthenticatedResource()
         )
-        unauthenticated = UnauthenticatedService().get_allow_unauthenticated_enabled()
-        restricted_paths = summit_rcm.SessionCheckingMiddleware().paths
-        if "/api/v2/system/power" in restricted_paths and unauthenticated:
-            restricted_paths.remove("/api/v2/system/power")
-        if "/api/v2/system/factoryReset" in restricted_paths and unauthenticated:
-            restricted_paths.remove("/api/v2/system/factoryReset")
     except ImportError:
         pass
     except Exception as exception:
@@ -103,3 +86,20 @@ async def server_config_preload_hook(_) -> None:
 
 async def server_config_postload_hook(_) -> None:
     """Hook function called after the Uvicorn ASGI server config is loaded"""
+    try:
+        from summit_rcm_unauthenticated.services.unauthenticated_service import (
+            UnauthenticatedService,
+        )
+    except ImportError:
+        return
+
+    restricted_paths = summit_rcm.SessionCheckingMiddleware().paths
+    if UnauthenticatedService().get_allow_unauthenticated_enabled():
+        if "/api/v2/system/power" in restricted_paths:
+            restricted_paths.remove("/api/v2/system/power")
+        if "/api/v2/system/factoryReset" in restricted_paths:
+            restricted_paths.remove("/api/v2/system/factoryReset")
+        if "reboot" in restricted_paths:
+            restricted_paths.remove("reboot")
+        if "factoryReset" in restricted_paths:
+            restricted_paths.remove("factoryReset")
