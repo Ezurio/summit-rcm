@@ -186,3 +186,63 @@ def frequency_to_channel(freq: int) -> int:
         return int((freq - 56160) / 2160)
     else:
         return 0
+
+
+async def convert_pkcs11_uri_to_pem(pkcs11_uri: str, output_path: str) -> None:
+    """
+    Convert a PKCS#11 URI to PEM format using the uri2pem.py script.
+
+    Args:
+        pkcs11_uri (str): The PKCS#11 URI to convert.
+        output_path (str): The file path to save the PEM output.
+    Raises:
+        RuntimeError: If the conversion fails.
+    """
+    URI2PEM_SCRIPT_PATH = "/opt/pkcs11-provider/uri2pem.py"
+
+    proc = await asyncio.create_subprocess_exec(
+        "python3",
+        URI2PEM_SCRIPT_PATH,
+        "--out",
+        output_path,
+        pkcs11_uri,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Failed to convert PKCS#11 URI to PEM: {stdout.decode('utf-8').strip()}"
+        )
+
+
+async def retrieve_certificate_from_pkcs11_uri(
+    pkcs11_uri: str, output_path: str
+) -> None:
+    """
+    Retrieve the certificate from a PKCS#11 URI using OpenSSL and save it to the specified output
+    path.
+
+    Args:
+        pkcs11_uri (str): The PKCS#11 URI to retrieve the certificate from.
+        output_path (str): The file path to save the retrieved certificate.
+    Raises:
+        RuntimeError: If the retrieval fails.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        "openssl",
+        "x509",
+        "-in",
+        pkcs11_uri,
+        "-out",
+        output_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Failed to retrieve certificate from PKCS#11 URI: {stderr.decode('utf-8').strip()}"
+        )
