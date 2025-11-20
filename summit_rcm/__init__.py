@@ -14,6 +14,7 @@ from syslog import LOG_ERR, syslog, openlog
 from types import ModuleType
 from typing import Any, Iterable, List, Optional
 import os
+import tempfile
 
 try:
     import ssl
@@ -23,7 +24,11 @@ except ImportError as error:
         raise error
 
 from summit_rcm.services.network_manager_service import NetworkManagerService
-from summit_rcm.utils import Singleton
+from summit_rcm.utils import (
+    Singleton,
+    convert_pkcs11_uri_to_pem,
+    retrieve_certificate_from_pkcs11_uri,
+)
 from summit_rcm.services.date_time_service import DateTimeService
 from summit_rcm.settings import ServerConfig, SystemSettingsManage
 from summit_rcm.definition import RouteAdd
@@ -48,6 +53,9 @@ try:
 
     X509_V_FLAG_NO_CHECK_TIME = 0x200000
     """Flags for OpenSSL 1.1.1 or newer to disable time checking during certificate verification"""
+
+    PKCS11_URI_PREFIX = "pkcs11:"
+    """Prefix for PKCS#11 URIs"""
 
     summit_rcm_plugins: List[str] = []
 
@@ -824,115 +832,141 @@ try:
         except ImportError:
             pass
 
-        config = uvicorn.Config(
-            app=app,
-            host="",
-            port=port,
-            ssl_certfile=ssl_certificate,
-            ssl_keyfile=ssl_private_key,
-            ssl_cert_reqs=ssl.CERT_NONE,
-            ssl_ca_certs=ssl_certificate_chain,
-            ssl_version=ssl.PROTOCOL_TLS_SERVER,
-            lifespan="on",
-            http="auto",
-            loop="asyncio",
-            log_level=SystemSettingsManage.get_uvicorn_log_level(),
-            ws=websockets_config,
-        )
+        with tempfile.TemporaryDirectory() as temp_dir_path:
+            if ssl_private_key.startswith(PKCS11_URI_PREFIX):
+                tmp_ssl_private_key = os.path.join(temp_dir_path, "server.key")
+                await convert_pkcs11_uri_to_pem(ssl_private_key, tmp_ssl_private_key)
+                ssl_private_key = tmp_ssl_private_key
 
-        # Populate the list of discovered plugins
-        discover_plugins()
-
-        # Call any plugin config pre-load hooks
-        for name, module in discovered_plugins.items():
-            try:
-                await module.server_config_preload_hook(config)
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    f"Error in plugin {name} config pre-load hook: {str(exception)}",
+            if ssl_certificate.startswith(PKCS11_URI_PREFIX):
+                tmp_ssl_certificate = os.path.join(temp_dir_path, "server.crt")
+                await retrieve_certificate_from_pkcs11_uri(
+                    ssl_certificate, tmp_ssl_certificate
                 )
+                ssl_certificate = tmp_ssl_certificate
 
-        # Load the Uvicorn server config
-        config.load()
+            if ssl_certificate_chain.startswith(PKCS11_URI_PREFIX):
+                tmp_ssl_certificate_chain = os.path.join(temp_dir_path, "ca.crt")
+                await retrieve_certificate_from_pkcs11_uri(
+                    ssl_certificate_chain, tmp_ssl_certificate_chain
+                )
+                ssl_certificate_chain = tmp_ssl_certificate_chain
 
-        # Update Uvicorn server's SSL context configuration to require client authentication and
-        # certificate expiration validation if enabled
-        if enable_client_auth:
-            try:
-                if ssl.OPENSSL_VERSION_NUMBER >= 0x10101000:
-                    # OpenSSL 1.1.1 or newer - we can use the built-in functionality to disable time
-                    # checking during certificate verification, only if enabled
-                    config.ssl.verify_mode = ssl.CERT_REQUIRED
-                    if disable_certificate_expiry_verification:
-                        config.ssl.verify_flags |= X509_V_FLAG_NO_CHECK_TIME
-                else:
-                    # OpenSSL 1.0.2 - we need to use the patched-in functionality to disable time
-                    # checking during certificate verification, only if enabled
-                    config.ssl.verify_mode = (
-                        PY_SSL_CERT_REQUIRED_NO_CHECK_TIME
-                        if disable_certificate_expiry_verification
-                        else ssl.CERT_REQUIRED
+            config = uvicorn.Config(
+                app=app,
+                host="",
+                port=port,
+                ssl_certfile=ssl_certificate,
+                ssl_keyfile=ssl_private_key,
+                ssl_cert_reqs=ssl.CERT_NONE,
+                ssl_ca_certs=ssl_certificate_chain,
+                ssl_version=ssl.PROTOCOL_TLS_SERVER,
+                lifespan="on",
+                http="auto",
+                loop="asyncio",
+                log_level=SystemSettingsManage.get_uvicorn_log_level(),
+                ws=websockets_config,
+            )
+
+            # Populate the list of discovered plugins
+            discover_plugins()
+
+            # Call any plugin config pre-load hooks
+            for name, module in discovered_plugins.items():
+                try:
+                    await module.server_config_preload_hook(config)
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Error in plugin {name} config pre-load hook: {str(exception)}",
                     )
 
-                # Register custom loop exception handler
-                def custom_exception_handler(loop, context):
-                    """
-                    Custom exception handler for the event loop to catch and report SSL client
-                    authentication errors
-                    """
+            # Load the Uvicorn server config
+            config.load()
 
-                    exception = context.get("exception", None)
-                    if exception is not None and isinstance(exception, ssl.SSLError):
-                        syslog(f"SSL client authentication error: {exception.reason}")
-                        return
+            # Update Uvicorn server's SSL context configuration to require client authentication and
+            # certificate expiration validation if enabled
+            if enable_client_auth:
+                try:
+                    if ssl.OPENSSL_VERSION_NUMBER >= 0x10101000:
+                        # OpenSSL 1.1.1 or newer - we can use the built-in functionality to disable
+                        # time checking during certificate verification, only if enabled
+                        config.ssl.verify_mode = ssl.CERT_REQUIRED
+                        if disable_certificate_expiry_verification:
+                            config.ssl.verify_flags |= X509_V_FLAG_NO_CHECK_TIME
+                    else:
+                        # OpenSSL 1.0.2 - we need to use the patched-in functionality to disable
+                        # time checking during certificate verification, only if enabled
+                        config.ssl.verify_mode = (
+                            PY_SSL_CERT_REQUIRED_NO_CHECK_TIME
+                            if disable_certificate_expiry_verification
+                            else ssl.CERT_REQUIRED
+                        )
 
-                    # Call the default exception handler to ensure proper handling of other
-                    # exceptions
-                    loop.default_exception_handler(context)
+                    # Register custom loop exception handler
+                    def custom_exception_handler(loop, context):
+                        """
+                        Custom exception handler for the event loop to catch and report SSL client
+                        authentication errors
+                        """
 
-                asyncio.get_event_loop().set_exception_handler(custom_exception_handler)
+                        exception = context.get("exception", None)
+                        if exception is not None and isinstance(
+                            exception, ssl.SSLError
+                        ):
+                            syslog(
+                                f"SSL client authentication error: {exception.reason}"
+                            )
+                            return
 
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    f"Error configuring SSL client authentication - {str(exception)}",
-                )
+                        # Call the default exception handler to ensure proper handling of other
+                        # exceptions
+                        loop.default_exception_handler(context)
 
-        # Call any plugin config post-load hooks
-        for name, module in discovered_plugins.items():
-            try:
-                await module.server_config_postload_hook(config)
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    f"Error in plugin {name} config post-load hook: {str(exception)}",
-                )
+                    asyncio.get_event_loop().set_exception_handler(
+                        custom_exception_handler
+                    )
 
-        if config.ssl.verify_mode == ssl.CERT_REQUIRED:
-            syslog("SSL client authentication enabled")
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Error configuring SSL client authentication - {str(exception)}",
+                    )
 
-        server = uvicorn.Server(config)
+            # Call any plugin config post-load hooks
+            for name, module in discovered_plugins.items():
+                try:
+                    await module.server_config_postload_hook(config)
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Error in plugin {name} config post-load hook: {str(exception)}",
+                    )
 
-        # Save off a reference to the uvicorn server for later use
-        ServerConfig().uvicorn_server = server
+            if config.ssl.verify_mode == ssl.CERT_REQUIRED:
+                syslog("SSL client authentication enabled")
 
-        # Add any middleware
-        add_default_middleware()
-        for name, module in discovered_plugins.items():
-            try:
-                app.add_middleware(await module.get_middleware())
-            except Exception as exception:
-                syslog(
-                    LOG_ERR,
-                    f"Error loading middleware for plugin {name}: {str(exception)}",
-                )
+            server = uvicorn.Server(config)
 
-        # Register uncaught exception handler
-        app.add_error_handler(Exception, custom_handle_uncaught_exception)
+            # Save off a reference to the uvicorn server for later use
+            ServerConfig().uvicorn_server = server
 
-        # Start serving
-        await server.serve()
+            # Add any middleware
+            add_default_middleware()
+            for name, module in discovered_plugins.items():
+                try:
+                    app.add_middleware(await module.get_middleware())
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Error loading middleware for plugin {name}: {str(exception)}",
+                    )
+
+            # Register uncaught exception handler
+            app.add_error_handler(Exception, custom_handle_uncaught_exception)
+
+            # Start serving
+            await server.serve()
 
 except ImportError:
     REST_ENABLED = False
