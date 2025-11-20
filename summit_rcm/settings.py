@@ -268,7 +268,7 @@ class SystemSettingsManage(object):
 class ServerConfig(object, metaclass=Singleton):
     def __init__(self):
         try:
-            self.parser = configparser.ConfigParser()
+            self.parser = configparser.ConfigParser(interpolation=None)
             self.parser.read(definition.SUMMIT_RCM_SERVER_CONF_FILE)
 
             self._sessions_enabled = self.parser.getboolean(
