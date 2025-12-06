@@ -198,7 +198,7 @@ async def convert_pkcs11_uri_to_pem(pkcs11_uri: str, output_path: str) -> None:
     Raises:
         RuntimeError: If the conversion fails.
     """
-    URI2PEM_SCRIPT_PATH = "/opt/pkcs11-provider/uri2pem.py"
+    URI2PEM_SCRIPT_PATH = "uri2pem.py"
 
     proc = await asyncio.create_subprocess_exec(
         "python3",
