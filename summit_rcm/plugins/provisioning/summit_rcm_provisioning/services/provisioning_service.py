@@ -20,6 +20,10 @@ except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
+
+    Message = None
+    MessageType = None
+
 import falcon.asgi.multipart
 from summit_rcm.settings import ServerConfig
 from summit_rcm.definition import (
