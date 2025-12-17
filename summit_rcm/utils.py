@@ -20,6 +20,8 @@ except ImportError as error:
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
 
+    Variant = None
+
 
 class Singleton(type):
     _instances = {}

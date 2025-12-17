@@ -13,6 +13,8 @@ except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
+
+    MessageBus = None
 from summit_rcm.utils import Singleton
 
 

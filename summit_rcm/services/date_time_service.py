@@ -19,6 +19,10 @@ except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
+
+    Message = None
+    MessageType = None
+
 from summit_rcm.definition import (
     TIMEDATE1_BUS_NAME,
     TIMEDATE1_MAIN_OBJ,

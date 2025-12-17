@@ -35,6 +35,12 @@ except ImportError as error:
             class bss_param:
                 """Dummy bss_param class for documentation generation"""
 
+    Message = None
+    MessageType = None
+    Variant = None
+    ProxyInterface = None
+    ProxyObject = None
+    InterfaceNotFoundError = None
 
 from summit_rcm.definition import FILEDIR_DICT, INVALID_RSSI
 from summit_rcm.utils import (
