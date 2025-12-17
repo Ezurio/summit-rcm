@@ -19,6 +19,8 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 try:
+    from dbus_fast import Message, MessageType
+    from summit_rcm.dbus_manager import DBusManager
     from pyroute2.iwutil import IW
     from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
     from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
@@ -39,6 +41,8 @@ except ImportError as error:
             class bss_param:
                 """Dummy bss_param class for documentation generation"""
 
+    Message = None
+    MessageType = None
 
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
@@ -59,7 +63,7 @@ from summit_rcm.services.network_manager_service import (
     NMActiveConnectionState,
 )
 from summit_rcm.settings import ServerConfig
-from summit_rcm.utils import Singleton, frequency_to_channel
+from summit_rcm.utils import Singleton, frequency_to_channel, variant_to_python
 
 RESERVED_NM_CONNECTIONS_DIR = "/usr/lib/NetworkManager/system-connections"
 
@@ -72,6 +76,8 @@ NETWORK_STATUS_DBUS_TIMEOUT = 10.0  # seconds
 """
 This constant defines the timeout duration for network status DBus requests in seconds.
 """
+
+SUPPLICANT_INTERFACE_IFACE = "fi.w1.wpa_supplicant1.Interface"
 
 
 class NetworkService(metaclass=Singleton):
@@ -2135,6 +2141,86 @@ class NetworkService(metaclass=Singleton):
                     pass
         return result
 
+    @staticmethod
+    async def get_supplicant_interfaces() -> list[str]:
+        """
+        Retrieve a list of object paths to interfaces known to the supplicant
+        """
+        bus = await DBusManager().get_bus()
+
+        reply = await bus.call(
+            Message(
+                destination=definition.WPA_IFACE,
+                path=definition.WPA_OBJ,
+                interface=definition.DBUS_PROP_IFACE,
+                member="Get",
+                signature="ss",
+                body=[definition.WPA_IFACE, "Interfaces"],
+            )
+        )
+
+        if reply.message_type == MessageType.ERROR:
+            raise Exception("Unable to retrieve supplicant interfaces")
+
+        return variant_to_python(reply.body[0])
+
+    @staticmethod
+    async def get_supplicant_interface_name(interface_obj_path: str) -> str:
+        """
+        Retrieve the name of an interface known to the supplicant by its object path
+        """
+        bus = await DBusManager().get_bus()
+
+        reply = await bus.call(
+            Message(
+                destination=definition.WPA_IFACE,
+                path=interface_obj_path,
+                interface=definition.DBUS_PROP_IFACE,
+                member="Get",
+                signature="ss",
+                body=[SUPPLICANT_INTERFACE_IFACE, "Ifname"],
+            )
+        )
+
+        if reply.message_type == MessageType.ERROR:
+            raise Exception("Unable to retrieve supplicant interface name")
+
+        return variant_to_python(reply.body[0])
+
+    @staticmethod
+    async def get_summit_status(ifname: Optional[str] = "wlan0") -> dict[str, str]:
+        """
+        Retrieve the Summit status info for the specified interface from the supplicant (default is
+        wlan0)
+        """
+        interface_obj_paths = await NetworkService().get_supplicant_interfaces()
+
+        for interface_obj_path in interface_obj_paths:
+            interface_name = await NetworkService().get_supplicant_interface_name(
+                interface_obj_path
+            )
+            if interface_name == ifname:
+                bus = await DBusManager().get_bus()
+
+                reply = await bus.call(
+                    Message(
+                        destination=definition.WPA_IFACE,
+                        path=interface_obj_path,
+                        interface=definition.DBUS_PROP_IFACE,
+                        member="Get",
+                        signature="ss",
+                        body=[SUPPLICANT_INTERFACE_IFACE, "SummitStatus"],
+                    )
+                )
+
+                if reply.message_type == MessageType.ERROR:
+                    raise Exception("Unable to retrieve Summit status info")
+
+                return variant_to_python(reply.body[0])
+
+        # If not found, raise exception
+        raise InterfaceNotFoundError("interface not found")
+
 
 class ConnectionProfileReservedError(Exception):
     """Custom error class for when the requested connection profile is reserved."""
@@ -2162,4 +2248,11 @@ class WifiDeviceNotFoundError(Exception):
     """
     Custom error class for when the user requests a scan for access points, but no Wi-Fi device is
     found.
+    """
+
+
+class InterfaceNotFoundError(Exception):
+    """
+    Custom error class for when the user requests status information for a network interface that
+    doesn't exist
     """

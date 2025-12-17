@@ -39,6 +39,7 @@ def generate_docs():
             NetworkInterfaceStationDumpResource,
             NetworkInterfaceAvailableApChannelsResource,
             NetworkInterfaceDhcpLeasesResource,
+            NetworkInterfaceSummitStatusResource,
         )
         from summit_rcm.rest_api.v2.network.connections import (
             NetworkConnectionsResource,
@@ -73,6 +74,9 @@ def generate_docs():
         routes["/api/v2/network/interfaces/{name}/dhcpLeases"] = (
             NetworkInterfaceDhcpLeasesResource
         )
+        routes["/api/v2/network/interfaces/{name}/summitStatus"] = (
+            NetworkInterfaceSummitStatusResource
+        )
         routes["/api/v2/network/connections"] = NetworkConnectionsResource
         routes["/api/v2/network/connections/uuid/{uuid}"] = (
             NetworkConnectionResourceByUuid
@@ -97,6 +101,7 @@ def generate_docs():
             NetworkInterfaceStationDump,
             NetworkInterfaceAvailableApChannels,
             NetworkInterfaceDhcpLeases,
+            NetworkInterfaceSummitStatus,
             NetworkConnections,
             NetworkConnection,
             NetworkAccessPoints,
@@ -114,6 +119,7 @@ def generate_docs():
             NetworkInterfaceAvailableApChannels
         )
         routes["/networkInterfaceDhcpLeases"] = NetworkInterfaceDhcpLeases
+        routes["/networkInterfaceSummitStatus"] = NetworkInterfaceSummitStatus
         routes["/connections"] = NetworkConnections
         routes["/connection"] = NetworkConnection
         routes["/accesspoints"] = NetworkAccessPoints
