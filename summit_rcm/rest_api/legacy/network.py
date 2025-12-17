@@ -13,7 +13,7 @@ from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
     SpectreeService,
 )
-from summit_rcm.services.network_service import NetworkService
+from summit_rcm.services.network_service import NetworkService, InterfaceNotFoundError
 from summit_rcm import definition
 
 try:
@@ -36,6 +36,7 @@ try:
         NetworkInterfaceStationDumpResponseModelLegacy,
         NetworkInterfaceAvailableApChannelsResponseModelLegacy,
         NetworkInterfaceDhcpLeasesResponseModelLegacy,
+        NetworkInterfaceSummitStatusResponseModelLegacy,
         NetworkInterfaceInfoRequestModelLegacy,
         NetworkInterfaceResponseModelLegacy,
         NetworkInterfaceStatsResponseModelLegacy,
@@ -64,6 +65,7 @@ except (ImportError, DocsNotEnabledException):
     NetworkInterfaceStationDumpResponseModelLegacy = None
     NetworkInterfaceAvailableApChannelsResponseModelLegacy = None
     NetworkInterfaceDhcpLeasesResponseModelLegacy = None
+    NetworkInterfaceSummitStatusResponseModelLegacy = None
     NetworkInterfaceInfoRequestModelLegacy = None
     NetworkInterfaceResponseModelLegacy = None
     NetworkInterfaceStatsResponseModelLegacy = None
@@ -816,6 +818,50 @@ class NetworkInterfaceDhcpLeases(object):
             result["InfoMsg"] = "Invalid interface name"
         except Exception as e:
             result["InfoMsg"] = f"Could not read current DHCP leases - {str(e)}"
+        resp.media = result
+
+
+class NetworkInterfaceSummitStatus(object):
+    @spec.validate(
+        query=NetworkInterfaceInfoRequestModelLegacy,
+        resp=Response(
+            HTTP_200=NetworkInterfaceSummitStatusResponseModelLegacy,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=SpectreeService().security,
+        tags=[network_tag],
+        deprecated=True,
+    )
+    async def on_get(self, req, resp):
+        """
+        Retrieve Summit status info for the requested interface (legacy)
+        """
+
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_JSON
+        result = {
+            "SDCERR": 1,
+            "InfoMsg": "",
+            "last": "",
+            "best": "",
+        }
+
+        try:
+            name = req.params.get("name", None)
+            if not name:
+                result["InfoMsg"] = "Invalid interface name"
+                resp.media = result
+                return
+
+            summit_status = await NetworkService.get_summit_status(ifname=name)
+            result["last"] = summit_status.get("last", "")
+            result["best"] = summit_status.get("best", "")
+            result["SDCERR"] = 0
+        except InterfaceNotFoundError:
+            result["InfoMsg"] = "Invalid interface name"
+        except Exception as e:
+            result["InfoMsg"] = f"Could not retrieve interface summit status - {str(e)}"
         resp.media = result
 
 

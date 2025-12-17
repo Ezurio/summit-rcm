@@ -13,7 +13,7 @@ from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
     SpectreeService,
 )
-from summit_rcm.services.network_service import NetworkService
+from summit_rcm.services.network_service import NetworkService, InterfaceNotFoundError
 
 try:
     if not ServerConfig().rest_api_docs_enabled:
@@ -27,6 +27,7 @@ try:
         NetworkInterfaceStationDumpResponseModel,
         NetworkInterfaceAvailableApChannelsResponseModel,
         NetworkInterfaceDhcpLeasesResponseModel,
+        NetworkInterfaceSummitStatusResponseModel,
         NetworkInterfaceResponseModel,
         NetworkInterfaceStatsResponseModel,
         NetworkInterfacesResponseModel,
@@ -43,6 +44,7 @@ except (ImportError, DocsNotEnabledException):
     NetworkInterfaceStationDumpResponseModel = None
     NetworkInterfaceAvailableApChannelsResponseModel = None
     NetworkInterfaceDhcpLeasesResponseModel = None
+    NetworkInterfaceSummitStatusResponseModel = None
     NetworkInterfaceResponseModel = None
     NetworkInterfaceStatsResponseModel = None
     NetworkInterfacesResponseModel = None
@@ -405,4 +407,37 @@ class NetworkInterfaceDhcpLeasesResource(object):
             resp.status = falcon.HTTP_400
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read DHCP leases: {str(exception)}")
+            resp.status = falcon.HTTP_500
+
+
+class NetworkInterfaceSummitStatusResource(object):
+    """
+    Resource to handle queries and requests for the Summit status for a network interface
+    """
+
+    @spec.validate(
+        resp=Response(
+            HTTP_200=NetworkInterfaceSummitStatusResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
+            HTTP_401=UnauthorizedErrorResponseModel,
+            HTTP_500=InternalServerErrorResponseModel,
+        ),
+        security=spec.security,
+        tags=[network_tag],
+    )
+    async def on_get(self, _, resp: falcon.asgi.Response, name: str) -> None:
+        """Retrieve the Summit status for a network interface"""
+        try:
+            if not name:
+                resp.status = falcon.HTTP_400
+                return
+
+            resp.media = await NetworkService.get_summit_status(name)
+            resp.content_type = falcon.MEDIA_JSON
+            resp.status = falcon.HTTP_200
+        except InterfaceNotFoundError as exception:
+            syslog(LOG_ERR, f"Invalid interface name provided: {str(exception)}")
+            resp.status = falcon.HTTP_400
+        except Exception as exception:
+            syslog(LOG_ERR, f"Unable to read Summit status: {str(exception)}")
             resp.status = falcon.HTTP_500

@@ -272,6 +272,7 @@ try:
         - /api/v2/network/interfaces/{name}/stationDump
         - /api/v2/network/interfaces/{name}/availableApChannels
         - /api/v2/network/interfaces/{name}/dhcpLeases
+        - /api/v2/network/interfaces/{name}/summitStatus
         - /api/v2/network/connections
         - /api/v2/network/connections/uuid/{uuid}
         - /api/v2/network/connections/id/{id}
@@ -293,6 +294,7 @@ try:
                 NetworkInterfaceStationDumpResource,
                 NetworkInterfaceAvailableApChannelsResource,
                 NetworkInterfaceDhcpLeasesResource,
+                NetworkInterfaceSummitStatusResource,
             )
             from summit_rcm.rest_api.v2.network.connections import (
                 NetworkConnectionsResource,
@@ -343,6 +345,10 @@ try:
                     "/api/v2/network/interfaces/{name}/dhcpLeases",
                     NetworkInterfaceDhcpLeasesResource(),
                 )
+                add_route(
+                    "/api/v2/network/interfaces/{name}/summitStatus",
+                    NetworkInterfaceSummitStatusResource(),
+                )
                 add_route("/api/v2/network/connections", NetworkConnectionsResource())
                 add_route(
                     "/api/v2/network/connections/uuid/{uuid}",
@@ -382,6 +388,7 @@ try:
         - /networkInterfaceStationDump
         - /networkInterfaceAvailableApChannels
         - /networkInterfaceDhcpLeases
+        - /networkInterfaceSummitStatus
         - /connections
         - /connection
         - /accesspoints
@@ -396,6 +403,7 @@ try:
                 NetworkInterfaceStationDump,
                 NetworkInterfaceAvailableApChannels,
                 NetworkInterfaceDhcpLeases,
+                NetworkInterfaceSummitStatus,
                 NetworkConnections,
                 NetworkConnection,
                 NetworkAccessPoints,
@@ -425,6 +433,7 @@ try:
                     "/networkInterfaceDhcpLeases",
                     NetworkInterfaceDhcpLeases(),
                 )
+                add_route("/networkInterfaceSummitStatus", NetworkInterfaceSummitStatus())
                 add_route("/connections", NetworkConnections())
                 add_route("/connection", NetworkConnection())
                 add_route("/accesspoints", NetworkAccessPoints())

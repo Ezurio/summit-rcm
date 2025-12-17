@@ -3341,6 +3341,20 @@ class NetworkInterfaceDhcpLeasesResponseModelLegacy(DefaultResponseModelLegacy):
     leases: NetworkInterfaceDhcpLeasesResponseModel
 
 
+class NetworkInterfaceSummitStatusResponseModel(BaseModel):
+    """Summit status model"""
+
+    last: Optional[str] = None
+    best: Optional[str] = None
+
+
+class NetworkInterfaceSummitStatusResponseModelLegacy(DefaultResponseModelLegacy):
+    """Summit status model (legacy)"""
+
+    last: Optional[str] = None
+    best: Optional[str] = None
+
+
 class NetworkInterfaceResponseModel(BaseModel):
     """Model for response to request for a specific network interface"""
 
