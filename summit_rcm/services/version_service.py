@@ -110,13 +110,15 @@ class VersionService(metaclass=Singleton):
                 version__info_legacy["kernel_vermagic"] = version__info_legacy.pop(
                     "kernelVermagic"
                 )
-                version__info_legacy["current_side"] = version__info_legacy.pop(
+                version__info_legacy["current_bootside"] = version__info_legacy.pop(
                     "currentSide"
                 )
-                version__info_legacy["next_side"] = version__info_legacy.pop("nextSide")
+                version__info_legacy["next_bootside"] = version__info_legacy.pop("nextSide")
                 version__info_legacy["base_hw_part_number"] = version__info_legacy.pop(
                     "baseHwPartNumber"
                 )
+                # Add "weblcm_python_webapp" for backward compatibility
+                version__info_legacy["weblcm_python_webapp"] = version__info_legacy["summit_rcm"]
                 return version__info_legacy
 
             return self._version_info
