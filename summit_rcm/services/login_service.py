@@ -6,7 +6,7 @@
 Module to handle session login management
 """
 
-from datetime import datetime
+from time import clock_gettime, CLOCK_BOOTTIME
 from threading import Lock
 from typing import List
 from summit_rcm.settings import (
@@ -91,7 +91,7 @@ class LoginService(metaclass=Singleton):
 
         user = {}
         with self._lock:
-            now = datetime.now()
+            now = clock_gettime(CLOCK_BOOTTIME)
             user = self._failed_logins.get(username)
             # Block username for 'login_block_timeout' seconds if failed consecutively for
             # 'login_retry_times' times
@@ -99,7 +99,7 @@ class LoginService(metaclass=Singleton):
                 user
                 and len(user["time"]) >= SystemSettingsManage.get_login_retry_times()
             ):
-                dt = abs((now - user["time"][-1]).total_seconds())
+                dt = abs(now - user["time"][-1])
                 if dt < SystemSettingsManage.get_tamper_protection_timeout():
                     return True
                 self._failed_logins.pop(username, None)
@@ -109,13 +109,13 @@ class LoginService(metaclass=Singleton):
         """Handle the event when a login attempt failed"""
 
         with self._lock:
-            now = datetime.now()
+            now = clock_gettime(CLOCK_BOOTTIME)
             user = self._failed_logins.get(username, {})
             if user:
                 user["time"] = [
                     dt
                     for dt in user["time"]
-                    if abs((now - dt).total_seconds())
+                    if abs(now - dt)
                     < SystemSettingsManage.get_login_retry_window()
                 ]
                 if len(user["time"]) >= SystemSettingsManage.get_login_retry_times():
@@ -155,12 +155,12 @@ class LoginService(metaclass=Singleton):
         Clean up and remove any expired sessions. If multiple sessions per user is not enabled, also
         log out the corresponding user.
         """
-        now = int(round(datetime.utcnow().timestamp()))
+        now = int(round(clock_gettime(CLOCK_BOOTTIME)))
         self._valid_sessions[:] = [x for x in self._valid_sessions if now < x.expiry]
 
     def keepalive_session(self, session_id: str) -> None:
         """Update the expiry for the session with the given ID"""
-        now = int(round(datetime.utcnow().timestamp()))
+        now = int(round(clock_gettime(CLOCK_BOOTTIME)))
         for session in self._valid_sessions:
             if session.id == session_id:
                 session.expiry = now + (SystemSettingsManage.get_session_timeout() * 60)
@@ -170,7 +170,7 @@ class LoginService(metaclass=Singleton):
         """
         Determine whether or not the session with the given ID is valid.
         """
-        now = int(round(datetime.utcnow().timestamp()))
+        now = int(round(clock_gettime(CLOCK_BOOTTIME)))
         for session in self.valid_sessions:
             if session_id == session.id and now < session.expiry:
                 # Target session is not expired
