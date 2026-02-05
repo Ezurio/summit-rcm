@@ -102,10 +102,11 @@ class RadioSISOModeResourceLegacy:
             "SISO_mode": -1,
         }
         try:
-            siso_mode = req.params.get("SISO_mode", None)
-            if siso_mode is None:
+            try:
+                siso_mode = int(req.params.get("SISO_mode", None))
+                RadioSISOModeService.set_siso_mode(RadioSISOModeEnum(siso_mode))
+            except (ValueError, TypeError):
                 raise Exception("invalid parameter value")
-            RadioSISOModeService.set_siso_mode(RadioSISOModeEnum(siso_mode))
             result["SISO_mode"] = RadioSISOModeService.get_current_siso_mode()
         except Exception as exception:
             try:

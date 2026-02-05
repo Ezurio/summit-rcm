@@ -107,8 +107,9 @@ class RadioSISOModeResource(object):
             # Parse inputs
             put_data: dict = await req.get_media()
             try:
-                siso_mode = RadioSISOModeEnum(put_data.get("sisoMode", None))
-                if siso_mode is None:
+                try:
+                    siso_mode = RadioSISOModeEnum(int(put_data.get("sisoMode", None)))
+                except (ValueError, TypeError):
                     raise Exception("Invalid parameter")
             except Exception:
                 resp.status = falcon.HTTP_400
