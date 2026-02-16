@@ -126,12 +126,14 @@ class FileManage:
         tmp_file = Path(UPLOAD_TMP_FILE_PATH)
 
         if not upload_file_type:
-            syslog("FileManage POST - no type specified")
-            result["InfoMsg"] = "file POST - no type specified"
-            if tmp_file.exists():
-                tmp_file.unlink()
-            resp.media = result
-            return
+            upload_file_type = req.get_param("type", None)
+            if not upload_file_type:
+                syslog("FileManage POST - no type specified")
+                result["InfoMsg"] = "file POST - no type specified"
+                if tmp_file.exists():
+                    tmp_file.unlink()
+                resp.media = result
+                return
 
         if upload_file_type not in definition.FILEDIR_DICT:
             syslog(f"FileManage POST type {upload_file_type} unknown")
