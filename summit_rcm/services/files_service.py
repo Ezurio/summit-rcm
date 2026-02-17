@@ -345,6 +345,51 @@ class FilesService(metaclass=Singleton):
         path.unlink()
 
     @staticmethod
+    def get_other_config_files() -> List[str]:
+        """
+        Retrieve a list of other config files that should be included in config exports/imports
+        """
+        other_config_files = []
+        directories = ["/etc/chrony", "/etc/dropbear", "/etc/stunnel"]
+        for directory in directories:
+            if Path(directory).exists():
+                other_config_files.append(f"{directory}/*")
+
+        return other_config_files
+
+    @staticmethod
+    def get_timezone_file_paths() -> List[str]:
+        """
+        Retrieve the file paths for timezone related files that should be included in config
+        exports/imports. When the encrypted storage toolkit is enabled, /etc/localtime is a symlink
+        to a file in /data, so it will be included as part of the config export/import. When the
+        encrypted storage toolkit is not enabled, /etc/localtime is a regular file that should be
+        included in the config export/import. /etc/adjtime and /etc/timezone may also be present and
+        should be included if they are.
+        """
+        timezone_files = []
+
+        localtime_path = Path("/etc/localtime")
+        if localtime_path.is_symlink():
+            timezone_files.append(str(localtime_path.readlink()))
+        elif localtime_path.exists():
+            timezone_files.append("/etc/localtime")
+
+        adjtime_path = Path("/etc/adjtime")
+        if adjtime_path.is_symlink():
+            timezone_files.append(str(adjtime_path.readlink()))
+        elif adjtime_path.exists():
+            timezone_files.append("/etc/adjtime")
+
+        timezone_path = Path("/etc/timezone")
+        if timezone_path.is_symlink():
+            timezone_files.append(str(timezone_path.readlink()))
+        elif timezone_path.exists():
+            timezone_files.append("/etc/timezone")
+
+        return timezone_files
+
+    @staticmethod
     async def export_system_config(password: str) -> Tuple[bool, str, Any]:
         """
         Handle exporting Summit RCM system configuration as a properly structured and encrypted zip
@@ -359,9 +404,12 @@ class FilesService(metaclass=Singleton):
             # encrypted archives).
             # https://docs.python.org/3/library/zipfile.html
             proc = await asyncio.create_subprocess_shell(
-                f"cd {definition.FILEDIR_DICT.get('config')} && "
-                f"{ZIP} --symlinks --password {password} -9 -r {CONFIG_TMP_ARCHIVE_FILE} "
-                f"summit-rcm/* NetworkManager/certs/* NetworkManager/system-connections/*",
+                f"cd / && {ZIP} --symlinks --password {password} -9 -r {CONFIG_TMP_ARCHIVE_FILE} "
+                "/etc/summit-rcm/summit-rcm-settings.ini "
+                "/etc/NetworkManager/certs/* "
+                "/etc/NetworkManager/system-connections/* "
+                f"{' '.join(FilesService.get_timezone_file_paths())} "
+                f"{' '.join(FilesService.get_other_config_files())}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -397,8 +445,7 @@ class FilesService(metaclass=Singleton):
         try:
             # Test that the file is encrypted
             proc = await asyncio.create_subprocess_shell(
-                f"cd {definition.FILEDIR_DICT.get('config')} && "
-                f"{UNZIP} -P 1234 -t {CONFIG_TMP_ARCHIVE_FILE}",
+                f"cd / && {UNZIP} -P 1234 -t {CONFIG_TMP_ARCHIVE_FILE}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -413,8 +460,7 @@ class FilesService(metaclass=Singleton):
 
             # Test that the password is correct
             proc = await asyncio.create_subprocess_shell(
-                f"cd {definition.FILEDIR_DICT.get('config')} && "
-                f"{UNZIP} -P {password} -t {CONFIG_TMP_ARCHIVE_FILE}",
+                f"cd / && {UNZIP} -P {password} -t {CONFIG_TMP_ARCHIVE_FILE}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -429,8 +475,11 @@ class FilesService(metaclass=Singleton):
 
             # Remove current config settings
             proc = await asyncio.create_subprocess_shell(
-                f"cd {definition.FILEDIR_DICT.get('config')} && "
-                f"rm -fr NetworkManager/system-connections/* NetworkManager/certs/* summit-rcm/*",
+                f"cd / && rm -fr /etc/NetworkManager/system-connections/* "
+                "/etc/NetworkManager/certs/* "
+                "/etc/summit-rcm/summit-rcm-settings.ini "
+                f"{' '.join(FilesService.get_timezone_file_paths())} "
+                f"{' '.join(FilesService.get_other_config_files())}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -448,8 +497,7 @@ class FilesService(metaclass=Singleton):
             # encrypted archives).
             # https://docs.python.org/3/library/zipfile.html
             proc = await asyncio.create_subprocess_shell(
-                f"cd {definition.FILEDIR_DICT.get('config')} && "
-                f"{UNZIP} -P {password} -o {CONFIG_TMP_ARCHIVE_FILE}",
+                f"cd / && {UNZIP} -P {password} -o {CONFIG_TMP_ARCHIVE_FILE}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
