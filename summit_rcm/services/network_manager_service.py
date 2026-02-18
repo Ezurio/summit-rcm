@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Tuple
 from enum import IntFlag, IntEnum, unique
 import os
+from re import search
 
 try:
     from dbus_fast import Message, MessageType, Variant
@@ -746,6 +747,32 @@ class NM80211ApSecurityFlags(IntFlag):
     BIP-GMAC-256 group management frame is supported
     """
 
+    @staticmethod
+    def flags_to_list(value: int) -> List[str]:
+        """
+        Convert a bitfield of flags into a list of flag names.
+
+        :param value: The bitfield value to convert
+        :return: A list of flag names corresponding to the set bits in the input value
+        """
+        PREFIX = "NM_802_11_AP_SEC_"
+
+        if value == 0:
+            return []
+        list_of_flags = []
+        for n in sorted(dir(NM80211ApSecurityFlags)):
+            if not search("^[A-Z0-9_]+$", n):
+                continue
+            flag_value = getattr(NM80211ApSecurityFlags, n)
+            if value & flag_value:
+                list_of_flags.append(n.removeprefix(PREFIX))
+                value &= ~flag_value
+                if value == 0:
+                    break
+        if value != 0:
+            list_of_flags.append(hex(value))
+        return list_of_flags
+
 
 @unique
 class NM80211ApFlags(IntFlag):
@@ -782,6 +809,32 @@ class NM80211ApFlags(IntFlag):
     """
     Access point has P2P IE
     """
+
+    @staticmethod
+    def flags_to_list(value: int) -> List[str]:
+        """
+        Convert a bitfield of flags into a list of flag names.
+
+        :param value: The bitfield value to convert
+        :return: A list of flag names corresponding to the set bits in the input value
+        """
+        PREFIX = "NM_802_11_AP_FLAGS_"
+
+        if value == 0:
+            return []
+        list_of_flags = []
+        for n in sorted(dir(NM80211ApFlags)):
+            if not search("^[A-Z0-9_]+$", n):
+                continue
+            flag_value = getattr(NM80211ApFlags, n)
+            if value & flag_value:
+                list_of_flags.append(n.removeprefix(PREFIX))
+                value &= ~flag_value
+                if value == 0:
+                    break
+        if value != 0:
+            list_of_flags.append(hex(value))
+        return list_of_flags
 
 
 @unique
@@ -1929,11 +1982,20 @@ NM_PROPERTY_CONVERTER_NAMES: Dict[str, NetworkManagerPropertyConverter] = {
         legacy="Maxbitrate", non_legacy="maxBitrate"
     ),
     "Flags": NetworkManagerPropertyConverter(legacy="Flags", non_legacy="flags"),
+    "FlagsList": NetworkManagerPropertyConverter(
+        legacy="FlagsList", non_legacy="flagsList"
+    ),
     "WpaFlags": NetworkManagerPropertyConverter(
         legacy="Wpaflags", non_legacy="wpaFlags"
     ),
+    "WpaFlagsList": NetworkManagerPropertyConverter(
+        legacy="WpaFlagsList", non_legacy="wpaFlagsList"
+    ),
     "RsnFlags": NetworkManagerPropertyConverter(
         legacy="Rsnflags", non_legacy="rsnFlags"
+    ),
+    "RsnFlagsList": NetworkManagerPropertyConverter(
+        legacy="RsnFlagsList", non_legacy="rsnFlagsList"
     ),
     "Bandwidth": NetworkManagerPropertyConverter(
         legacy="Bandwidth", non_legacy="bandwidth"
@@ -1992,9 +2054,94 @@ NM_PROPERTY_CONVERTER_NAMES: Dict[str, NetworkManagerPropertyConverter] = {
     "LastScan": NetworkManagerPropertyConverter(
         legacy="LastScan", non_legacy="lastScan"
     ),
-    "interface-name": NetworkManagerPropertyConverter(
-        legacy="interface-name", non_legacy="interfaceName"
+
+    # Properties from NM.SettingConnection
+    "auth-retries": NetworkManagerPropertyConverter(
+        legacy="auth-retries", non_legacy="auth-retries"
     ),
+    "autoconnect": NetworkManagerPropertyConverter(
+        legacy="autoconnect", non_legacy="autoconnect"
+    ),
+    "autoconnect-ports": NetworkManagerPropertyConverter(
+        legacy="autoconnect-ports", non_legacy="autoconnect-ports"
+    ),
+    "autoconnect-priority": NetworkManagerPropertyConverter(
+        legacy="autoconnect-priority", non_legacy="autoconnect-priority"
+    ),
+    "autoconnect-retries": NetworkManagerPropertyConverter(
+        legacy="autoconnect-retries", non_legacy="autoconnect-retries"
+    ),
+    "autoconnect-slaves": NetworkManagerPropertyConverter(
+        legacy="autoconnect-slaves", non_legacy="autoconnect-slaves"
+    ),
+    "controller": NetworkManagerPropertyConverter(
+        legacy="controller", non_legacy="controller"
+    ),
+    "dns-over-tls": NetworkManagerPropertyConverter(
+        legacy="dns-over-tls", non_legacy="dns-over-tls"
+    ),
+    "down-on-poweroff": NetworkManagerPropertyConverter(
+        legacy="down-on-poweroff", non_legacy="down-on-poweroff"
+    ),
+    "gateway-ping-timeout": NetworkManagerPropertyConverter(
+        legacy="gateway-ping-timeout", non_legacy="gateway-ping-timeout"
+    ),
+    "id": NetworkManagerPropertyConverter(legacy="id", non_legacy="id"),
+    "interface-name": NetworkManagerPropertyConverter(
+        legacy="interface-name", non_legacy="interface-name"
+    ),
+    "ip-ping-addresses": NetworkManagerPropertyConverter(
+        legacy="ip-ping-addresses", non_legacy="ip-ping-addresses"
+    ),
+    "ip-ping-addresses-require-all": NetworkManagerPropertyConverter(
+        legacy="ip-ping-addresses-require-all",
+        non_legacy="ip-ping-addresses-require-all",
+    ),
+    "ip-ping-timeout": NetworkManagerPropertyConverter(
+        legacy="ip-ping-timeout", non_legacy="ip-ping-timeout"
+    ),
+    "lldp": NetworkManagerPropertyConverter(legacy="lldp", non_legacy="lldp"),
+    "llmnr": NetworkManagerPropertyConverter(legacy="llmnr", non_legacy="llmnr"),
+    "master": NetworkManagerPropertyConverter(legacy="master", non_legacy="master"),
+    "mdns": NetworkManagerPropertyConverter(legacy="mdns", non_legacy="mdns"),
+    "metered": NetworkManagerPropertyConverter(legacy="metered", non_legacy="metered"),
+    "mptcp-flags": NetworkManagerPropertyConverter(
+        legacy="mptcp-flags", non_legacy="mptcp-flags"
+    ),
+    "mud-url": NetworkManagerPropertyConverter(legacy="mud-url", non_legacy="mud-url"),
+    "multi-connect": NetworkManagerPropertyConverter(
+        legacy="multi-connect", non_legacy="multi-connect"
+    ),
+    "permissions": NetworkManagerPropertyConverter(
+        legacy="permissions", non_legacy="permissions"
+    ),
+    "port-type": NetworkManagerPropertyConverter(
+        legacy="port-type", non_legacy="port-type"
+    ),
+    "read-only": NetworkManagerPropertyConverter(
+        legacy="read-only", non_legacy="read-only"
+    ),
+    "secondaries": NetworkManagerPropertyConverter(
+        legacy="secondaries", non_legacy="secondaries"
+    ),
+    "slave-type": NetworkManagerPropertyConverter(
+        legacy="slave-type", non_legacy="slave-type"
+    ),
+    "stable-id": NetworkManagerPropertyConverter(
+        legacy="stable-id", non_legacy="stable-id"
+    ),
+    "timestamp": NetworkManagerPropertyConverter(
+        legacy="timestamp", non_legacy="timestamp"
+    ),
+    "type": NetworkManagerPropertyConverter(legacy="type", non_legacy="type"),
+    "uuid": NetworkManagerPropertyConverter(legacy="uuid", non_legacy="uuid"),
+    "wait-activation-delay": NetworkManagerPropertyConverter(
+        legacy="wait-activation-delay", non_legacy="wait-activation-delay"
+    ),
+    "wait-device-timeout": NetworkManagerPropertyConverter(
+        legacy="wait-device-timeout", non_legacy="wait-device-timeout"
+    ),
+    "zone": NetworkManagerPropertyConverter(legacy="zone", non_legacy="zone"),
     "connection_active": NetworkManagerPropertyConverter(
         legacy="connection_active", non_legacy="activeConnection"
     ),
@@ -2057,6 +2204,531 @@ NM_PROPERTY_CONVERTER_NAMES: Dict[str, NetworkManagerPropertyConverter] = {
     ),
     "InterfaceFlags": NetworkManagerPropertyConverter(
         legacy="interface_flags", non_legacy="interfaceFlags"
+    ),
+
+    # Properties from DHCP4 options
+    "subnet_mask": NetworkManagerPropertyConverter(
+        legacy="subnet_mask", non_legacy="subnetMask"
+    ),
+    "time_offset": NetworkManagerPropertyConverter(
+        legacy="time_offset", non_legacy="timeOffset"
+    ),
+    "domain_name_servers": NetworkManagerPropertyConverter(
+        legacy="domain_name_servers", non_legacy="domainNameServers"
+    ),
+    "host_name": NetworkManagerPropertyConverter(
+        legacy="host_name", non_legacy="hostName"
+    ),
+    "domain_name": NetworkManagerPropertyConverter(
+        legacy="domain_name", non_legacy="domainName"
+    ),
+    "interface_mtu": NetworkManagerPropertyConverter(
+        legacy="interface_mtu", non_legacy="interfaceMtu"
+    ),
+    "broadcast_address": NetworkManagerPropertyConverter(
+        legacy="broadcast_address", non_legacy="broadcastAddress"
+    ),
+    "rfc3442_classless_static_routes": NetworkManagerPropertyConverter(
+        legacy="rfc3442_classless_static_routes",
+        non_legacy="rfc3442ClasslessStaticRoutes",
+    ),
+    "routers": NetworkManagerPropertyConverter(legacy="routers", non_legacy="routers"),
+    "static_routes": NetworkManagerPropertyConverter(
+        legacy="static_routes", non_legacy="staticRoutes"
+    ),
+    "nis_domain": NetworkManagerPropertyConverter(
+        legacy="nis_domain", non_legacy="nisDomain"
+    ),
+    "nis_servers": NetworkManagerPropertyConverter(
+        legacy="nis_servers", non_legacy="nisServers"
+    ),
+    "ntp_servers": NetworkManagerPropertyConverter(
+        legacy="ntp_servers", non_legacy="ntpServers"
+    ),
+    "dhcp_server_identifier": NetworkManagerPropertyConverter(
+        legacy="dhcp_server_identifier", non_legacy="dhcpServerIdentifier"
+    ),
+    "domain_search": NetworkManagerPropertyConverter(
+        legacy="domain_search", non_legacy="domainSearch"
+    ),
+    "ms_classless_static_routes": NetworkManagerPropertyConverter(
+        legacy="ms_classless_static_routes", non_legacy="msClasslessStaticRoutes"
+    ),
+    "wpad": NetworkManagerPropertyConverter(legacy="wpad", non_legacy="wpad"),
+    "root_path": NetworkManagerPropertyConverter(
+        legacy="root_path", non_legacy="rootPath"
+    ),
+    "time_servers": NetworkManagerPropertyConverter(
+        legacy="time_servers", non_legacy="timeServers"
+    ),
+    "ien116_name_servers": NetworkManagerPropertyConverter(
+        legacy="ien116_name_servers", non_legacy="ien116NameServers"
+    ),
+    "log_servers": NetworkManagerPropertyConverter(
+        legacy="log_servers", non_legacy="logServers"
+    ),
+    "cookie_servers": NetworkManagerPropertyConverter(
+        legacy="cookie_servers", non_legacy="cookieServers"
+    ),
+    "lpr_servers": NetworkManagerPropertyConverter(
+        legacy="lpr_servers", non_legacy="lprServers"
+    ),
+    "impress_servers": NetworkManagerPropertyConverter(
+        legacy="impress_servers", non_legacy="impressServers"
+    ),
+    "resource_location_servers": NetworkManagerPropertyConverter(
+        legacy="resource_location_servers", non_legacy="resourceLocationServers"
+    ),
+    "boot_size": NetworkManagerPropertyConverter(
+        legacy="boot_size", non_legacy="bootSize"
+    ),
+    "merit_dump": NetworkManagerPropertyConverter(
+        legacy="merit_dump", non_legacy="meritDump"
+    ),
+    "swap_server": NetworkManagerPropertyConverter(
+        legacy="swap_server", non_legacy="swapServer"
+    ),
+    "extensions_path": NetworkManagerPropertyConverter(
+        legacy="extensions_path", non_legacy="extensionsPath"
+    ),
+    "ip_forwarding": NetworkManagerPropertyConverter(
+        legacy="ip_forwarding", non_legacy="ipForwarding"
+    ),
+    "non_local_source_routing": NetworkManagerPropertyConverter(
+        legacy="non_local_source_routing", non_legacy="nonLocalSourceRouting"
+    ),
+    "policy_filter": NetworkManagerPropertyConverter(
+        legacy="policy_filter", non_legacy="policyFilter"
+    ),
+    "max_dgram_reassembly": NetworkManagerPropertyConverter(
+        legacy="max_dgram_reassembly", non_legacy="maxDgramReassembly"
+    ),
+    "default_ip_ttl": NetworkManagerPropertyConverter(
+        legacy="default_ip_ttl", non_legacy="defaultIpTtl"
+    ),
+    "path_mtu_aging_timeout": NetworkManagerPropertyConverter(
+        legacy="path_mtu_aging_timeout", non_legacy="pathMtuAgingTimeout"
+    ),
+    "path_mtu_plateau_table": NetworkManagerPropertyConverter(
+        legacy="path_mtu_plateau_table", non_legacy="pathMtuPlateauTable"
+    ),
+    "all_subnets_local": NetworkManagerPropertyConverter(
+        legacy="all_subnets_local", non_legacy="allSubnetsLocal"
+    ),
+    "perform_mask_discovery": NetworkManagerPropertyConverter(
+        legacy="perform_mask_discovery", non_legacy="performMaskDiscovery"
+    ),
+    "mask_supplier": NetworkManagerPropertyConverter(
+        legacy="mask_supplier", non_legacy="maskSupplier"
+    ),
+    "router_discovery": NetworkManagerPropertyConverter(
+        legacy="router_discovery", non_legacy="routerDiscovery"
+    ),
+    "router_solicitation_address": NetworkManagerPropertyConverter(
+        legacy="router_solicitation_address", non_legacy="routerSolicitationAddress"
+    ),
+    "trailer_encapsulation": NetworkManagerPropertyConverter(
+        legacy="trailer_encapsulation", non_legacy="trailerEncapsulation"
+    ),
+    "arp_cache_timeout": NetworkManagerPropertyConverter(
+        legacy="arp_cache_timeout", non_legacy="arpCacheTimeout"
+    ),
+    "ieee802_3_encapsulation": NetworkManagerPropertyConverter(
+        legacy="ieee802_3_encapsulation", non_legacy="ieee802_3_encapsulation"
+    ),
+    "default_tcp_ttl": NetworkManagerPropertyConverter(
+        legacy="default_tcp_ttl", non_legacy="defaultTcpTtl"
+    ),
+    "tcp_keepalive_internal": NetworkManagerPropertyConverter(
+        legacy="tcp_keepalive_internal", non_legacy="tcpKeepaliveInternal"
+    ),
+    "tcp_keepalive_garbage": NetworkManagerPropertyConverter(
+        legacy="tcp_keepalive_garbage", non_legacy="tcpKeepaliveGarbage"
+    ),
+    "vendor_encapsulated_options": NetworkManagerPropertyConverter(
+        legacy="vendor_encapsulated_options", non_legacy="vendorEncapsulatedOptions"
+    ),
+    "netbios_name_servers": NetworkManagerPropertyConverter(
+        legacy="netbios_name_servers", non_legacy="netbiosNameServers"
+    ),
+    "netbios_dd_server": NetworkManagerPropertyConverter(
+        legacy="netbios_dd_server", non_legacy="netbiosDdServer"
+    ),
+    "font_servers": NetworkManagerPropertyConverter(
+        legacy="font_servers", non_legacy="fontServers"
+    ),
+    "x_display_manager": NetworkManagerPropertyConverter(
+        legacy="x_display_manager", non_legacy="xDisplayManager"
+    ),
+    "dhcp_lease_time": NetworkManagerPropertyConverter(
+        legacy="dhcp_lease_time", non_legacy="dhcpLeaseTime"
+    ),
+    "dhcp_renewal_time": NetworkManagerPropertyConverter(
+        legacy="dhcp_renewal_time", non_legacy="dhcpRenewalTime"
+    ),
+    "dhcp_rebinding_time": NetworkManagerPropertyConverter(
+        legacy="dhcp_rebinding_time", non_legacy="dhcpRebindingTime"
+    ),
+    "dhcp_client_identifier": NetworkManagerPropertyConverter(
+        legacy="dhcp_client_identifier", non_legacy="dhcpClientIdentifier"
+    ),
+    "tcode": NetworkManagerPropertyConverter(legacy="tcode", non_legacy="tcode"),
+    "nwip_domain": NetworkManagerPropertyConverter(
+        legacy="nwip_domain", non_legacy="nwipDomain"
+    ),
+    "nwip_suboptions": NetworkManagerPropertyConverter(
+        legacy="nwip_suboptions", non_legacy="nwipSuboptions"
+    ),
+    "nisplus_domain": NetworkManagerPropertyConverter(
+        legacy="nisplus_domain", non_legacy="nisplusDomain"
+    ),
+    "nisplus_servers": NetworkManagerPropertyConverter(
+        legacy="nisplus_servers", non_legacy="nisplusServers"
+    ),
+    "tftp_server_name": NetworkManagerPropertyConverter(
+        legacy="tftp_server_name", non_legacy="tftpServerName"
+    ),
+    "bootfile_name": NetworkManagerPropertyConverter(
+        legacy="bootfile_name", non_legacy="bootfileName"
+    ),
+    "mobile_ip_home_agent": NetworkManagerPropertyConverter(
+        legacy="mobile_ip_home_agent", non_legacy="mobileIpHomeAgent"
+    ),
+    "smtp_server": NetworkManagerPropertyConverter(
+        legacy="smtp_server", non_legacy="smtpServer"
+    ),
+    "pop_server": NetworkManagerPropertyConverter(
+        legacy="pop_server", non_legacy="popServer"
+    ),
+    "nntp_server": NetworkManagerPropertyConverter(
+        legacy="nntp_server", non_legacy="nntpServer"
+    ),
+    "www_server": NetworkManagerPropertyConverter(
+        legacy="www_server", non_legacy="wwwServer"
+    ),
+    "finger_server": NetworkManagerPropertyConverter(
+        legacy="finger_server", non_legacy="fingerServer"
+    ),
+    "irc_server": NetworkManagerPropertyConverter(
+        legacy="irc_server", non_legacy="ircServer"
+    ),
+    "streettalk_server": NetworkManagerPropertyConverter(
+        legacy="streettalk_server", non_legacy="streettalkServer"
+    ),
+    "streettalk_directory_assistance_server": NetworkManagerPropertyConverter(
+        legacy="streettalk_directory_assistance_server",
+        non_legacy="streettalkDirectoryAssistanceServer",
+    ),
+    "slp_directory_agent": NetworkManagerPropertyConverter(
+        legacy="slp_directory_agent", non_legacy="slpDirectoryAgent"
+    ),
+    "slp_service_scope": NetworkManagerPropertyConverter(
+        legacy="slp_service_scope", non_legacy="slpServiceScope"
+    ),
+    "fqdn": NetworkManagerPropertyConverter(legacy="fqdn", non_legacy="fqdn"),
+    "relay_agent_information": NetworkManagerPropertyConverter(
+        legacy="relay_agent_information", non_legacy="relayAgentInformation"
+    ),
+    "nds_servers": NetworkManagerPropertyConverter(
+        legacy="nds_servers", non_legacy="ndsServers"
+    ),
+    "nds_tree_name": NetworkManagerPropertyConverter(
+        legacy="nds_tree_name", non_legacy="ndsTreeName"
+    ),
+    "nds_context": NetworkManagerPropertyConverter(
+        legacy="nds_context", non_legacy="ndsContext"
+    ),
+    "bcms_controller_names": NetworkManagerPropertyConverter(
+        legacy="bcms_controller_names", non_legacy="bcmsControllerNames"
+    ),
+    "bcms_controller_address": NetworkManagerPropertyConverter(
+        legacy="bcms_controller_address", non_legacy="bcmsControllerAddress"
+    ),
+    "client_last_transaction_time": NetworkManagerPropertyConverter(
+        legacy="client_last_transaction_time", non_legacy="clientLastTransactionTime"
+    ),
+    "associated_ip": NetworkManagerPropertyConverter(
+        legacy="associated_ip", non_legacy="associatedIp"
+    ),
+    "pxe_system_id": NetworkManagerPropertyConverter(
+        legacy="pxe_system_id", non_legacy="pxeSystemId"
+    ),
+    "pxe_interface_id": NetworkManagerPropertyConverter(
+        legacy="pxe_interface_id", non_legacy="pxeInterfaceId"
+    ),
+    "pxe_client_id": NetworkManagerPropertyConverter(
+        legacy="pxe_client_id", non_legacy="pxeClientId"
+    ),
+    "uap_servers": NetworkManagerPropertyConverter(
+        legacy="uap_servers", non_legacy="uapServers"
+    ),
+    "geoconf_civic": NetworkManagerPropertyConverter(
+        legacy="geoconf_civic", non_legacy="geoconfCivic"
+    ),
+    "ipv6_only_preferred": NetworkManagerPropertyConverter(
+        legacy="ipv6_only_preferred", non_legacy="ipv6OnlyPreferred"
+    ),
+    "netinfo_server_address": NetworkManagerPropertyConverter(
+        legacy="netinfo_server_address", non_legacy="netinfoServerAddress"
+    ),
+    "netinfo_server_tag": NetworkManagerPropertyConverter(
+        legacy="netinfo_server_tag", non_legacy="netinfoServerTag"
+    ),
+    "default_url": NetworkManagerPropertyConverter(
+        legacy="default_url", non_legacy="defaultUrl"
+    ),
+    "auto_config": NetworkManagerPropertyConverter(
+        legacy="auto_config", non_legacy="autoConfig"
+    ),
+    "name_service_search": NetworkManagerPropertyConverter(
+        legacy="name_service_search", non_legacy="nameServiceSearch"
+    ),
+    "subnet_selection": NetworkManagerPropertyConverter(
+        legacy="subnet_selection", non_legacy="subnetSelection"
+    ),
+    "vivco": NetworkManagerPropertyConverter(legacy="vivco", non_legacy="vivco"),
+    "vivso": NetworkManagerPropertyConverter(legacy="vivso", non_legacy="vivso"),
+    "pana_agent": NetworkManagerPropertyConverter(
+        legacy="pana_agent", non_legacy="panaAgent"
+    ),
+    "v4_lost": NetworkManagerPropertyConverter(legacy="v4_lost", non_legacy="v4Lost"),
+    "sip_ua_cs_domains": NetworkManagerPropertyConverter(
+        legacy="sip_ua_cs_domains", non_legacy="sipUaCsDomains"
+    ),
+    "ipv4_address_andsf": NetworkManagerPropertyConverter(
+        legacy="ipv4_address_andsf", non_legacy="ipv4AddressAndsf"
+    ),
+    "rndss_selection": NetworkManagerPropertyConverter(
+        legacy="rndss_selection", non_legacy="rndssSelection"
+    ),
+    "tftp_server_address": NetworkManagerPropertyConverter(
+        legacy="tftp_server_address", non_legacy="tftpServerAddress"
+    ),
+    "v4_portparams": NetworkManagerPropertyConverter(
+        legacy="v4_portparams", non_legacy="v4Portparams"
+    ),
+    "v4_captive_portal": NetworkManagerPropertyConverter(
+        legacy="v4_captive_portal", non_legacy="v4CaptivePortal"
+    ),
+    "mud_url": NetworkManagerPropertyConverter(legacy="mud_url", non_legacy="mudUrl"),
+    "loader_configfile": NetworkManagerPropertyConverter(
+        legacy="loader_configfile", non_legacy="loaderConfigfile"
+    ),
+    "loader_pathprefix": NetworkManagerPropertyConverter(
+        legacy="loader_pathprefix", non_legacy="loaderPathprefix"
+    ),
+    "loader_reboottime": NetworkManagerPropertyConverter(
+        legacy="loader_reboottime", non_legacy="loaderReboottime"
+    ),
+    "option_6rd": NetworkManagerPropertyConverter(
+        legacy="option_6rd", non_legacy="option6rd"
+    ),
+    "v4_access_domain": NetworkManagerPropertyConverter(
+        legacy="v4_access_domain", non_legacy="v4AccessDomain"
+    ),
+    "private_224": NetworkManagerPropertyConverter(
+        legacy="private_224", non_legacy="private224"
+    ),
+    "private_225": NetworkManagerPropertyConverter(
+        legacy="private_225", non_legacy="private225"
+    ),
+    "private_226": NetworkManagerPropertyConverter(
+        legacy="private_226", non_legacy="private226"
+    ),
+    "private_227": NetworkManagerPropertyConverter(
+        legacy="private_227", non_legacy="private227"
+    ),
+    "private_228": NetworkManagerPropertyConverter(
+        legacy="private_228", non_legacy="private228"
+    ),
+    "private_229": NetworkManagerPropertyConverter(
+        legacy="private_229", non_legacy="private229"
+    ),
+    "private_230": NetworkManagerPropertyConverter(
+        legacy="private_230", non_legacy="private230"
+    ),
+    "private_231": NetworkManagerPropertyConverter(
+        legacy="private_231", non_legacy="private231"
+    ),
+    "private_232": NetworkManagerPropertyConverter(
+        legacy="private_232", non_legacy="private232"
+    ),
+    "private_233": NetworkManagerPropertyConverter(
+        legacy="private_233", non_legacy="private233"
+    ),
+    "private_234": NetworkManagerPropertyConverter(
+        legacy="private_234", non_legacy="private234"
+    ),
+    "private_235": NetworkManagerPropertyConverter(
+        legacy="private_235", non_legacy="private235"
+    ),
+    "private_236": NetworkManagerPropertyConverter(
+        legacy="private_236", non_legacy="private236"
+    ),
+    "private_237": NetworkManagerPropertyConverter(
+        legacy="private_237", non_legacy="private237"
+    ),
+    "private_238": NetworkManagerPropertyConverter(
+        legacy="private_238", non_legacy="private238"
+    ),
+    "private_239": NetworkManagerPropertyConverter(
+        legacy="private_239", non_legacy="private239"
+    ),
+    "private_240": NetworkManagerPropertyConverter(
+        legacy="private_240", non_legacy="private240"
+    ),
+    "private_241": NetworkManagerPropertyConverter(
+        legacy="private_241", non_legacy="private241"
+    ),
+    "private_242": NetworkManagerPropertyConverter(
+        legacy="private_242", non_legacy="private242"
+    ),
+    "private_243": NetworkManagerPropertyConverter(
+        legacy="private_243", non_legacy="private243"
+    ),
+    "private_244": NetworkManagerPropertyConverter(
+        legacy="private_244", non_legacy="private244"
+    ),
+    "private_245": NetworkManagerPropertyConverter(
+        legacy="private_245", non_legacy="private245"
+    ),
+    "private_246": NetworkManagerPropertyConverter(
+        legacy="private_246", non_legacy="private246"
+    ),
+    "private_247": NetworkManagerPropertyConverter(
+        legacy="private_247", non_legacy="private247"
+    ),
+    "private_248": NetworkManagerPropertyConverter(
+        legacy="private_248", non_legacy="private248"
+    ),
+    "private_249": NetworkManagerPropertyConverter(
+        legacy="private_249", non_legacy="private249"
+    ),
+    "private_250": NetworkManagerPropertyConverter(
+        legacy="private_250", non_legacy="private250"
+    ),
+    "private_251": NetworkManagerPropertyConverter(
+        legacy="private_251", non_legacy="private251"
+    ),
+    "private_252": NetworkManagerPropertyConverter(
+        legacy="private_252", non_legacy="private252"
+    ),
+    "private_253": NetworkManagerPropertyConverter(
+        legacy="private_253", non_legacy="private253"
+    ),
+    "private_254": NetworkManagerPropertyConverter(
+        legacy="private_254", non_legacy="private254"
+    ),
+    "ip_address": NetworkManagerPropertyConverter(
+        legacy="ip_address", non_legacy="ipAddress"
+    ),
+    "expiry": NetworkManagerPropertyConverter(legacy="expiry", non_legacy="expiry"),
+    "next_server": NetworkManagerPropertyConverter(
+        legacy="next_server", non_legacy="nextServer"
+    ),
+    "filename": NetworkManagerPropertyConverter(
+        legacy="filename", non_legacy="filename"
+    ),
+
+    # Properties from DHCP6 options
+    "dhcp6_client_id": NetworkManagerPropertyConverter(
+        legacy="dhcp6_client_id", non_legacy="dhcp6ClientId"
+    ),
+    "dhcp6_server_id": NetworkManagerPropertyConverter(
+        legacy="dhcp6_server_id", non_legacy="dhcp6ServerId"
+    ),
+    "dhcp6_name_servers": NetworkManagerPropertyConverter(
+        legacy="dhcp6_name_servers", non_legacy="dhcp6NameServers"
+    ),
+    "dhcp6_domain_search": NetworkManagerPropertyConverter(
+        legacy="dhcp6_domain_search", non_legacy="dhcp6DomainSearch"
+    ),
+    "ip6_prefix": NetworkManagerPropertyConverter(
+        legacy="ip6_prefix", non_legacy="ip6Prefix"
+    ),
+    "dhcp6_sntp_servers": NetworkManagerPropertyConverter(
+        legacy="dhcp6_sntp_servers", non_legacy="dhcp6SntpServers"
+    ),
+    "fqdn_fqdn": NetworkManagerPropertyConverter(
+        legacy="fqdn_fqdn", non_legacy="fqdnFqdn"
+    ),
+    "dhcp_ntp_servers": NetworkManagerPropertyConverter(
+        legacy="dhcp_ntp_servers", non_legacy="dhcpNtpServers"
+    ),
+    "dhcp6_mud_url": NetworkManagerPropertyConverter(
+        legacy="dhcp6_mud_url", non_legacy="dhcp6MudUrl"
+    ),
+    "ip6_address": NetworkManagerPropertyConverter(
+        legacy="ip6_address", non_legacy="ip6Address"
+    ),
+    "ip6_prefixlen": NetworkManagerPropertyConverter(
+        legacy="ip6_prefixlen", non_legacy="ip6Prefixlen"
+    ),
+    "preferred_life": NetworkManagerPropertyConverter(
+        legacy="preferred_life", non_legacy="preferredLife"
+    ),
+    "max_life": NetworkManagerPropertyConverter(
+        legacy="max_life", non_legacy="maxLife"
+    ),
+    "starts": NetworkManagerPropertyConverter(legacy="starts", non_legacy="starts"),
+    "life_starts": NetworkManagerPropertyConverter(
+        legacy="life_starts", non_legacy="lifeStarts"
+    ),
+    "renew": NetworkManagerPropertyConverter(legacy="renew", non_legacy="renew"),
+    "rebind": NetworkManagerPropertyConverter(legacy="rebind", non_legacy="rebind"),
+    "iaid": NetworkManagerPropertyConverter(legacy="iaid", non_legacy="iaid"),
+    "requested_broadcast_address": NetworkManagerPropertyConverter(
+        legacy="requested_broadcast_address", non_legacy="requestedBroadcastAddress"
+    ),
+    "requested_domain_name": NetworkManagerPropertyConverter(
+        legacy="requested_domain_name", non_legacy="requestedDomainName"
+    ),
+    "requested_domain_name_servers": NetworkManagerPropertyConverter(
+        legacy="requested_domain_name_servers", non_legacy="requestedDomainNameServers"
+    ),
+    "requested_domain_search": NetworkManagerPropertyConverter(
+        legacy="requested_domain_search", non_legacy="requestedDomainSearch"
+    ),
+    "requested_host_name": NetworkManagerPropertyConverter(
+        legacy="requested_host_name", non_legacy="requestedHostName"
+    ),
+    "requested_interface_mtu": NetworkManagerPropertyConverter(
+        legacy="requested_interface_mtu", non_legacy="requestedInterfaceMtu"
+    ),
+    "requested_ms_classless_static_routes": NetworkManagerPropertyConverter(
+        legacy="requested_ms_classless_static_routes",
+        non_legacy="requestedMsClasslessStaticRoutes",
+    ),
+    "requested_nis_domain": NetworkManagerPropertyConverter(
+        legacy="requested_nis_domain", non_legacy="requestedNisDomain"
+    ),
+    "requested_nis_servers": NetworkManagerPropertyConverter(
+        legacy="requested_nis_servers", non_legacy="requestedNisServers"
+    ),
+    "requested_ntp_servers": NetworkManagerPropertyConverter(
+        legacy="requested_ntp_servers", non_legacy="requestedNtpServers"
+    ),
+    "requested_rfc3442_classless_static_routes": NetworkManagerPropertyConverter(
+        legacy="requested_rfc3442_classless_static_routes",
+        non_legacy="requestedRfc3442ClasslessStaticRoutes",
+    ),
+    "requested_root_path": NetworkManagerPropertyConverter(
+        legacy="requested_root_path", non_legacy="requestedRootPath"
+    ),
+    "requested_routers": NetworkManagerPropertyConverter(
+        legacy="requested_routers", non_legacy="requestedRouters"
+    ),
+    "requested_static_routes": NetworkManagerPropertyConverter(
+        legacy="requested_static_routes", non_legacy="requestedStaticRoutes"
+    ),
+    "requested_subnet_mask": NetworkManagerPropertyConverter(
+        legacy="requested_subnet_mask", non_legacy="requestedSubnetMask"
+    ),
+    "requested_time_offset": NetworkManagerPropertyConverter(
+        legacy="requested_time_offset", non_legacy="requestedTimeOffset"
+    ),
+    "requested_wpad": NetworkManagerPropertyConverter(
+        legacy="requested_wpad", non_legacy="requestedWpad"
     ),
 }
 """
@@ -2799,11 +3471,18 @@ class NetworkManagerService(object, metaclass=Singleton):
             ap_properties["Flags"] = ap_props.get(
                 "Flags", NM80211ApFlags.NM_802_11_AP_FLAGS_NONE
             )
+            ap_properties["FlagsList"] = NM80211ApFlags.flags_to_list(ap_properties["Flags"])
             ap_properties["WpaFlags"] = ap_props.get(
                 "WpaFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
             )
+            ap_properties["WpaFlagsList"] = NM80211ApSecurityFlags.flags_to_list(
+                ap_properties["WpaFlags"]
+            )
             ap_properties["RsnFlags"] = ap_props.get(
                 "RsnFlags", NM80211ApSecurityFlags.NM_802_11_AP_SEC_NONE
+            )
+            ap_properties["RsnFlagsList"] = NM80211ApSecurityFlags.flags_to_list(
+                ap_properties["RsnFlags"]
             )
             ap_properties["Bandwidth"] = ap_props.get("Bandwidth", 0)
             mode = int(
@@ -2932,7 +3611,8 @@ class NetworkManagerService(object, metaclass=Singleton):
             if is_legacy:
                 ipconfig_properties["Routes"] = routes
             ipconfig_properties["RouteData"] = route_data
-            ipconfig_properties["Gateway"] = props.get("Gateway", "")
+            gateway = props.get("Gateway", None)
+            ipconfig_properties["Gateway"] = None if gateway == "" else gateway
             ipconfig_properties["Domains"] = []
             props_domains = (
                 props["Domains"] if props.get("Domains", None) is not None else []
@@ -3036,7 +3716,8 @@ class NetworkManagerService(object, metaclass=Singleton):
             if is_legacy:
                 ipconfig_properties["Routes"] = routes
             ipconfig_properties["RouteData"] = route_data
-            ipconfig_properties["Gateway"] = props.get("Gateway", "")
+            gateway = props.get("Gateway", None)
+            ipconfig_properties["Gateway"] = None if gateway == "" else gateway
             ipconfig_properties["Domains"] = []
             props_domains = (
                 props["Domains"] if props.get("Domains", None) is not None else []
@@ -3051,7 +3732,14 @@ class NetworkManagerService(object, metaclass=Singleton):
             )
             for nameserver in props_nameservers:
                 ipconfig_properties["NameserverData"].append(
-                    inet_ntop(AF_INET6, nameserver)
+                    inet_ntop(
+                        AF_INET6,
+                        (
+                            bytearray.fromhex(nameserver)
+                            if isinstance(nameserver, str)
+                            else nameserver
+                        ),
+                    )
                 )
             if is_legacy:
                 # Legacy WebLCM included a 'WinsServerData' entry, but this data is not exposed via
@@ -3077,11 +3765,17 @@ class NetworkManagerService(object, metaclass=Singleton):
         try:
             options = props.get("Options", None)
             if options is not None:
-                dhcpconfig_properties["Options"] = {}
-                for option in options:
-                    dhcpconfig_properties["Options"][
-                        option if is_legacy else to_camel_case(option)
-                    ] = variant_to_python(options[option])
+                if is_legacy:
+                    for option in options:
+                        dhcpconfig_properties[option] = variant_to_python(
+                            options[option]
+                        )
+                else:
+                    dhcpconfig_properties["Options"] = {}
+                    for option in options:
+                        dhcpconfig_properties["Options"][to_camel_case(option)] = (
+                            variant_to_python(options[option])
+                        )
         except Exception as ex:
             syslog(f"Error retrieving DHCP config properties: {str(ex)}")
             return {}
@@ -3230,7 +3924,7 @@ class NetworkManagerService(object, metaclass=Singleton):
 
         return converted_dict
 
-    async def get_status(
+    async def get_status_internal(
         self, is_legacy: bool = False, timeout: Optional[float] = None
     ) -> dict:
         """
@@ -3310,41 +4004,33 @@ class NetworkManagerService(object, metaclass=Singleton):
                                     "connection_active"
                                 ] = connection_active
 
-                    status[device.device_interface_name]["Ip4Config"] = (
-                        await self.get_ip4config_properties(
-                            device.ip4_config.properties if device.ip4_config else {},
-                            is_legacy=is_legacy,
-                        )
+                status[device.device_interface_name]["Ip4Config"] = (
+                    await self.get_ip4config_properties(
+                        device.ip4_config.properties if device.ip4_config else {},
+                        is_legacy=is_legacy,
                     )
+                )
 
-                    status[device.device_interface_name]["Ip6Config"] = (
-                        await self.get_ip6config_properties(
-                            device.ip6_config.properties if device.ip6_config else {},
-                            is_legacy=is_legacy,
-                        )
+                status[device.device_interface_name]["Ip6Config"] = (
+                    await self.get_ip6config_properties(
+                        device.ip6_config.properties if device.ip6_config else {},
+                        is_legacy=is_legacy,
                     )
+                )
 
-                    status[device.device_interface_name]["Dhcp4Config"] = (
-                        await self.get_dhcp_config_properties(
-                            (
-                                device.dhcp4_config.properties
-                                if device.dhcp4_config
-                                else {}
-                            ),
-                            is_legacy=is_legacy,
-                        )
+                status[device.device_interface_name]["Dhcp4Config"] = (
+                    await self.get_dhcp_config_properties(
+                        (device.dhcp4_config.properties if device.dhcp4_config else {}),
+                        is_legacy=is_legacy,
                     )
+                )
 
-                    status[device.device_interface_name]["Dhcp6Config"] = (
-                        await self.get_dhcp_config_properties(
-                            (
-                                device.dhcp6_config.properties
-                                if device.dhcp6_config
-                                else {}
-                            ),
-                            is_legacy=is_legacy,
-                        )
+                status[device.device_interface_name]["Dhcp6Config"] = (
+                    await self.get_dhcp_config_properties(
+                        (device.dhcp6_config.properties if device.dhcp6_config else {}),
+                        is_legacy=is_legacy,
                     )
+                )
 
                 if (
                     status[device.device_interface_name]["status"].get(
@@ -3380,7 +4066,7 @@ class NetworkManagerService(object, metaclass=Singleton):
                             )
                         )
 
-        return self.convert_property_names(status, is_legacy)
+        return status
 
     async def get_interface_status(
         self, target_interface_name: str, is_legacy: bool = False
@@ -3398,7 +4084,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         ]:
             return {}
 
-        status = await self.get_status(is_legacy=is_legacy)
+        status = await self.get_status_internal(is_legacy=is_legacy)
 
         dev_properties = status.get(target_interface_name, {})
 
