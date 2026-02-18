@@ -3843,7 +3843,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         if connection.get("ipv4"):
             new_connection["ipv4"] = {}
 
-            if connection["ipv4"].get("address-data"):
+            if "address-data" in connection["ipv4"]:
                 # Found the 'address-data' property - this isn't technically the proper property
                 # name to use here (should be 'addresses'), but this is what was used in the past,
                 # so we need to support it.
@@ -3879,7 +3879,7 @@ class NetworkManagerService(object, metaclass=Singleton):
                 )
                 del connection["ipv4"]["address-data"]
 
-            if connection["ipv4"].get("dns"):
+            if "dns" in connection["ipv4"]:
                 new_connection["ipv4"]["dns"] = Variant(
                     "au",
                     [
@@ -3894,7 +3894,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         if connection.get("ipv6"):
             new_connection["ipv6"] = {}
 
-            if connection["ipv6"].get("address-data"):
+            if "address-data" in connection["ipv6"]:
                 # Found the 'address-data' property - this isn't technically the proper property
                 # name to use here (should be 'addresses'), but this is what was used in the past,
                 # so we need to support it.
@@ -3923,7 +3923,7 @@ class NetworkManagerService(object, metaclass=Singleton):
                 )
                 del connection["ipv6"]["address-data"]
 
-            if connection["ipv6"].get("dns"):
+            if "dns" in connection["ipv6"]:
                 new_connection["ipv6"]["dns"] = Variant(
                     "aay",
                     [
