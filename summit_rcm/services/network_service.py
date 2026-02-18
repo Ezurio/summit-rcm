@@ -233,9 +233,12 @@ class NetworkService(metaclass=Singleton):
         """
         Retrieve the network status information
         """
-        return await NetworkManagerService().get_status(
+        return NetworkManagerService().convert_property_names(
+            await NetworkManagerService().get_status_internal(
+                is_legacy=is_legacy,
+                timeout=NETWORK_STATUS_DBUS_TIMEOUT,
+            ),
             is_legacy=is_legacy,
-            timeout=NETWORK_STATUS_DBUS_TIMEOUT,
         )
 
     @staticmethod

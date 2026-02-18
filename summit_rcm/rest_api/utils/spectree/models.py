@@ -400,7 +400,6 @@ class AccessPoint(BaseModel):
     strength: Optional[int] = None
     maxBitrate: Optional[int] = None
     frequency: Optional[int] = None
-    channel: Optional[int] = None
     flags: Optional[int] = None
     wpaFlags: Optional[int] = None
     rsnFlags: Optional[int] = None
@@ -417,7 +416,6 @@ class AccessPointLegacy(BaseModel):
     Strength: Optional[int] = None
     MaxBitrate: Optional[int] = None
     Frequency: Optional[int] = None
-    Channel: Optional[int] = None
     Flags: Optional[int] = None
     WpaFlags: Optional[int] = None
     RsnFlags: Optional[int] = None
@@ -426,10 +424,23 @@ class AccessPointLegacy(BaseModel):
     Keymgmt: Optional[str] = None
 
 
-class ActiveAccessPoint(AccessPoint):
+class ActiveAccessPoint(BaseModel):
     """Model for an active access point"""
 
+    ssid: Optional[str] = None
+    hwAddress: Optional[str] = None
+    maxBitrate: Optional[int] = None
+    flags: Optional[int] = None
+    flagsList: Optional[List[str]] = None
+    wpaFlags: Optional[int] = None
+    wpaFlagsList: Optional[List[str]] = None
+    rsnFlags: Optional[int] = None
+    rsnFlagsList: Optional[List[str]] = None
+    bandwidth: Optional[int] = None
+    strength: Optional[int] = None
+    frequency: Optional[int] = None
     signal: Optional[float] = None
+    channel: Optional[int] = None
 
 
 class ActiveAccessPointLegacy(BaseModel):
@@ -439,12 +450,16 @@ class ActiveAccessPointLegacy(BaseModel):
     HwAddress: Optional[str] = None
     Maxbitrate: Optional[int] = None
     Flags: Optional[int] = None
-    Wpaflags: Optional[int] = None
-    Rsnflags: Optional[int] = None
+    FlagsList: Optional[List[str]] = None
+    WpaFlags: Optional[int] = None
+    WpaFlagsList: Optional[List[str]] = None
+    RsnFlags: Optional[int] = None
+    RsnFlagsList: Optional[List[str]] = None
+    Bandwidth: Optional[int] = None
     Strength: Optional[int] = None
     Frequency: Optional[int] = None
-    Channel: Optional[int] = None
     Signal: Optional[float] = None
+    Channel: Optional[int] = None
 
 
 class AccessPoints(RootModel):
@@ -3373,12 +3388,6 @@ class DhcpConfigModel(BaseModel):
     options: Optional[Dict[str, str]] = None
 
 
-class DhcpConfigModelLegacy(BaseModel):
-    """Model for the DHCP configuration (legacy)"""
-
-    Options: Optional[Dict[str, str]] = None
-
-
 class AvailableApChannel(BaseModel):
     """A WLAN channel available for use in access point (AP) mode"""
 
@@ -3515,8 +3524,8 @@ class NetworkInterfaceStatusModelLegacy(BaseModel):
     status: Optional[NetworkInterfaceStatusLegacy] = None
     ip4config: Optional[IP4ConfigModelLegacy] = None
     ip6config: Optional[IP6ConfigModelLegacy] = None
-    dhcp4config: Optional[DhcpConfigModelLegacy] = None
-    dhcp6config: Optional[DhcpConfigModelLegacy] = None
+    dhcp4config: Optional[Dict[str, str]] = None
+    dhcp6config: Optional[Dict[str, str]] = None
     wireless: Optional[NetworkInterfaceWirelessPropertiesLegacy] = None
     activeaccesspoint: Optional[ActiveAccessPointLegacy] = None
     wired: Optional[NetworkInterfaceWiredPropertiesLegacy] = None
