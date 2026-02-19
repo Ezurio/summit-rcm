@@ -6,6 +6,7 @@ from asyncio import wait_for, Lock
 from socket import inet_pton, inet_ntop, AF_INET, AF_INET6
 from sys import byteorder
 from syslog import LOG_ERR, syslog
+from types import MappingProxyType
 from typing import Any, Dict, List, Optional, Tuple
 from enum import IntFlag, IntEnum, unique
 import os
@@ -1431,48 +1432,50 @@ class NMSettingWirelessSummitFlags(IntFlag):
     """
 
 
-NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
-    "auth-retries": -1,
-    "autoconnect": True,
-    "autoconnect-ports": -1,
-    "autoconnect-priority": 0,
-    "autoconnect-retries": -1,
-    "autoconnect-slaves": (
-        NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT
-    ),
-    "controller": None,
-    "dns-over-tls": -1,
-    "down-on-poweroff": -1,
-    "gateway-ping-timeout": 0,
-    "id": None,
-    "interface-name": None,
-    "ip-ping-addresses": [],
-    "ip-ping-addresses-require-all": -1,
-    "ip-ping-timeout": 0,
-    "lldp": -1,
-    "llmnr": -1,
-    "master": None,         # Deprecated since version 1.46: Use 'controller' instead, this is just
-                            # an alias.
-    "mdns": -1,
-    "metered": NMMetered.NM_METERED_UNKNOWN,
-    "mptcp-flags": 0,
-    "mud-url": None,
-    "multi-connect": 0,
-    "permissions": [],
-    "port-type": None,
-    "read-only": False,     # Deprecated since version 1.44: This property is deprecated and has no
-                            # meaning.
-    "secondaries": [],
-    "slave-type": None,     # Deprecated since version 1.46: Use 'port-type' instead, this is just
-                            # an alias.
-    "stable-id": None,
-    "timestamp": 0,
-    "type": None,
-    "uuid": None,
-    "wait-activation-delay": -1,
-    "wait-device-timeout": -1,
-    "zone": None,
-}
+NM_SETTING_CONNECTION_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "auth-retries": -1,
+        "autoconnect": True,
+        "autoconnect-ports": -1,
+        "autoconnect-priority": 0,
+        "autoconnect-retries": -1,
+        "autoconnect-slaves": (
+            NMSettingConnectionAutoconnectSlaves.NM_SETTING_CONNECTION_AUTOCONNECT_SLAVES_DEFAULT
+        ),
+        "controller": None,
+        "dns-over-tls": -1,
+        "down-on-poweroff": -1,
+        "gateway-ping-timeout": 0,
+        "id": None,
+        "interface-name": None,
+        "ip-ping-addresses": [],
+        "ip-ping-addresses-require-all": -1,
+        "ip-ping-timeout": 0,
+        "lldp": -1,
+        "llmnr": -1,
+        "master": None,         # Deprecated since version 1.46: Use 'controller' instead, this is
+                                # just an alias.
+        "mdns": -1,
+        "metered": NMMetered.NM_METERED_UNKNOWN,
+        "mptcp-flags": 0,
+        "mud-url": None,
+        "multi-connect": 0,
+        "permissions": [],
+        "port-type": None,
+        "read-only": False,     # Deprecated since version 1.44: This property is deprecated and has
+                                # no meaning.
+        "secondaries": [],
+        "slave-type": None,     # Deprecated since version 1.46: Use 'port-type' instead, this is
+                                # just an alias.
+        "stable-id": None,
+        "timestamp": 0,
+        "type": None,
+        "uuid": None,
+        "wait-activation-delay": -1,
+        "wait-device-timeout": -1,
+        "zone": None,
+    }
+)
 """
 Default values for the NM.SettingConnection settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingConnection.html
@@ -1480,43 +1483,45 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_IPCONFIG_DEFAULTS: Dict[str, Any] = {
-    "address-data": None,
-    "addresses": None,              # Deprecated
-    "auto-route-ext-gw": NMTernary.NM_TERNARY_DEFAULT,
-    "dad-timeout": -1,
-    "dhcp-dscp": None,
-    "dhcp-hostname": None,
-    "dhcp-hostname-flags": 0,
-    "dhcp-iaid": None,
-    "dhcp-reject-servers": [],
-    "dhcp-send-hostname": True,     # Deprecated since version 1.52: use the new version of
-                                    # dhcp-send-hostname instead.
-    "dhcp-send-hostname-v2": -1,
-    "dhcp-send-release": NMTernary.NM_TERNARY_DEFAULT,
-    "dhcp-timeout": 0,
-    "dns": [],                      # Deprecated
-    "dns-data": [],
-    "dns-options": [],
-    "dns-priority": 0,
-    "dns-search": [],
-    "gateway": None,
-    "ignore-auto-dns": False,
-    "ignore-auto-routes": False,
-    "may-fail": True,
-    "method": None,
-    "never-default": False,
-    "replace-local-rule": NMTernary.NM_TERNARY_DEFAULT,
-    "required-timeout": -1,
-    "route-data": None,
-    "route-metric": -1,
-    "route-table": 0,
-    "routed-dns": -1,
-    "routes": None,                 # Deprecated
-    "routing-rules": None,
-    "shared-dhcp-lease-time": 0,
-    "shared-dhcp-range": None,
-}
+NM_SETTING_IPCONFIG_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "address-data": None,
+        "addresses": None,              # Deprecated
+        "auto-route-ext-gw": NMTernary.NM_TERNARY_DEFAULT,
+        "dad-timeout": -1,
+        "dhcp-dscp": None,
+        "dhcp-hostname": None,
+        "dhcp-hostname-flags": 0,
+        "dhcp-iaid": None,
+        "dhcp-reject-servers": [],
+        "dhcp-send-hostname": True,     # Deprecated since version 1.52: use the new version of
+                                        # dhcp-send-hostname instead.
+        "dhcp-send-hostname-v2": -1,
+        "dhcp-send-release": NMTernary.NM_TERNARY_DEFAULT,
+        "dhcp-timeout": 0,
+        "dns": [],                      # Deprecated
+        "dns-data": [],
+        "dns-options": [],
+        "dns-priority": 0,
+        "dns-search": [],
+        "gateway": None,
+        "ignore-auto-dns": False,
+        "ignore-auto-routes": False,
+        "may-fail": True,
+        "method": None,
+        "never-default": False,
+        "replace-local-rule": NMTernary.NM_TERNARY_DEFAULT,
+        "required-timeout": -1,
+        "route-data": None,
+        "route-metric": -1,
+        "route-table": 0,
+        "routed-dns": -1,
+        "routes": None,                 # Deprecated
+        "routing-rules": None,
+        "shared-dhcp-lease-time": 0,
+        "shared-dhcp-range": None,
+    }
+)
 """
 Default values for the NM.SettingIPConfig settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIPConfig.html
@@ -1524,14 +1529,16 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_IP4CONFIG_DEFAULTS: Dict[str, Any] = {
-    **NM_SETTING_IPCONFIG_DEFAULTS,
-    "dhcp-client-id": None,
-    "dhcp-fqdn": None,
-    "dhcp-ipv6-only-preferred": -1,
-    "dhcp-vendor-class-identifier": None,
-    "link-local": 0,
-}
+NM_SETTING_IP4CONFIG_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        **NM_SETTING_IPCONFIG_DEFAULTS,
+        "dhcp-client-id": None,
+        "dhcp-fqdn": None,
+        "dhcp-ipv6-only-preferred": -1,
+        "dhcp-vendor-class-identifier": None,
+        "link-local": 0,
+    }
+)
 """
 Default values for the NM.SettingIP4Config settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIP4Config.html
@@ -1539,18 +1546,20 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_IP6CONFIG_DEFAULTS: Dict[str, Any] = {
-    **NM_SETTING_IPCONFIG_DEFAULTS,
-    "addr-gen-mode": NMSettingIP6ConfigAddrGenMode.NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT,
-    "dhcp-duid": None,
-    "dhcp-pd-hint": None,
-    "ip6-privacy": NMSettingIP6ConfigPrivacy.NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN,
-    "mtu": 0,
-    "ra-timeout": 0,
-    "temp-preferred-lifetime": 0,
-    "temp-valid-lifetime": 0,
-    "token": None,
-}
+NM_SETTING_IP6CONFIG_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        **NM_SETTING_IPCONFIG_DEFAULTS,
+        "addr-gen-mode": NMSettingIP6ConfigAddrGenMode.NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_DEFAULT,
+        "dhcp-duid": None,
+        "dhcp-pd-hint": None,
+        "ip6-privacy": NMSettingIP6ConfigPrivacy.NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN,
+        "mtu": 0,
+        "ra-timeout": 0,
+        "temp-preferred-lifetime": 0,
+        "temp-valid-lifetime": 0,
+        "token": None,
+    }
+)
 """
 Default values for the NM.SettingIP6Config settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingIP6Config.html
@@ -1558,12 +1567,14 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_PROXY_DEFAULTS: Dict[str, Any] = {
-    "browser-only": False,
-    "method": 0,
-    "pac-script": None,
-    "pac-url": None,
-}
+NM_SETTING_PROXY_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "browser-only": False,
+        "method": 0,
+        "pac-script": None,
+        "pac-url": None,
+    }
+)
 """
 Default values for the NM.SettingProxy settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingProxy.html
@@ -1571,25 +1582,27 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_WIRED_DEFAULTS: Dict[str, Any] = {
-    "accept-all-mac-addresses": NMTernary.NM_TERNARY_DEFAULT,
-    "assigned-mac-address": None,
-    "auto-negotiate": False,
-    "cloned-mac-address": None,     # Deprecated
-    "duplex": None,
-    "generate-mac-address-mask": None,
-    "mac-address": None,
-    "mac-address-blacklist": [],
-    "mac-address-denylist": [],
-    "mtu": 0,
-    "port": None,
-    "s390-nettype": None,
-    "s390-options": {},
-    "s390-subchannels": [],
-    "speed": 0,
-    "wake-on-lan": 1,
-    "wake-on-lan-password": None,
-}
+NM_SETTING_WIRED_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "accept-all-mac-addresses": NMTernary.NM_TERNARY_DEFAULT,
+        "assigned-mac-address": None,
+        "auto-negotiate": False,
+        "cloned-mac-address": None,     # Deprecated
+        "duplex": None,
+        "generate-mac-address-mask": None,
+        "mac-address": None,
+        "mac-address-blacklist": [],
+        "mac-address-denylist": [],
+        "mtu": 0,
+        "port": None,
+        "s390-nettype": None,
+        "s390-options": {},
+        "s390-subchannels": [],
+        "speed": 0,
+        "wake-on-lan": 1,
+        "wake-on-lan-password": None,
+    }
+)
 """
 Default values for the NM.SettingWired settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWired.html
@@ -1597,51 +1610,53 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
-    "acs": 0,                           # Summit feature
-    "ap-config-file": None,             # Summit feature
-    "ap-isolation": NMTernary.NM_TERNARY_DEFAULT,
-    "assigned-mac-address": None,
-    "auth-timeout": 0,                  # Summit feature
-    "band": None,
-    "bgscan": None,                     # Summit feature
-    "bssid": None,
-    "ccx": NMSettingWirelessCcx.NM_SETTING_WIRELESS_CCX_DISABLE,    # Summit feature
-    "channel": 0,
-    "channel-width": 0,
-    "client-name": None,                # Summit feature
-    "cloned-mac-address": None,         # Deprecated
-    "dms": 0,                           # Summit feature
-    "frequency-list": None,             # Summit feature
-    "frequency-dfs": 1,                 # Summit feature
-    "generate-mac-address-mask": None,
-    "hidden": False,
-    "mac-address": None,
-    "mac-address-blacklist": [],
-    "mac-address-denylist": [],
-    "mac-address-randomization": 0,     # Deprecated since version 1.4: Use the NM.SettingWireless
-                                        # :cloned-mac-address property instead.
-    "max-scan-interval": 0,             # Summit feature
-    "mode": None,
-    "mtu": 0,
-    "powersave": 0,
-    "rate": 0,                          # Deprecated since version 1.44: This property is not
-                                        # implemented and has no effect.
-    "scan-delay": 0,                    # Summit feature
-    "scan-dwell": 0,                    # Summit feature
-    "scan-passive-dwell": 0,            # Summit feature
-    "scan-suspend-time": 0,             # Summit feature
-    "scan-roam-delta": 0,               # Summit feature
-    "security": None,                   # Deprecated: This property is deprecated and has no
-                                        # effect.
-    "seen-bssids": [],
-    "ssid": None,
-    "summit-flags": NMSettingWirelessSummitFlags.NM_SETTING_WIRELESS_SUMMIT_FLAGS_NONE,  # Summit
-                                                                                         # feature
-    "tx-power": 0,                      # Deprecated since version 1.44: This property is not
-                                        # implemented and has no effect.
-    "wake-on-wlan": 1,
-}
+NM_SETTING_WIRELESS_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "acs": 0,                           # Summit feature
+        "ap-config-file": None,             # Summit feature
+        "ap-isolation": NMTernary.NM_TERNARY_DEFAULT,
+        "assigned-mac-address": None,
+        "auth-timeout": 0,                  # Summit feature
+        "band": None,
+        "bgscan": None,                     # Summit feature
+        "bssid": None,
+        "ccx": NMSettingWirelessCcx.NM_SETTING_WIRELESS_CCX_DISABLE,  # Summit feature
+        "channel": 0,
+        "channel-width": 0,
+        "client-name": None,                # Summit feature
+        "cloned-mac-address": None,         # Deprecated
+        "dms": 0,                           # Summit feature
+        "frequency-list": None,             # Summit feature
+        "frequency-dfs": 1,                 # Summit feature
+        "generate-mac-address-mask": None,
+        "hidden": False,
+        "mac-address": None,
+        "mac-address-blacklist": [],
+        "mac-address-denylist": [],
+        "mac-address-randomization": 0,     # Deprecated since version 1.4: Use the
+                                            # NM.SettingWireless :cloned-mac-address property
+                                            # instead.
+        "max-scan-interval": 0,             # Summit feature
+        "mode": None,
+        "mtu": 0,
+        "powersave": 0,
+        "rate": 0,                          # Deprecated since version 1.44: This property is not
+                                            # implemented and has no effect.
+        "scan-delay": 0,                    # Summit feature
+        "scan-dwell": 0,                    # Summit feature
+        "scan-passive-dwell": 0,            # Summit feature
+        "scan-suspend-time": 0,             # Summit feature
+        "scan-roam-delta": 0,               # Summit feature
+        "security": None,                   # Deprecated: This property is deprecated and has no
+                                            # effect.
+        "seen-bssids": [],
+        "ssid": None,
+        "summit-flags": NMSettingWirelessSummitFlags.NM_SETTING_WIRELESS_SUMMIT_FLAGS_NONE,  # Summit feature
+        "tx-power": 0,                      # Deprecated since version 1.44: This property is not
+                                            # implemented and has no effect.
+        "wake-on-wlan": 1,
+    }
+)
 """
 Default values for the NM.SettingWireless settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWireless.html
@@ -1649,28 +1664,30 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_WIRELESS_SECURITY_DEFAULTS: Dict[str, Any] = {
-    "auth-alg": None,
-    "fils": 0,
-    "group": [],
-    "key-mgmt": None,
-    "leap-password": None,
-    "leap-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "leap-username": None,
-    "pairwise": [],
-    "pmf": 0,
-    "proto": [],
-    "psk": None,
-    "psk-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "wep-key-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "wep-key-type": NMWepKeyType.NM_WEP_KEY_TYPE_UNKNOWN,
-    "wep-key0": None,
-    "wep-key1": None,
-    "wep-key2": None,
-    "wep-key3": None,
-    "wep-tx-keyidx": 0,
-    "wps-method": 0,
-}
+NM_SETTING_WIRELESS_SECURITY_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "auth-alg": None,
+        "fils": 0,
+        "group": [],
+        "key-mgmt": None,
+        "leap-password": None,
+        "leap-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "leap-username": None,
+        "pairwise": [],
+        "pmf": 0,
+        "proto": [],
+        "psk": None,
+        "psk-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "wep-key-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "wep-key-type": NMWepKeyType.NM_WEP_KEY_TYPE_UNKNOWN,
+        "wep-key0": None,
+        "wep-key1": None,
+        "wep-key2": None,
+        "wep-key3": None,
+        "wep-tx-keyidx": 0,
+        "wps-method": 0,
+    }
+)
 """
 Default values for the NM.SettingWirelessSecurity settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingWirelessSecurity.html
@@ -1678,56 +1695,59 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_8021X_DEFAULTS: Dict[str, Any] = {
-    "altsubject-matches": [],
-    "anonymous-identity": None,
-    "auth-timeout": 0,
-    "ca-cert": None,
-    "ca-cert-password": None,
-    "ca-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "ca-path": None,
-    "client-cert": None,
-    "client-cert-password": None,
-    "client-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "domain-match": None,
-    "domain-suffix-match": None,
-    "eap": [],
-    "identity": None,
-    "openssl-ciphers": None,
-    "optional": False,
-    "pac-file": None,
-    "password": None,
-    "password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "password-raw": None,
-    "password-raw-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "phase1-auth-flags": 0,
-    "phase1-fast-provisioning": None,
-    "phase1-peaplabel": None,
-    "phase1-peapver": None,
-    "phase2-altsubject-matches": [],
-    "phase2-auth": None,
-    "phase2-autheap": None,
-    "phase2-ca-cert": None,
-    "phase2-ca-cert-password": None,
-    "phase2-ca-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "phase2-ca-path": None,
-    "phase2-client-cert": None,
-    "phase2-client-cert-password": None,
-    "phase2-client-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "phase2-domain-match": None,
-    "phase2-domain-suffix-match": None,
-    "phase2-private-key": None,
-    "phase2-private-key-password": None,
-    "phase2-private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "phase2-subject-match": None,
-    "pin": None,
-    "pin-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "private-key": None,
-    "private-key-password": None,
-    "private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "subject-match": None,  # Deprecated since version 1.2: Use "phase2-domain-suffix-match" instead
-    "system-ca-certs": False,
-}
+NM_SETTING_8021X_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "altsubject-matches": [],
+        "anonymous-identity": None,
+        "auth-timeout": 0,
+        "ca-cert": None,
+        "ca-cert-password": None,
+        "ca-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "ca-path": None,
+        "client-cert": None,
+        "client-cert-password": None,
+        "client-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "domain-match": None,
+        "domain-suffix-match": None,
+        "eap": [],
+        "identity": None,
+        "openssl-ciphers": None,
+        "optional": False,
+        "pac-file": None,
+        "password": None,
+        "password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "password-raw": None,
+        "password-raw-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "phase1-auth-flags": 0,
+        "phase1-fast-provisioning": None,
+        "phase1-peaplabel": None,
+        "phase1-peapver": None,
+        "phase2-altsubject-matches": [],
+        "phase2-auth": None,
+        "phase2-autheap": None,
+        "phase2-ca-cert": None,
+        "phase2-ca-cert-password": None,
+        "phase2-ca-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "phase2-ca-path": None,
+        "phase2-client-cert": None,
+        "phase2-client-cert-password": None,
+        "phase2-client-cert-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "phase2-domain-match": None,
+        "phase2-domain-suffix-match": None,
+        "phase2-private-key": None,
+        "phase2-private-key-password": None,
+        "phase2-private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "phase2-subject-match": None,
+        "pin": None,
+        "pin-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "private-key": None,
+        "private-key-password": None,
+        "private-key-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "subject-match": None,  # Deprecated since version 1.2: Use "phase2-domain-suffix-match"
+                                # instead
+        "system-ca-certs": False,
+    }
+)
 """
 Default values for the NM.Setting8021x settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/Setting8021x.html
@@ -1735,34 +1755,36 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 """
 
 
-NM_SETTING_GSM_DEFAULTS: Dict[str, Any] = {
-    "apn": None,
-    "auto-config": False,
-    "device-id": None,
-    "home-only": False,
-    "initial-eps-bearer-apn": None,
-    "initial-eps-bearer-configure": False,
-    "initial-eps-bearer-noauth": True,
-    "initial-eps-bearer-password": None,
-    "initial-eps-bearer-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "initial-eps-bearer-refuse-chap": False,
-    "initial-eps-bearer-refuse-eap": False,
-    "initial-eps-bearer-refuse-mschap": False,
-    "initial-eps-bearer-refuse-mschapv2": False,
-    "initial-eps-bearer-refuse-pap": False,
-    "initial-eps-bearer-username": None,
-    "mtu": 0,
-    "network-id": None,
-    "number": None,     # Deprecated since version 1.16: User-provided values for this setting are
-                        # no longer used.
-    "password": None,
-    "password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "pin": None,
-    "pin-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
-    "sim-id": None,
-    "sim-operator-id": None,
-    "username": None,
-}
+NM_SETTING_GSM_DEFAULTS: MappingProxyType[str, Any] = MappingProxyType(
+    {
+        "apn": None,
+        "auto-config": False,
+        "device-id": None,
+        "home-only": False,
+        "initial-eps-bearer-apn": None,
+        "initial-eps-bearer-configure": False,
+        "initial-eps-bearer-noauth": True,
+        "initial-eps-bearer-password": None,
+        "initial-eps-bearer-password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "initial-eps-bearer-refuse-chap": False,
+        "initial-eps-bearer-refuse-eap": False,
+        "initial-eps-bearer-refuse-mschap": False,
+        "initial-eps-bearer-refuse-mschapv2": False,
+        "initial-eps-bearer-refuse-pap": False,
+        "initial-eps-bearer-username": None,
+        "mtu": 0,
+        "network-id": None,
+        "number": None,     # Deprecated since version 1.16: User-provided values for this setting
+                            # are no longer used.
+        "password": None,
+        "password-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "pin": None,
+        "pin-flags": NMSettingSecretFlags.NM_SETTING_SECRET_FLAG_NONE,
+        "sim-id": None,
+        "sim-operator-id": None,
+        "username": None,
+    }
+)
 """
 Default values for the NM.SettingGsm settings. Values taken from:
 https://lazka.github.io/pgi-docs/#NM-1.0/classes/SettingGsm.html
