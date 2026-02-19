@@ -1387,6 +1387,50 @@ class NMState(IntEnum):
     """
 
 
+@unique
+class NMSettingWirelessCcx(IntFlag):
+    """
+    Cisco CCX (Cisco Compatible Extensions) flags for wireless settings
+    """
+
+    NM_SETTING_WIRELESS_CCX_DISABLE = 0x0
+    """
+    Disable CCX
+    """
+
+    NM_SETTING_WIRELESS_CCX_OPTIMIZED = 0x1
+    """
+    Enable support for all CCX features except AP-assisted roaming, AP-specified maximum transmit
+    power, and radio management
+    """
+
+    NM_SETTING_WIRELESS_CCX_FULL = 0x2
+    """
+    Enable CCX
+    """
+
+
+class NMSettingWirelessSummitFlags(IntFlag):
+    """
+    NMSettingWirelessSummitFlags values indicate which summit settings should be used
+    """
+
+    NM_SETTING_WIRELESS_SUMMIT_FLAGS_NONE = 0x0
+    """
+    No flags
+    """
+
+    NM_SETTING_WIRELESS_SUMMIT_FLAGS_ROAM_MFP_DEAUTH = 0x1
+    """
+    Deauth before an mfp roam
+    """
+
+    NM_SETTING_WIRELESS_SUMMIT_FLAGS_ALL = 0x1
+    """
+    All flags enabled
+    """
+
+
 NM_SETTING_CONNECTION_DEFAULTS: Dict[str, Any] = {
     "auth-retries": -1,
     "autoconnect": True,
@@ -1554,13 +1598,22 @@ https://networkmanager.dev/docs/api/latest/nm-settings-dbus.html
 
 
 NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
+    "acs": 0,                           # Summit feature
+    "ap-config-file": None,             # Summit feature
     "ap-isolation": NMTernary.NM_TERNARY_DEFAULT,
     "assigned-mac-address": None,
+    "auth-timeout": 0,                  # Summit feature
     "band": None,
+    "bgscan": None,                     # Summit feature
     "bssid": None,
+    "ccx": NMSettingWirelessCcx.NM_SETTING_WIRELESS_CCX_DISABLE,    # Summit feature
     "channel": 0,
     "channel-width": 0,
+    "client-name": None,                # Summit feature
     "cloned-mac-address": None,         # Deprecated
+    "dms": 0,                           # Summit feature
+    "frequency-list": None,             # Summit feature
+    "frequency-dfs": 1,                 # Summit feature
     "generate-mac-address-mask": None,
     "hidden": False,
     "mac-address": None,
@@ -1568,15 +1621,23 @@ NM_SETTING_WIRELESS_DEFAULTS: Dict[str, Any] = {
     "mac-address-denylist": [],
     "mac-address-randomization": 0,     # Deprecated since version 1.4: Use the NM.SettingWireless
                                         # :cloned-mac-address property instead.
+    "max-scan-interval": 0,             # Summit feature
     "mode": None,
     "mtu": 0,
     "powersave": 0,
     "rate": 0,                          # Deprecated since version 1.44: This property is not
                                         # implemented and has no effect.
+    "scan-delay": 0,                    # Summit feature
+    "scan-dwell": 0,                    # Summit feature
+    "scan-passive-dwell": 0,            # Summit feature
+    "scan-suspend-time": 0,             # Summit feature
+    "scan-roam-delta": 0,               # Summit feature
     "security": None,                   # Deprecated: This property is deprecated and has no
                                         # effect.
     "seen-bssids": [],
     "ssid": None,
+    "summit-flags": NMSettingWirelessSummitFlags.NM_SETTING_WIRELESS_SUMMIT_FLAGS_NONE,  # Summit
+                                                                                         # feature
     "tx-power": 0,                      # Deprecated since version 1.44: This property is not
                                         # implemented and has no effect.
     "wake-on-wlan": 1,
