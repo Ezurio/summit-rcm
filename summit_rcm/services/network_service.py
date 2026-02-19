@@ -1495,14 +1495,14 @@ class NetworkService(metaclass=Singleton):
         )
 
         # 'connection' setting
-        settings["connection"] = NM_SETTING_CONNECTION_DEFAULTS
+        settings["connection"] = NM_SETTING_CONNECTION_DEFAULTS.copy()
         setting_connection = connection_conn_props.get("connection", None)
         if setting_connection is not None:
             for param in setting_connection:
                 settings["connection"][param] = setting_connection[param].value
 
         # 'ipv4' setting
-        settings["ipv4"] = NM_SETTING_IP4CONFIG_DEFAULTS
+        settings["ipv4"] = NM_SETTING_IP4CONFIG_DEFAULTS.copy()
         setting_ipv4 = connection_conn_props.get("ipv4", None)
         if setting_ipv4 is not None:
             for param in setting_ipv4:
@@ -1552,7 +1552,7 @@ class NetworkService(metaclass=Singleton):
                 settings["ipv4"][param] = setting_ipv4[param].value
 
         # 'ipv6' setting
-        settings["ipv6"] = NM_SETTING_IP6CONFIG_DEFAULTS
+        settings["ipv6"] = NM_SETTING_IP6CONFIG_DEFAULTS.copy()
         setting_ipv6 = connection_conn_props.get("ipv6", None)
         if setting_ipv6 is not None:
             for param in setting_ipv6:
@@ -1602,7 +1602,7 @@ class NetworkService(metaclass=Singleton):
                 settings["ipv6"][param] = setting_ipv6[param].value
 
         # 'proxy' setting
-        settings["proxy"] = NM_SETTING_PROXY_DEFAULTS
+        settings["proxy"] = NM_SETTING_PROXY_DEFAULTS.copy()
         setting_proxy = connection_conn_props.get("proxy", None)
         if setting_proxy is not None:
             for param in setting_proxy:
@@ -1657,7 +1657,7 @@ class NetworkService(metaclass=Singleton):
             ):
                 settings[
                     definition.SUMMIT_RCM_NM_SETTING_WIRED_TEXT
-                ] = NM_SETTING_WIRED_DEFAULTS
+                ] = NM_SETTING_WIRED_DEFAULTS.copy()
                 setting_wired = connection_conn_props.get(
                     definition.SUMMIT_RCM_NM_SETTING_WIRED_TEXT, None
                 )
@@ -1673,7 +1673,7 @@ class NetworkService(metaclass=Singleton):
             ):
                 settings[
                     definition.SUMMIT_RCM_NM_SETTING_WIRELESS_TEXT
-                ] = NM_SETTING_WIRELESS_DEFAULTS
+                ] = NM_SETTING_WIRELESS_DEFAULTS.copy()
                 setting_wireless = connection_conn_props.get(
                     definition.SUMMIT_RCM_NM_SETTING_WIRELESS_TEXT, None
                 )
@@ -1695,7 +1695,7 @@ class NetworkService(metaclass=Singleton):
 
                 settings[
                     definition.SUMMIT_RCM_NM_SETTING_WIRELESS_SECURITY_TEXT
-                ] = NM_SETTING_WIRELESS_SECURITY_DEFAULTS
+                ] = NM_SETTING_WIRELESS_SECURITY_DEFAULTS.copy()
                 setting_wireless_security = connection_conn_props.get(
                     definition.SUMMIT_RCM_NM_SETTING_WIRELESS_SECURITY_TEXT, None
                 )
@@ -1726,7 +1726,7 @@ class NetworkService(metaclass=Singleton):
             if setting_8021x is not None:
                 settings[
                     definition.SUMMIT_RCM_NM_SETTING_802_1X_TEXT
-                ] = NM_SETTING_8021X_DEFAULTS
+                ] = NM_SETTING_8021X_DEFAULTS.copy()
                 for param in setting_8021x:
                     # The following properties are presented as a bytearray containing "file://"
                     # followed by the path to the target file and a terminating null byte
