@@ -13,7 +13,11 @@ from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
     SpectreeService,
 )
-from summit_rcm.services.network_service import NetworkService, InterfaceNotFoundError
+from summit_rcm.services.network_service import (
+    NetworkService,
+    InterfaceNotFoundError,
+    ConnectionProfileAlreadyInactiveError,
+)
 from summit_rcm import definition
 
 try:
@@ -155,6 +159,9 @@ class NetworkConnection:
                 await NetworkService.deactivate_connection_profile(uuid=uuid)
                 result["SDCERR"] = 0
                 result["InfoMsg"] = "Connection Deactivated"
+            except ConnectionProfileAlreadyInactiveError:
+                result["SDCERR"] = 0
+                result["InfoMsg"] = "Already inactive. No action taken"
             except Exception as e:
                 result["InfoMsg"] = f"Unable to deactivate connection - {str(e)}"
         except Exception as e:
