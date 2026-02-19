@@ -2623,6 +2623,19 @@ class ConnectionSettingsWiredModel(BaseModel):
 class ConnectionSettingsWirelessModel(BaseModel):
     """Model for the '802-11-wireless' setting of a NetworkManager Connection"""
 
+    acs: Optional[int] = Field(
+        default=NM_SETTING_WIRELESS_DEFAULTS["acs"],
+        description=(
+            "Auto channel selection. 0: ACS is disabled, 1: best available ACS: script ACS for now"
+        ),
+    )
+    ap_config_file: Optional[str] = Field(
+        alias="ap-config-file",
+        default=NM_SETTING_WIRELESS_DEFAULTS["ap-config-file"],
+        description=(
+            "Hostap configuration template file used for 802.1x AP modes with Summit Supplicant."
+        ),
+    )
     ap_isolation: Optional[int] = Field(
         alias="ap-isolation",
         default=NM_SETTING_WIRELESS_DEFAULTS["ap-isolation"],
@@ -2650,6 +2663,14 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "\"cloned-mac-address\"."
         ),
     )
+    auth_timeout: Optional[int] = Field(
+        alias="auth-timeout",
+        default=NM_SETTING_WIRELESS_DEFAULTS["auth-timeout"],
+        description=(
+            "Will restart association if authentication does not complete within the configured "
+            "auth-timeout."
+        ),
+    )
     band: Optional[str] = Field(
         default=NM_SETTING_WIRELESS_DEFAULTS["band"],
         description=(
@@ -2658,6 +2679,13 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "i.e. if \"a\" is specified, the device will not associate with the same network in "
             "the 2.4GHz band even if the network's settings are compatible. This setting depends "
             "on specific driver capability and may not work with all drivers."
+        ),
+    )
+    bgscan: Optional[str] = Field(
+        default=NM_SETTING_WIRELESS_DEFAULTS["bgscan"],
+        description=(
+            "The background scan configuration. See wpa_supplicant for details on valid "
+            "configuration."
         ),
     )
     bssid: Optional[str] = Field(
@@ -2669,6 +2697,17 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "unlikely to in the future. Locking a client profile to a certain BSSID will prevent "
             "roaming and also disable background scanning. That can be useful, if there is only "
             "one access point for the SSID."
+        ),
+    )
+    ccx: Optional[int] = Field(
+        default=NM_SETTING_WIRELESS_DEFAULTS["ccx"],
+        description=(
+            "Indicates whether Cisco Compatible Extensions (ccx) are enabled for the connection. "
+            "One of %NM_SETTING_WIRELESS_CCX_DISABLE (Do not use Cisco IE and CCX version "
+            "number.), %NM_SETTING_WIRELESS_CCX_OPTIMIZED (Use Cisco IE and CCX version number and "
+            "enable support for all CCX features except AP-assisted roaming, AP-specified maximum "
+            "transmit power, and radio management.) or %NM_SETTING_WIRELESS_CCX_FULL (Use Cisco IE "
+            "and CCX version number and enable support for all CCX features.)"
         ),
     )
     channel: Optional[int] = Field(
@@ -2692,6 +2731,14 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "only when the interface is configured in AP mode."
         ),
     )
+    client_name: Optional[str] = Field(
+        alias="client-name",
+        default=NM_SETTING_WIRELESS_DEFAULTS["client-name"],
+        description=(
+            "The device name assigned to the radio and the client device that uses it. If CCX "
+            "features are on then the client name is relayed and used for association."
+        ),
+    )
     cloned_mac_address: Optional[str] = Field(
         alias="cloned-mac-address",
         default=NM_SETTING_WIRELESS_DEFAULTS["cloned-mac-address"],
@@ -2701,6 +2748,22 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "this field is called \"cloned-mac-address\"."
         ),
         deprecated=True,
+    )
+    dms: Optional[int] = Field(
+        default=NM_SETTING_WIRELESS_DEFAULTS["dms"],
+        description=("Directed multicast service."),
+    )
+    frequency_list: Optional[str] = Field(
+        alias="frequency-list",
+        default=NM_SETTING_WIRELESS_DEFAULTS["frequency-list"],
+        description=(
+            "The allowed frequencies for connecting. A space separated list of frequencies."
+        ),
+    )
+    frequency_dfs: Optional[int] = Field(
+        alias="frequency-dfs",
+        default=NM_SETTING_WIRELESS_DEFAULTS["frequency-dfs"],
+        description=("Enables/disables DFS/RADAR frequencies."),
     )
     generate_mac_address_mask: Optional[str] = Field(
         alias="generate-mac-address-mask",
@@ -2784,6 +2847,13 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "Use the \"cloned-mac-address\" property instead."
         ),
     )
+    max_scan_interval: Optional[int] = Field(
+        alias="max-scan-interval",
+        default=NM_SETTING_WIRELESS_DEFAULTS["max-scan-interval"],
+        description=(
+            "The maximum scan interval to use for NM scanning for this profile."
+        ),
+    )
     mode: Optional[str] = Field(
         default=NM_SETTING_WIRELESS_DEFAULTS["mode"],
         description=(
@@ -2817,6 +2887,42 @@ class ConnectionSettingsWirelessModel(BaseModel):
             "This property is not implemented and has no effect."
         ),
     )
+    scan_delay: Optional[int] = Field(
+        alias="scan-delay",
+        default=NM_SETTING_WIRELESS_DEFAULTS["scan-delay"],
+        description=(
+            "For active scanning, the time to wait after tuning to a new channel before "
+            "transmitting a probe request."
+        ),
+    )
+    scan_dwell: Optional[int] = Field(
+        alias="scan-dwell",
+        default=NM_SETTING_WIRELESS_DEFAULTS["scan-dwell"],
+        description=(
+            "For active scanning, the time to wait for probe responses after transmitting a probe "
+            "request."
+        ),
+    )
+    scan_passive_dwell: Optional[int] = Field(
+        alias="scan-passive-dwell",
+        default=NM_SETTING_WIRELESS_DEFAULTS["scan-passive-dwell"],
+        description=("For passive scanning, the time to wait for probe responses."),
+    )
+    scan_suspend_time: Optional[int] = Field(
+        alias="scan-suspend-time",
+        default=NM_SETTING_WIRELESS_DEFAULTS["scan-suspend-time"],
+        description=(
+            "For background scanning, the duration to periodically suspend background scanning to "
+            "service the active connection."
+        ),
+    )
+    scan_roam_delta: Optional[int] = Field(
+        alias="scan-roam-delta",
+        default=NM_SETTING_WIRELESS_DEFAULTS["scan-roam-delta"],
+        description=(
+            "For roaming, limits the number of dB better required for a roam."
+        ),
+    )
     security: Optional[Any] = Field(
         default=NM_SETTING_WIRELESS_DEFAULTS["security"],
         description=(
@@ -2844,6 +2950,16 @@ class ConnectionSettingsWirelessModel(BaseModel):
     ssid: str = Field(
         description=(
             "SSID of the Wi-Fi network. Must be specified."
+        ),
+    )
+    summit_flags: Optional[int] = Field(
+        alias="summit-flags",
+        default=NM_SETTING_WIRELESS_DEFAULTS["summit-flags"],
+        description=(
+            "The #NMSettingWirelessSummitFlags options to enable. Not all devices support all "
+            "options. May be any combination of %NM_SETTING_WIRELESS_SUMMIT_FLAGS_ALL, "
+            "%NM_SETTING_WIRELESS_SUMMIT_FLAGS_ROAM_MFP_DEAUTH (to deauth before an mfp roam), or "
+            "the special value %NM_SETTING_WIRELESS_SUMMIT_FLAGS_NONE (to disable)"
         ),
     )
     tx_power: Optional[int] = Field(
