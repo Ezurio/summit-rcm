@@ -70,6 +70,7 @@ class FileManage:
         form=FileUploadRequestModelLegacy,
         resp=Response(
             HTTP_200=DefaultResponseModelLegacy,
+            HTTP_400=BadRequestErrorResponseModel,
             HTTP_401=UnauthorizedErrorResponseModel,
         ),
         security=SpectreeService().security,
@@ -144,6 +145,11 @@ class FileManage:
                 tmp_file.unlink()
             resp.media = result
             return
+
+        # Check if password was passed via query parameter if not found in form data, to support
+        # legacy clients
+        if not password:
+            password = req.get_param("password", None)
 
         if upload_file_type == "timezone":
             # We don't support uploading timezone data
