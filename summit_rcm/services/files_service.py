@@ -210,39 +210,60 @@ class FilesService(metaclass=Singleton):
             ):
                 raise Exception("Expected files missing")
 
-            # Copy connections and certs
-            for subdir in ["system-connections", "certs"]:
-                for file in Path(
-                    TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, subdir
-                ).iterdir():
-                    try:
-                        # Check for reserved connections
-                        if FilesService.imported_connection_is_reserved(file):
-                            raise ConnectionProfileReservedError("Reserved")
+            # Copy connections
+            for file in Path(
+                TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, "system-connections"
+            ).iterdir():
+                try:
+                    # Check for reserved connections
+                    if FilesService.imported_connection_is_reserved(file):
+                        raise ConnectionProfileReservedError("Reserved")
 
-                        # Check for existing connections
-                        if (
-                            not overwrite_existing
-                            and await FilesService.imported_connection_exists(file)
-                        ):
-                            raise Exception("Connection exists")
+                    # Check for existing connections
+                    if (
+                        not overwrite_existing
+                        and await FilesService.imported_connection_exists(file)
+                    ):
+                        raise Exception("Connection exists")
 
-                        dest = Path("/", NETWORKMANAGER_DIR, subdir, file.name)
-                        if dest.is_symlink():
-                            raise Exception("Symlink")
+                    dest = Path(
+                        "/", NETWORKMANAGER_DIR, "system-connections", file.name
+                    )
+                    if dest.is_symlink():
+                        raise Exception("Symlink")
 
-                        copy2(
-                            file,
-                            dest,
-                            follow_symlinks=False,
-                        )
-                    except Exception as exception:
-                        syslog(
-                            LOG_ERR,
-                            f"Could not import connection file {str(file)} - {str(exception)}",
-                        )
+                    copy2(
+                        file,
+                        dest,
+                        follow_symlinks=False,
+                    )
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Could not import connection file {str(file)} - {str(exception)}",
+                    )
 
-            # Requst NetworkManager to reload connections
+            # Copy certs
+            for file in Path(
+                TMP_ARCHIVE_DIRECTORY, NETWORKMANAGER_DIR, "certs"
+            ).iterdir():
+                try:
+                    dest = Path("/", NETWORKMANAGER_DIR, "certs", file.name)
+                    if dest.is_symlink():
+                        raise Exception("Symlink")
+
+                    copy2(
+                        file,
+                        dest,
+                        follow_symlinks=False,
+                    )
+                except Exception as exception:
+                    syslog(
+                        LOG_ERR,
+                        f"Could not import certificate file {str(file)} - {str(exception)}",
+                    )
+
+            # Request NetworkManager to reload connections
             if not await NetworkManagerService().reload_connections():
                 return (False, "Unable to reload connections after import")
 
