@@ -38,3 +38,9 @@ class CertificateProvisioningCertUploadRequestFormModel(BaseModel):
     """Model for a request to upload a certificate"""
 
     certificate: BaseFile
+
+
+class CertificateProvisioningClientBundleUploadRequestFormModel(BaseModel):
+    """Model for a request to upload a paired client certificate"""
+
+    certificate: BaseFile
