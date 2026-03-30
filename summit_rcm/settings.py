@@ -285,6 +285,11 @@ class ServerConfig(object, metaclass=Singleton):
             self._rest_api_docs_enabled = self.parser.getboolean(
                 section="summit-rcm", option="rest_api_docs", fallback=False
             ) or os.environ.get("DOCS_GENERATION", "False") == "True"
+            self._disable_certificate_expiry_verification = self.parser.getboolean(
+                section="summit-rcm",
+                option="disable_certificate_expiry_verification",
+                fallback=True,
+            )
         except Exception:
             syslog(LOG_ERR, "Unable to parse server configuration")
             self.parser = None
@@ -292,6 +297,7 @@ class ServerConfig(object, metaclass=Singleton):
             self._validate_request = False
             self._validate_response = False
             self._rest_api_docs_enabled = False
+            self._disable_certificate_expiry_verification = True
         self._uvicorn_server: Optional[Server] = None
 
     def get_parser(self) -> Optional[configparser.ConfigParser]:
@@ -316,6 +322,11 @@ class ServerConfig(object, metaclass=Singleton):
     def validate_response(self) -> bool:
         """Determine whether or not response validation is enabled"""
         return self._validate_response
+
+    @property
+    def disable_certificate_expiry_verification(self) -> bool:
+        """Determine whether or not certificate expiry verification is disabled"""
+        return self._disable_certificate_expiry_verification
 
     @property
     def uvicorn_server(self) -> Optional[Server]:

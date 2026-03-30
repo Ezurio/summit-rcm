@@ -117,9 +117,20 @@ async def server_config_preload_hook(config) -> None:
 
 async def server_config_postload_hook(config) -> None:
     """Hook function called after the Uvicorn ASGI server config is loaded"""
-    if (
-        CertificateProvisioningService().get_provisioning_state()
-        != ProvisioningState.FULLY_PROVISIONED
-    ):
-        # Don't require client certificates when not fully provisioned
-        config.ssl.verify_mode = ssl.CERT_NONE
+    provisioning_state = CertificateProvisioningService().get_provisioning_state()
+    enable_client_pairing = (
+        ServerConfig()
+        .get_parser()["summit-rcm"]
+        .getboolean("enable_client_pairing", fallback=False)
+    )
+
+    if enable_client_pairing:
+        # With client pairing enabled, only UNPROVISIONED gets CERT_NONE.
+        # PARTIALLY uses CERT_REQUIRED against the CA trust store.
+        if provisioning_state == ProvisioningState.UNPROVISIONED:
+            config.ssl.verify_mode = ssl.CERT_NONE
+    else:
+        # Default behavior: don't require client certificates when not fully
+        # provisioned (both UNPROVISIONED and PARTIALLY get CERT_NONE)
+        if provisioning_state != ProvisioningState.FULLY_PROVISIONED:
+            config.ssl.verify_mode = ssl.CERT_NONE

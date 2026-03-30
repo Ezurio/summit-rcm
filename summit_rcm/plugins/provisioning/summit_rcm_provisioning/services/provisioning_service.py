@@ -298,8 +298,15 @@ class CertificateProvisioningService:
     async def verify_certificate_against_ca(cert_path: str, ca_cert_path: str) -> bool:
         """Utilize OpenSSL to verify a certificate against a CA certificate"""
         try:
+            cmd = ["openssl", "verify", "-CAfile", ca_cert_path]
+
+            if ServerConfig().disable_certificate_expiry_verification:
+                cmd.append("-no_check_time")
+
+            cmd.append(cert_path)
+
             proc = await asyncio.create_subprocess_exec(
-                *["openssl", "verify", "-CAfile", ca_cert_path, cert_path],
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

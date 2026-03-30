@@ -826,11 +826,6 @@ try:
         enable_client_auth = parser.getboolean(
             section="summit-rcm", option="enable_client_auth", fallback=False
         )
-        disable_certificate_expiry_verification = parser.getboolean(
-            section="summit-rcm",
-            option="disable_certificate_expiry_verification",
-            fallback=True,
-        )
         port = parser.getint(section="summit-rcm", option="socket_port", fallback=443)
 
         websockets_config = "none"
@@ -901,14 +896,14 @@ try:
                         # OpenSSL 1.1.1 or newer - we can use the built-in functionality to disable
                         # time checking during certificate verification, only if enabled
                         config.ssl.verify_mode = ssl.CERT_REQUIRED
-                        if disable_certificate_expiry_verification:
+                        if ServerConfig().disable_certificate_expiry_verification:
                             config.ssl.verify_flags |= X509_V_FLAG_NO_CHECK_TIME
                     else:
                         # OpenSSL 1.0.2 - we need to use the patched-in functionality to disable
                         # time checking during certificate verification, only if enabled
                         config.ssl.verify_mode = (
                             PY_SSL_CERT_REQUIRED_NO_CHECK_TIME
-                            if disable_certificate_expiry_verification
+                            if ServerConfig().disable_certificate_expiry_verification
                             else ssl.CERT_REQUIRED
                         )
 
