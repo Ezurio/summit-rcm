@@ -46,6 +46,20 @@ class CertificateProvisioningMiddleware:
     ):
         self._provisioning_state: ProvisioningState = provisioning_state
         self._last_cert_hash: int = None
+        self._enable_client_pairing: bool = (
+            ServerConfig()
+            .get_parser()["summit-rcm"]
+            .getboolean("enable_client_pairing", fallback=True)
+        )
+        self._disable_cert_expiry_verification: bool = (
+            ServerConfig().disable_certificate_expiry_verification
+        )
+
+        if ServerConfig().rest_api_docs_enabled:
+            if SpectreeService().doc_page_path not in UNPROVISIONED_PATH_WHITE_LIST:
+                UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().doc_page_path)
+                UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().spec_url)
+                UNPROVISIONED_PATH_WHITE_LIST.append("/")
 
     async def check_for_time_set_request(
         self, req: falcon.asgi.Request, resp: falcon.asgi.Response
@@ -241,12 +255,22 @@ class CertificateProvisioningMiddleware:
         if self._provisioning_state == ProvisioningState.FULLY_PROVISIONED:
             return
 
+        # With client pairing enabled, PARTIALLY_PROVISIONED enforces
+        # CERT_REQUIRED against the CA trust store — TLS client auth is the access
+        # control, so the whitelist is unnecessary.
+        if (
+            self._enable_client_pairing
+            and self._provisioning_state
+            == ProvisioningState.PARTIALLY_PROVISIONED
+        ):
+            return
+
         if ServerConfig().rest_api_docs_enabled:
             UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().doc_page_path)
             UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().spec_url)
             UNPROVISIONED_PATH_WHITE_LIST.append("/")
 
-        # If we're partially or unprovisioned, we only allow requests to the following paths:
+        # If we're unprovisioned, we only allow requests to the following paths:
         if req.path not in UNPROVISIONED_PATH_WHITE_LIST:
             resp.status = falcon.HTTP_401
             resp.complete = True
