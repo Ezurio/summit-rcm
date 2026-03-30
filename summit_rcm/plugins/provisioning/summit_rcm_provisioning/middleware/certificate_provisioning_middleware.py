@@ -69,6 +69,9 @@ class CertificateProvisioningMiddleware:
         Check for a request to set the date/time. If found, validate the timestamp before allowing
         the request to proceed.
         """
+        if self._disable_cert_expiry_verification:
+            return
+
         try:
             if req.method != "PUT":
                 return
@@ -202,6 +205,9 @@ class CertificateProvisioningMiddleware:
         Check if the client certificate's validity period starts after the current fallback
         timestamp. If so, update the fallback timestamp.
         """
+        if self._disable_cert_expiry_verification:
+            return
+
         if self._provisioning_state != ProvisioningState.FULLY_PROVISIONED:
             return
 

@@ -17,6 +17,7 @@ from summit_rcm.rest_api.services.spectree_service import (
 )
 from summit_rcm_provisioning.services.provisioning_service import (
     CertificateProvisioningService,
+    InvalidCertificateError,
     ProvisioningState,
 )
 from summit_rcm.rest_api.services.rest_files_service import (
@@ -126,7 +127,7 @@ class CertificateProvisioningClientBundleResource:
             )
 
             resp.status = falcon.HTTP_200
-        except ValueError:
+        except (InvalidCertificateError, ValueError):
             resp.status = falcon.HTTP_400
         except Exception as exception:
             syslog(
