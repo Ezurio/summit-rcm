@@ -45,6 +45,12 @@ async def get_v2_supported_routes():
     """Optional Function to return supported v2 routes"""
     routes = []
     routes.append("/api/v2/system/certificateProvisioning")
+    if (
+        ServerConfig()
+        .get_parser()["summit-rcm"]
+        .getboolean("enable_client_pairing", fallback=False)
+    ):
+        routes.append("/api/v2/system/certificateProvisioning/clientBundle")
     return routes
 
 
@@ -66,6 +72,28 @@ async def get_v2_routes():
             LOG_ERR,
             f"Error Importing certificate provisioning v2 routes: {str(exception)}",
         )
+
+    if (
+        ServerConfig()
+        .get_parser()["summit-rcm"]
+        .getboolean("enable_client_pairing", fallback=False)
+    ):
+        try:
+            from summit_rcm_provisioning.rest_api.v2.system.client_bundle import (
+                CertificateProvisioningClientBundleResource,
+            )
+
+            routes["/api/v2/system/certificateProvisioning/clientBundle"] = (
+                CertificateProvisioningClientBundleResource()
+            )
+        except ImportError:
+            pass
+        except Exception as exception:
+            syslog(
+                LOG_ERR,
+                f"Error Importing client bundle v2 routes: {str(exception)}",
+            )
+
     return routes
 
 

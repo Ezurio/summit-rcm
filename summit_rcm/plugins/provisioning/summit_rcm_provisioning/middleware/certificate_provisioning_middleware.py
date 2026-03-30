@@ -31,6 +31,7 @@ UNPROVISIONED_PATH_WHITE_LIST = [
     # v2 routes
     "/api/v2/system/datetime",
     "/api/v2/system/certificateProvisioning",
+    "/api/v2/system/certificateProvisioning/clientBundle",
     "/api/v2/network/status",
     "/api/v2/system/version",
     "/api/v2/system/power",

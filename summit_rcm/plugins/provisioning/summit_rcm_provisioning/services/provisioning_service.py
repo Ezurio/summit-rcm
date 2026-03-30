@@ -405,6 +405,35 @@ class CertificateProvisioningService:
             syslog(LOG_ERR, f"Could not restart summit-rcm: {str(exception)}")
             return False
 
+    @staticmethod
+    async def save_paired_client_cert(temp_path: str) -> None:
+        """Save an uploaded paired client certificate to the configured path.
+
+        Validates the file is a PEM certificate then moves it to the path
+        specified by paired_client_cert_path in the ini file.
+        """
+        if not Path(temp_path).exists():
+            raise Exception("Paired client certificate temp file not found")
+
+        paired_client_cert_path = (
+            ServerConfig()
+            .get_parser()["summit-rcm"]
+            .get("paired_client_cert_path", "")
+            .strip('"')
+        )
+        if not paired_client_cert_path:
+            raise Exception("paired_client_cert_path not configured")
+
+        # Basic PEM validation
+        content = Path(temp_path).read_text()
+        if "-----BEGIN CERTIFICATE-----" not in content:
+            Path(temp_path).unlink(missing_ok=True)
+            raise InvalidCertificateError()
+
+        dest = Path(paired_client_cert_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(temp_path, str(dest))
+
 
 class InvalidCertificateError(Exception):
     """
