@@ -4,8 +4,9 @@
 #
 """Init File to setup the Provisioning Plugin"""
 
-from syslog import syslog, LOG_ERR
+from syslog import syslog, LOG_ERR, LOG_INFO
 import ssl
+from pathlib import Path
 from typing import Optional
 from summit_rcm_provisioning.services.provisioning_service import (
     CertificateProvisioningService,
@@ -81,6 +82,39 @@ async def get_middleware() -> Optional[list]:
     ]
 
 
+def _rebuild_trust_store(parser) -> None:
+    """Rebuild the TLS trust store from the rodata CA and paired client cert.
+
+    Concatenates the immutable rodata CA cert with the paired client cert
+    (if present) and writes the result to the ssl_certificate_chain path.
+    This only writes the file to disk; callers set config.ssl_ca_certs as needed.
+    """
+    rodata_ca = parser["summit-rcm"].get("rodata_ca_cert_path", "").strip('"')
+    paired_cert = parser["summit-rcm"].get("paired_client_cert_path", "").strip('"')
+    ca_crt_path = (
+        parser["global"].get("server.ssl_certificate_chain", "").strip('"')
+    )
+
+    if not rodata_ca or not ca_crt_path:
+        return
+
+    rodata_ca_path = Path(rodata_ca)
+    if not rodata_ca_path.exists():
+        syslog(LOG_ERR, f"rodata CA cert not found: {rodata_ca}")
+        return
+
+    trust_store = rodata_ca_path.read_bytes()
+    if paired_cert:
+        paired_cert_path = Path(paired_cert)
+        if paired_cert_path.exists():
+            trust_store += b"\n" + paired_cert_path.read_bytes()
+
+    ca_crt = Path(ca_crt_path)
+    ca_crt.parent.mkdir(parents=True, exist_ok=True)
+    ca_crt.write_bytes(trust_store)
+    syslog(LOG_INFO, f"Trust store rebuilt at {ca_crt_path}")
+
+
 async def server_config_preload_hook(config) -> None:
     """Hook function called before the Uvicorn ASGI server config is loaded"""
     provisioning_state = CertificateProvisioningService().get_provisioning_state()
@@ -89,6 +123,16 @@ async def server_config_preload_hook(config) -> None:
         config.ssl_keyfile = "/etc/summit-rcm/ssl/provisioning.key"
         config.ssl_certfile = "/etc/summit-rcm/ssl/provisioning.crt"
         config.ssl_ca_certs = ""
+
+        # Ensure the trust store exists for UNPROVISIONED when client pairing
+        # is enabled (the trust store file may not exist yet on first boot)
+        parser = ServerConfig().get_parser()
+        enable_client_pairing = parser["summit-rcm"].getboolean(
+            "enable_client_pairing", fallback=False
+        )
+        if enable_client_pairing:
+            _rebuild_trust_store(parser)
+
         syslog("*** RESTRICTED PROVISIONING MODE ***")
         return
 
@@ -112,6 +156,13 @@ async def server_config_preload_hook(config) -> None:
             )
             .strip('"')
         )
+
+        enable_client_pairing = parser["summit-rcm"].getboolean(
+            "enable_client_pairing", fallback=False
+        )
+        if enable_client_pairing:
+            _rebuild_trust_store(parser)
+
         syslog("*** PARTIALLY PROVISIONED MODE ***")
 
 
