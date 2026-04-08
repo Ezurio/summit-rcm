@@ -44,10 +44,10 @@ if [ -z "${JQ_APP}" ]; then
 fi
 
 # Path to the CA certificate to use for server authentication, leave blank for default insecure mode
-AUTH_CA_CERT=""
+AUTH_CA_CERT="${AUTH_CA_CERT:-}"
 # Path to the client certificate and key to use for mutual authentication, leave blank for default insecure mode
-AUTH_CLIENT_CERT=""
-AUTH_CLIENT_KEY=""
+AUTH_CLIENT_CERT="${AUTH_CLIENT_CERT:-}"
+AUTH_CLIENT_KEY="${AUTH_CLIENT_KEY:-}"
 
 # Set authentication type to use for the Summit RCM API, one of:
 #  - "insecure" for no authentication using username/password (default)
