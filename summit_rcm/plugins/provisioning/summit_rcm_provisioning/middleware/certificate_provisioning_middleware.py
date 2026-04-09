@@ -272,11 +272,6 @@ class CertificateProvisioningMiddleware:
         ):
             return
 
-        if ServerConfig().rest_api_docs_enabled:
-            UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().doc_page_path)
-            UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().spec_url)
-            UNPROVISIONED_PATH_WHITE_LIST.append("/")
-
         # If we're unprovisioned, we only allow requests to the following paths:
         if req.path not in UNPROVISIONED_PATH_WHITE_LIST:
             resp.status = falcon.HTTP_401
