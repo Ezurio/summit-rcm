@@ -77,6 +77,12 @@ NETWORK_STATUS_DBUS_TIMEOUT = 10.0  # seconds
 This constant defines the timeout duration for network status DBus requests in seconds.
 """
 
+NETWORK_STATE_VERIFY_TIMEOUT = 3.0  # seconds
+"""
+Timeout for polling NetworkManager to verify a connection state change (activate, deactivate,
+or wireless enable/disable) has taken effect.
+"""
+
 SUPPLICANT_INTERFACE_IFACE = "fi.w1.wpa_supplicant1.Interface"
 
 
@@ -863,23 +869,35 @@ class NetworkService(metaclass=Singleton):
         if activate_connection:
             # Activation requested
             await NetworkService.activate_connection_profile(uuid=uuid)
-            count = 0
-            while not bool(
-                await NetworkService.get_active_connection_obj_path(uuid=uuid)
-            ):
-                if count == 5:
-                    raise Exception("Unable to verify connection activated")
-                await asyncio.sleep(0.1)
-                count += 1
+
+            async def _wait_activated():
+                while not bool(
+                    await NetworkService.get_active_connection_obj_path(uuid=uuid)
+                ):
+                    await asyncio.sleep(0.1)
+
+            try:
+                await asyncio.wait_for(
+                    _wait_activated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                raise Exception("Unable to verify connection activated")
         elif activated_setting is not None:
             # Deactivation requested
             await NetworkService.deactivate_connection_profile(uuid=uuid)
-            count = 0
-            while bool(await NetworkService.get_active_connection_obj_path(uuid=uuid)):
-                if count == 5:
-                    raise Exception("Unable to verify connection deactivated")
-                await asyncio.sleep(0.1)
-                count += 1
+
+            async def _wait_deactivated():
+                while bool(
+                    await NetworkService.get_active_connection_obj_path(uuid=uuid)
+                ):
+                    await asyncio.sleep(0.1)
+
+            try:
+                await asyncio.wait_for(
+                    _wait_deactivated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                raise Exception("Unable to verify connection deactivated")
 
         return await NetworkService.get_connection_profile_settings(
             uuid=uuid, id=None, extended=True, is_legacy=is_legacy
@@ -2008,14 +2026,18 @@ class NetworkService(metaclass=Singleton):
         if not verify:
             return
 
-        count = 0
-        while await NetworkService.get_wireless_enabled() != enabled:
-            if count == 5:
-                raise Exception(
-                    f"Unable to verify wireless {'enabled' if enabled else 'disabled'}"
-                )
-            await asyncio.sleep(0.1)
-            count += 1
+        async def _wait_wireless_state():
+            while await NetworkService.get_wireless_enabled() != enabled:
+                await asyncio.sleep(0.1)
+
+        try:
+            await asyncio.wait_for(
+                _wait_wireless_state(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            raise Exception(
+                f"Unable to verify wireless {'enabled' if enabled else 'disabled'}"
+            )
 
     @staticmethod
     async def get_wireless_hardware_enabled() -> bool:
