@@ -10,7 +10,7 @@ import asyncio
 import importlib
 import pkgutil
 import signal
-from syslog import LOG_ERR, syslog, openlog
+from syslog import LOG_ERR, LOG_WARNING, syslog, openlog
 from types import ModuleType
 from typing import Any, Iterable, List, Optional
 import os
@@ -888,6 +888,49 @@ try:
             # Load the Uvicorn server config
             config.load()
 
+            # Register custom loop exception handler.
+            def custom_exception_handler(loop, context):
+                """
+                Custom exception handler for the event loop to catch and report expected TLS
+                transport setup failures without printing a traceback.
+                """
+
+                exception = context.get("exception", None)
+                transport_creation_error = (
+                    context.get("message", "")
+                    == "Error on transport creation for incoming connection"
+                )
+                if (
+                    exception is not None
+                    and isinstance(exception, ConnectionResetError)
+                    and transport_creation_error
+                ):
+                    syslog(LOG_WARNING, "TLS connection reset during handshake")
+                    return
+
+                if (
+                    exception is not None
+                    and isinstance(exception, ssl.SSLError)
+                ):
+                    if enable_client_auth:
+                        syslog(
+                            LOG_WARNING,
+                            f"SSL client authentication error: {exception.reason}"
+                        )
+                        return
+
+                    if transport_creation_error:
+                        syslog(LOG_WARNING, f"TLS handshake failed: {exception.reason}")
+                        return
+
+                # Call the default exception handler to ensure proper handling of other
+                # exceptions.
+                loop.default_exception_handler(context)
+
+            asyncio.get_event_loop().set_exception_handler(
+                custom_exception_handler
+            )
+
             # Update Uvicorn server's SSL context configuration to require client authentication and
             # certificate expiration validation if enabled
             if enable_client_auth:
@@ -906,30 +949,6 @@ try:
                             if ServerConfig().disable_certificate_expiry_verification
                             else ssl.CERT_REQUIRED
                         )
-
-                    # Register custom loop exception handler
-                    def custom_exception_handler(loop, context):
-                        """
-                        Custom exception handler for the event loop to catch and report SSL client
-                        authentication errors
-                        """
-
-                        exception = context.get("exception", None)
-                        if exception is not None and isinstance(
-                            exception, ssl.SSLError
-                        ):
-                            syslog(
-                                f"SSL client authentication error: {exception.reason}"
-                            )
-                            return
-
-                        # Call the default exception handler to ensure proper handling of other
-                        # exceptions
-                        loop.default_exception_handler(context)
-
-                    asyncio.get_event_loop().set_exception_handler(
-                        custom_exception_handler
-                    )
 
                 except Exception as exception:
                     syslog(
