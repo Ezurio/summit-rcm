@@ -520,11 +520,14 @@ class Bluetooth(metaclass=Singleton):
         discovery_filters = {}
 
         if powered is not None:
-            await adapter_interface.set_powered(bool(powered))
-            if not powered:
-                # Do not attempt to set discoverable or discovering state if powering off
-                discoverable = discoverable if discoverable else None
-                discovering = discovering if discovering else None
+            powered_bool = bool(powered)
+            await adapter_interface.set_powered(powered_bool)
+            if not powered_bool:
+                # Do not attempt to set discoverable or discovering state or discovery filters if
+                # powering off
+                result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
+                result["InfoMsg"] = ""
+                return result
 
         for settable_filter in SETTABLE_DISCOVERY_FILTERS:
             prop_name, prop_type, prop_signature = settable_filter
