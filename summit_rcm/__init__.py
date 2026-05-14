@@ -975,7 +975,6 @@ try:
             ServerConfig().uvicorn_server = server
 
             # Add any middleware
-            add_default_middleware()
             for name, module in discovered_plugins.items():
                 try:
                     app.add_middleware(await module.get_middleware())
@@ -984,6 +983,7 @@ try:
                         LOG_ERR,
                         f"Error loading middleware for plugin {name}: {str(exception)}",
                     )
+            add_default_middleware()
 
             # Register uncaught exception handler
             app.add_error_handler(Exception, custom_handle_uncaught_exception)

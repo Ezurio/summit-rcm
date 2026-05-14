@@ -77,7 +77,13 @@ async def get_v2_routes():
 
 async def get_middleware() -> Optional[list]:
     """Handler called when adding Falcon middleware"""
-    return None
+    from summit_rcm_unauthenticated.middleware.unauthenticated_middleware import (
+        UnauthenticatedMiddleware,
+    )
+
+    return [
+        UnauthenticatedMiddleware()
+    ]
 
 
 async def server_config_preload_hook(_) -> None:
@@ -86,20 +92,3 @@ async def server_config_preload_hook(_) -> None:
 
 async def server_config_postload_hook(_) -> None:
     """Hook function called after the Uvicorn ASGI server config is loaded"""
-    try:
-        from summit_rcm_unauthenticated.services.unauthenticated_service import (
-            UnauthenticatedService,
-        )
-    except ImportError:
-        return
-
-    restricted_paths = summit_rcm.SessionCheckingMiddleware().paths
-    if UnauthenticatedService().get_allow_unauthenticated_enabled():
-        if "/api/v2/system/power" in restricted_paths:
-            restricted_paths.remove("/api/v2/system/power")
-        if "/api/v2/system/factoryReset" in restricted_paths:
-            restricted_paths.remove("/api/v2/system/factoryReset")
-        if "reboot" in restricted_paths:
-            restricted_paths.remove("reboot")
-        if "factoryReset" in restricted_paths:
-            restricted_paths.remove("factoryReset")

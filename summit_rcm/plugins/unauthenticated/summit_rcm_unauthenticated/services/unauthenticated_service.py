@@ -25,6 +25,7 @@ class UnauthenticatedService:
             SystemSettingsManage.update_persistent(
                 "AllowUnauthenticatedRebootReset", str(enabled)
             )
+            self._allowed = enabled
             return True
         except Exception as exception:
             syslog(LOG_ERR, f"Error updating unauthenticated enabled: {str(exception)}")
