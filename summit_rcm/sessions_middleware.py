@@ -110,6 +110,7 @@ class SessionsMiddleware:
 
             if hasattr(req.context, "_session") and req.context.valid_session:
                 # Session was previously validated in process_request()
+                LoginService().keepalive_session(req.context.session_id)
                 resp.set_cookie(
                     self._session_cookie,
                     convert_dict_to_base64_string(req.context._session),
