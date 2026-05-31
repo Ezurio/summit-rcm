@@ -1,10 +1,17 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools", "cython>=0.29.36"]
+requires = ["setuptools"]
 
 [project]
 name = "summit_rcm"
 version = "14.0.0.6"
 description = "Summit Remote Control Manager (RCM)"
-license = { file = "LICENSE.ezurio" }
-dependencies = ["aiofiles", "dbus-fast", "pyroute2"]
+license = "LicenseRef-Ezurio-Clause"
+license-files = ["LICENSE.ezurio"]
+dependencies = ["aiofiles", "dbus-fast", "pyroute2>=0.9.1"]
+
+[project.optional-dependencies]
+web = ["uvicorn", "falcon"]
+at-interface = ["pyserial-asyncio", "transitions"]
+bluetooth = ["pyudev", "websockets"]
+docs = ["mkdocs", "mkdocs-material", "falcon", "pydantic", "spectree"]
