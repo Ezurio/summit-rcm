@@ -282,9 +282,12 @@ class ServerConfig(object, metaclass=Singleton):
                 option="rest_api_validate_response",
                 fallback=False,
             )
-            self._rest_api_docs_enabled = self.parser.getboolean(
+            self._rest_api_docs_runtime_enabled = self.parser.getboolean(
                 section="summit-rcm", option="rest_api_docs", fallback=False
-            ) or os.environ.get("DOCS_GENERATION", "False") == "True"
+            )
+            self._rest_api_docs_enabled = (
+                os.environ.get("DOCS_GENERATION", "False") == "True"
+            )
             self._disable_certificate_expiry_verification = self.parser.getboolean(
                 section="summit-rcm",
                 option="disable_certificate_expiry_verification",
@@ -296,6 +299,7 @@ class ServerConfig(object, metaclass=Singleton):
             self._sessions_enabled = True
             self._validate_request = False
             self._validate_response = False
+            self._rest_api_docs_runtime_enabled = False
             self._rest_api_docs_enabled = False
             self._disable_certificate_expiry_verification = True
         self._uvicorn_server: Optional[Server] = None
@@ -310,8 +314,13 @@ class ServerConfig(object, metaclass=Singleton):
 
     @property
     def rest_api_docs_enabled(self) -> bool:
-        """Determine whether or not the REST API documentation is enabled"""
+        """Determine whether or not host-side REST API schema generation is enabled"""
         return self._rest_api_docs_enabled
+
+    @property
+    def rest_api_docs_runtime_enabled(self) -> bool:
+        """Determine whether or not the pre-generated REST API docs should be served"""
+        return self._rest_api_docs_runtime_enabled
 
     @property
     def validate_request(self) -> bool:

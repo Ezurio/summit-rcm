@@ -56,7 +56,7 @@ class CertificateProvisioningMiddleware:
             ServerConfig().disable_certificate_expiry_verification
         )
 
-        if ServerConfig().rest_api_docs_enabled:
+        if ServerConfig().rest_api_docs_runtime_enabled:
             if SpectreeService().doc_page_path not in UNPROVISIONED_PATH_WHITE_LIST:
                 UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().doc_page_path)
                 UNPROVISIONED_PATH_WHITE_LIST.append(SpectreeService().spec_url)

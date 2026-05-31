@@ -779,7 +779,7 @@ try:
             app.add_middleware(SessionsMiddleware())
             app.add_middleware(SessionCheckingMiddleware())
 
-        if ServerConfig().rest_api_docs_enabled:
+        if ServerConfig().rest_api_docs_runtime_enabled:
             SpectreeService().register(app)
 
     def add_route(route_path: str, resource: Any, **kwargs):

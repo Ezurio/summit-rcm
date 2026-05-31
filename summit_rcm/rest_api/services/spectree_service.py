@@ -6,6 +6,7 @@
 Module to handle SpecTree
 """
 
+import os
 from syslog import syslog
 from pathlib import Path
 import json
@@ -158,7 +159,7 @@ class SpectreeService(metaclass=Singleton):
     """Service to handle Spectree"""
 
     def __init__(self) -> None:
-        if SpecTree is None or Path(OPENAPI_JSON_PATH).exists():
+        if SpecTree is None or os.environ.get("DOCS_GENERATION", "False") != "True":
             self.spec = None
             return
 
@@ -185,6 +186,10 @@ class SpectreeService(metaclass=Singleton):
     def register(self, app):
         """Singleton wrapper around the SpecTree register() function"""
         if not self.spec:
+            if not Path(OPENAPI_JSON_PATH).exists():
+                syslog(f"OpenAPI spec file not found: {OPENAPI_JSON_PATH}")
+                return
+
             # Load the API spec from the file
             with open(OPENAPI_JSON_PATH, "r") as api_spec_file:
                 api_spec = json.load(api_spec_file)
