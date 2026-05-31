@@ -67,7 +67,7 @@ class NTPResourceLegacy:
         tags=[system_tag],
         deprecated=True,
     )
-    async def on_get(self, _, resp: falcon.asgi.Response) -> None:
+    async def on_get(self, _, resp: falcon.asgi.Response, command: str | None = None) -> None:
         """
         Retrieve chrony NTP sources (legacy)
         """
@@ -98,7 +98,7 @@ class NTPResourceLegacy:
         deprecated=True,
     )
     async def on_put(
-        self, req: falcon.asgi.Request, resp: falcon.asgi.Response, command: str
+        self, req: falcon.asgi.Request, resp: falcon.asgi.Response, command: str | None = None
     ) -> None:
         """
         Update chrony NTP sources (legacy)

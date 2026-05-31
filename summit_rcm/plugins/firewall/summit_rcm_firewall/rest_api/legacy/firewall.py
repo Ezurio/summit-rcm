@@ -84,7 +84,7 @@ class FirewallResourceLegacy:
         tags=[network_tag],
         deprecated=True,
     )
-    async def on_get(self, _, resp):
+    async def on_get(self, _, resp, command=None):
         """
         Retrieve a list of ports currently forwarded via iptables firewall rules (legacy)
         """
@@ -116,7 +116,7 @@ class FirewallResourceLegacy:
         tags=[network_tag],
         deprecated=True,
     )
-    async def on_put(self, req, resp, command):
+    async def on_put(self, req, resp, command=None):
         """
         Update the list of ports currently forwarded via iptables firewall rules (legacy)
         """
