@@ -6,14 +6,11 @@
 Main AT Interface Module
 """
 
-import termios
-import os
-import fcntl
-import struct
 from syslog import LOG_ERR, syslog
 import asyncio
 import serial_asyncio
 from summit_rcm.at_interface.fsm import ATInterfaceFSM
+from summit_rcm.at_interface.serial import create_serial_connection, set_closing_wait
 from summit_rcm.services.date_time_service import DateTimeService
 from summit_rcm.settings import ServerConfig
 
@@ -45,83 +42,10 @@ class ATInterface:
         self.state_machine.close()
 
     def _set_closing_wait(
-        self, serial_port: str = None, closing_wait_in: int = 65535
-    ) -> None:
-        """
-        Sets the closing wait time for the serial port
-
-        See include/uapi/linux/serial.h from the Linux kernel for the definition of serial_struct.
-
-        :param serial_port: The serial port to configure
-        :param closing_wait_in: The closing wait time in centiseconds with special handling for 0
-         (wait forever) and 65535 (disable wait)
-        """
-        if not serial_port:
-            raise ValueError("AT Interface Failed: Invalid Serial Port")
-
-        if closing_wait_in < 0 or closing_wait_in > 65535:
-            raise ValueError("AT Interface Failed: Invalid Closing Wait Time")
-
-        fmt = "iiIiiiiiHcsiHHPHHL"
-
-        try:
-            # Open the serial port
-            fd = os.open(serial_port, os.O_RDWR | os.O_NOCTTY)
-
-            # Get the current serial port settings
-            serial_info = bytearray(struct.calcsize(fmt))
-            fcntl.ioctl(fd, termios.TIOCGSERIAL, serial_info)
-            (
-                type,
-                line,
-                port,
-                irq,
-                flags,
-                xmit_fifo_size,
-                custom_divisor,
-                baud_base,
-                close_delay,
-                io_type,
-                reserved_char_bytes,
-                hub6,
-                closing_wait,
-                closing_wait2,
-                iomem_base,
-                iomem_reg_shift,
-                port_high,
-                iomap_base,
-            ) = struct.unpack(fmt, serial_info)
-
-            # Set the closing wait time
-            closing_wait = closing_wait_in
-
-            # Set the new serial port settings using TIOCSSERIAL
-            serial_info = struct.pack(
-                fmt,
-                type,
-                line,
-                port,
-                irq,
-                flags,
-                xmit_fifo_size,
-                custom_divisor,
-                baud_base,
-                close_delay,
-                io_type,
-                reserved_char_bytes,
-                hub6,
-                closing_wait,
-                closing_wait2,
-                iomem_base,
-                iomem_reg_shift,
-                port_high,
-                iomap_base,
-            )
-            fcntl.ioctl(fd, termios.TIOCSSERIAL, serial_info)
-
-        finally:
-            # Close the serial port
-            os.close(fd)
+        self, serial_port: str | None = None, closing_wait_in: int = 65535
+    ) -> bool:
+        """Apply the UART closing-wait workaround when the target device supports it."""
+        return set_closing_wait(serial_port=serial_port, closing_wait_in=closing_wait_in)
 
     async def start(self):
         """Starts the AT Interface"""
@@ -145,7 +69,7 @@ class ATInterface:
 
         self._set_closing_wait(serial_port=serial_port, closing_wait_in=65535)
 
-        transport, protocol = await serial_asyncio.create_serial_connection(
+        transport, protocol = await create_serial_connection(
             self.loop,
             ATInterfaceSerialProtocol,
             serial_port,
