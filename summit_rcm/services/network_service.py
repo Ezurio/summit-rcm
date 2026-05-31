@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 # Copyright (C) 2024 Ezurio LLC.
 #
+from __future__ import annotations
+
 """
 Module to provide an interface to perform networking tasks (interfaces, connection profiles, etc.).
 """
@@ -21,9 +23,7 @@ from urllib.parse import urlparse
 try:
     from dbus_fast import Message, MessageType
     from summit_rcm.dbus_manager import DBusManager
-    from pyroute2.iwutil import IW
-    from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
-    from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
+    from pyroute2.iwutil import AsyncIW
 except ImportError as error:
     # Ignore the error if the pyroute2 module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
@@ -161,76 +161,95 @@ class NetworkService(metaclass=Singleton):
         return bss_param_dict
 
     @staticmethod
-    def get_station_dump(ifname: Optional[str] = "wlan0") -> dict:
+    async def get_station_dump(ifname: Optional[str] = "wlan0") -> dict:
         """
         Retrieve station dump info for the specified interface (default is wlan0)
         """
-        iw = IW()
         try:
-            for interface in iw.get_interfaces_dump():
-                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
-                    continue
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                interfaces = await iw.get_interfaces_dump()
+                try:
+                    async for interface in interfaces:
+                        if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                            continue
 
-                # Found the correct interface, get the station dump
-                stations = {}
-                resp = iw.get_stations(interface.get_attr("NL80211_ATTR_IFINDEX"))
+                        stations = {}
+                        resp = await iw.get_stations(
+                            interface.get_attr("NL80211_ATTR_IFINDEX")
+                        )
+                        try:
+                            async for station in resp:
+                                station_info = station.get_attr("NL80211_ATTR_STA_INFO")
+                                if station_info is None:
+                                    continue
 
-                for station in resp:
-                    station_info = station.get_attr("NL80211_ATTR_STA_INFO")
-                    bss_params = NetworkService().parse_bss_param(
-                        station_info.get_attr("NL80211_STA_INFO_BSS_PARAM")
-                    )
+                                bss_params = NetworkService().parse_bss_param(
+                                    station_info.get_attr("NL80211_STA_INFO_BSS_PARAM")
+                                )
 
-                    stations[station.get_attr("NL80211_ATTR_MAC")] = {
-                        "signal": station_info.get_attr("NL80211_STA_INFO_SIGNAL"),
-                        "inactive": station_info.get_attr(
-                            "NL80211_STA_INFO_INACTIVE_TIME"
-                        ),
-                        "connectedTime": station_info.get_attr(
-                            "NL80211_STA_INFO_CONNECTED_TIME"
-                        ),
-                        "rxPackets": station_info.get_attr(
-                            "NL80211_STA_INFO_RX_PACKETS"
-                        ),
-                        "txPackets": station_info.get_attr(
-                            "NL80211_STA_INFO_TX_PACKETS"
-                        ),
-                        "beaconRx": station_info.get_attr("NL80211_STA_INFO_BEACON_RX"),
-                        "rxRate": NetworkService().parse_rateinfo(
-                            station_info.get_attr("NL80211_STA_INFO_RX_BITRATE")
-                        ),
-                        "txRate": NetworkService().parse_rateinfo(
-                            station_info.get_attr("NL80211_STA_INFO_TX_BITRATE")
-                        ),
-                        "rxBytes": station_info.get_attr("NL80211_STA_INFO_RX_BYTES64"),
-                        "txBytes": station_info.get_attr("NL80211_STA_INFO_TX_BYTES64"),
-                        "rxDuration": station_info.get_attr(
-                            "NL80211_STA_INFO_RX_DURATION"
-                        ),
-                        "txRetries": station_info.get_attr(
-                            "NL80211_STA_INFO_TX_RETRIES"
-                        ),
-                        "txFailed": station_info.get_attr("NL80211_STA_INFO_TX_FAILED"),
-                        "beaconLoss": station_info.get_attr(
-                            "NL80211_STA_INFO_BEACON_LOSS"
-                        ),
-                        "rxDropMisc": station_info.get_attr(
-                            "NL80211_STA_INFO_RX_DROP_MISC"
-                        ),
-                        "dtimPeriod": bss_params["dtimPeriod"] if bss_params else None,
-                        "beaconInterval": (
-                            bss_params["beaconInterval"] if bss_params else None
-                        ),
-                    }
+                                stations[station.get_attr("NL80211_ATTR_MAC")] = {
+                                    "signal": station_info.get_attr("NL80211_STA_INFO_SIGNAL"),
+                                    "inactive": station_info.get_attr(
+                                        "NL80211_STA_INFO_INACTIVE_TIME"
+                                    ),
+                                    "connectedTime": station_info.get_attr(
+                                        "NL80211_STA_INFO_CONNECTED_TIME"
+                                    ),
+                                    "rxPackets": station_info.get_attr(
+                                        "NL80211_STA_INFO_RX_PACKETS"
+                                    ),
+                                    "txPackets": station_info.get_attr(
+                                        "NL80211_STA_INFO_TX_PACKETS"
+                                    ),
+                                    "beaconRx": station_info.get_attr(
+                                        "NL80211_STA_INFO_BEACON_RX"
+                                    ),
+                                    "rxRate": NetworkService().parse_rateinfo(
+                                        station_info.get_attr("NL80211_STA_INFO_RX_BITRATE")
+                                    ),
+                                    "txRate": NetworkService().parse_rateinfo(
+                                        station_info.get_attr("NL80211_STA_INFO_TX_BITRATE")
+                                    ),
+                                    "rxBytes": station_info.get_attr(
+                                        "NL80211_STA_INFO_RX_BYTES64"
+                                    ),
+                                    "txBytes": station_info.get_attr(
+                                        "NL80211_STA_INFO_TX_BYTES64"
+                                    ),
+                                    "rxDuration": station_info.get_attr(
+                                        "NL80211_STA_INFO_RX_DURATION"
+                                    ),
+                                    "txRetries": station_info.get_attr(
+                                        "NL80211_STA_INFO_TX_RETRIES"
+                                    ),
+                                    "txFailed": station_info.get_attr(
+                                        "NL80211_STA_INFO_TX_FAILED"
+                                    ),
+                                    "beaconLoss": station_info.get_attr(
+                                        "NL80211_STA_INFO_BEACON_LOSS"
+                                    ),
+                                    "rxDropMisc": station_info.get_attr(
+                                        "NL80211_STA_INFO_RX_DROP_MISC"
+                                    ),
+                                    "dtimPeriod": (
+                                        bss_params["dtimPeriod"] if bss_params else None
+                                    ),
+                                    "beaconInterval": (
+                                        bss_params["beaconInterval"] if bss_params else None
+                                    ),
+                                }
+                        finally:
+                            await resp.aclose()
 
-                return stations
+                        return stations
+                finally:
+                    await interfaces.aclose()
 
             # If not found, raise exception
             raise Exception("interface not found")
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to get station dump: {str(exception)}")
-        finally:
-            iw.close()
 
         return {}
 
@@ -248,83 +267,82 @@ class NetworkService(metaclass=Singleton):
         )
 
     @staticmethod
-    def get_interface_available_ap_channels(ifname: str = "wlan0") -> list:
+    async def get_interface_available_ap_channels(ifname: str = "wlan0") -> list:
         """
         Retrieve a list of available AP channels/frequencies for the given interface
         """
-        iw = IW()
         try:
-            for interface in iw.get_interfaces_dump():
-                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
-                    continue
-
-                # Retrieve the list of supported channels
-                msg = nl80211cmd()
-                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_WIPHY"]
-                msg["attrs"] = [
-                    ["NL80211_ATTR_IFINDEX", interface.get_attr("NL80211_ATTR_IFINDEX")]
-                ]
-
-                res = iw.nlm_request(
-                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
-                )
-
-                phy = res[0].get_attr("NL80211_ATTR_WIPHY")
-                bands = res[0].get_attr("NL80211_ATTR_WIPHY_BANDS")
-                if not bands:
-                    raise Exception("no channels found")
-
-                supported_channel_freqs = []
-                for band in bands:
-                    for freq in band.get_attr("NL80211_BAND_ATTR_FREQS"):
-                        if freq.get_attr("NL80211_FREQUENCY_ATTR_DISABLED"):
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                interfaces = await iw.get_interfaces_dump()
+                try:
+                    async for interface in interfaces:
+                        if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
                             continue
-                        supported_channel_freqs.append(
-                            freq.get_attr("NL80211_FREQUENCY_ATTR_FREQ")
-                        )
 
-                # Retrieve the list of regulatory rules
-                msg = nl80211cmd()
-                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_REG"]
-                msg["attrs"] = [["NL80211_ATTR_WIPHY", phy]]
+                        phy = interface.get_attr("NL80211_ATTR_WIPHY")
 
-                res = iw.nlm_request(msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST)
+                        bands = None
+                        wiphys = await iw.list_wiphy()
+                        try:
+                            async for wiphy in wiphys:
+                                if wiphy.get_attr("NL80211_ATTR_WIPHY") != phy:
+                                    continue
+                                bands = wiphy.get_attr("NL80211_ATTR_WIPHY_BANDS")
+                                break
+                        finally:
+                            await wiphys.aclose()
 
-                # Parse the regulatory rules and remove any channels that are not allowed
-                for reg_rule in res[0].get_attr("NL80211_ATTR_REG_RULES"):
-                    range_start_mhz = (
-                        reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_START") / 1000
-                    )
-                    range_end_mhz = (
-                        reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_END") / 1000
-                    )
-                    flags = reg_rule.get_attr("NL80211_ATTR_REG_RULE_FLAGS")
-                    passive_scan = bool(flags & NL80211_RRF_PASSIVE_SCAN)
-                    dfs = bool(flags & NL80211_RRF_DFS)
+                        if not bands:
+                            raise Exception("no channels found")
 
-                    for channel_freq in supported_channel_freqs[:]:
-                        if range_start_mhz <= channel_freq <= range_end_mhz and (
-                            dfs or passive_scan
-                        ):
-                            supported_channel_freqs.remove(channel_freq)
+                        supported_channel_freqs = []
+                        for band in bands:
+                            for freq in band.get_attr("NL80211_BAND_ATTR_FREQS"):
+                                if freq.get_attr("NL80211_FREQUENCY_ATTR_DISABLED"):
+                                    continue
+                                supported_channel_freqs.append(
+                                    freq.get_attr("NL80211_FREQUENCY_ATTR_FREQ")
+                                )
 
-                # Convert the frequency values to channel numbers
-                available_channels = []
-                for channel_freq in supported_channel_freqs:
-                    channel = frequency_to_channel(channel_freq)
-                    available_channels.append(
-                        {"channel": channel, "frequency": channel_freq}
-                    )
+                        reg_domains = await iw.get_regulatory_domain(phy)
+                        reg_domain = reg_domains[0] if reg_domains else None
+                        if reg_domain is None:
+                            raise Exception("no regulatory rules found")
 
-                return available_channels
+                        for reg_rule in reg_domain.get_attr("NL80211_ATTR_REG_RULES"):
+                            range_start_mhz = (
+                                reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_START") / 1000
+                            )
+                            range_end_mhz = (
+                                reg_rule.get_attr("NL80211_ATTR_FREQ_RANGE_END") / 1000
+                            )
+                            flags = reg_rule.get_attr("NL80211_ATTR_REG_RULE_FLAGS")
+                            passive_scan = bool(flags & NL80211_RRF_PASSIVE_SCAN)
+                            dfs = bool(flags & NL80211_RRF_DFS)
+
+                            for channel_freq in supported_channel_freqs[:]:
+                                if range_start_mhz <= channel_freq <= range_end_mhz and (
+                                    dfs or passive_scan
+                                ):
+                                    supported_channel_freqs.remove(channel_freq)
+
+                        available_channels = []
+                        for channel_freq in supported_channel_freqs:
+                            channel = frequency_to_channel(channel_freq)
+                            available_channels.append(
+                                {"channel": channel, "frequency": channel_freq}
+                            )
+
+                        return available_channels
+                finally:
+                    await interfaces.aclose()
 
             # If not found, just return an empty list
             return []
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read channel list: {str(exception)}")
             return []
-        finally:
-            iw.close()
 
     @staticmethod
     async def get_interface_status(
@@ -390,15 +408,14 @@ class NetworkService(metaclass=Singleton):
         This is used when the radio is intended to operate in AP + STA mode. Currently, only 'wlan1'
         as a 'managed' (or 'station') interface is supported.
         """
-        iw = IW()
         try:
-            iw.add_interface(ifname="wlan1", iftype="station", phy=0)
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                await iw.add_interface(ifname="wlan1", iftype="station", phy=0)
             return True
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to add interface: {str(exception)}")
             return False
-        finally:
-            iw.close()
 
     @staticmethod
     async def remove_virtual_interface() -> bool:
@@ -406,19 +423,22 @@ class NetworkService(metaclass=Singleton):
         Remove a previously-created virtual network interface (wlan1) using 'netlink' (pyroute2) and
         return a boolean indicating success. Currently, only 'wlan1' is supported.
         """
-        iw = IW()
         try:
-            for interface in iw.get_interfaces_dump():
-                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != "wlan1":
-                    continue
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                interfaces = await iw.get_interfaces_dump()
+                try:
+                    async for interface in interfaces:
+                        if str(interface.get_attr("NL80211_ATTR_IFNAME")) != "wlan1":
+                            continue
 
-                iw.del_interface(interface.get_attr("NL80211_ATTR_IFINDEX"))
-                return True
+                        await iw.del_interface(interface.get_attr("NL80211_ATTR_IFINDEX"))
+                        return True
+                finally:
+                    await interfaces.aclose()
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to del interface: {str(exception)}")
             return False
-        finally:
-            iw.close()
 
     @staticmethod
     async def get_interface_statistics(
@@ -1712,7 +1732,7 @@ class NetworkService(metaclass=Singleton):
                         ] = setting_wireless[param].value
                 settings[definition.SUMMIT_RCM_NM_SETTING_WIRELESS_TEXT][
                     "RegDomain"
-                ] = NetworkManagerService.get_reg_domain_info()
+                ] = await NetworkManagerService.get_reg_domain_info()
 
                 settings[
                     definition.SUMMIT_RCM_NM_SETTING_WIRELESS_SECURITY_TEXT

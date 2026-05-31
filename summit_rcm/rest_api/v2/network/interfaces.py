@@ -335,7 +335,7 @@ class NetworkInterfaceStationDumpResource(object):
                 resp.status = falcon.HTTP_400
                 return
 
-            resp.media = NetworkService.get_station_dump(ifname=name)
+            resp.media = await NetworkService.get_station_dump(ifname=name)
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_200
         except Exception as exception:
@@ -367,7 +367,7 @@ class NetworkInterfaceAvailableApChannelsResource(object):
                 resp.status = falcon.HTTP_400
                 return
 
-            resp.media = NetworkService.get_interface_available_ap_channels(
+            resp.media = await NetworkService.get_interface_available_ap_channels(
                 ifname=name
             )
             resp.content_type = falcon.MEDIA_JSON

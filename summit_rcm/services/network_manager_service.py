@@ -7,42 +7,29 @@ from socket import inet_pton, inet_ntop, AF_INET, AF_INET6
 from sys import byteorder
 from syslog import LOG_ERR, syslog
 from types import MappingProxyType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import IntFlag, IntEnum, unique
 import os
 from re import search
 
+if TYPE_CHECKING:
+    from dbus_fast.aio.proxy_object import ProxyInterface, ProxyObject
+
 try:
     from dbus_fast import Message, MessageType, Variant
-    from dbus_fast.aio.proxy_object import ProxyInterface, ProxyObject
     from dbus_fast.errors import InterfaceNotFoundError
     from summit_rcm.dbus_manager import DBusManager
-    from pyroute2.iwutil import IW
-    from pyroute2.netlink import NLM_F_REQUEST, NLM_F_DUMP
-    from pyroute2.netlink.nl80211 import nl80211cmd, NL80211_NAMES
+    from pyroute2.iwutil import AsyncIW
 except ImportError as error:
     # Ignore the error if the dbus_fast module is not available if generating documentation
     if os.environ.get("DOCS_GENERATION") != "True":
         raise error
 
-    class nl80211cmd:
-        """Dummy nl80211cmd class for documentation generation"""
-
-        class STAInfo:
-            """Dummy STAInfo class for documentation generation"""
-
-            class rate_info:
-                """Dummy rate_info class for documentation generation"""
-
-            class bss_param:
-                """Dummy bss_param class for documentation generation"""
-
     Message = None
     MessageType = None
     Variant = None
-    ProxyInterface = None
-    ProxyObject = None
     InterfaceNotFoundError = None
+    AsyncIW = None
 
 from summit_rcm.definition import FILEDIR_DICT, INVALID_RSSI
 from summit_rcm.utils import (
@@ -2924,8 +2911,8 @@ class NetworkManagerDeviceWatcher:
         self.device_interface_name = device_interface_name
         self.device_properties = device_properties
         self.bus = None
-        self.proxy_object: Optional[ProxyObject] = None
-        self.interface: Optional[ProxyInterface] = None
+        self.proxy_object: Optional["ProxyObject"] = None
+        self.interface: Optional["ProxyInterface"] = None
         self.subscribed = False
         self.dev_lock = Lock()
         self.ip4_config: Optional[NetworkManagerIp4ConfigWatcher] = None
@@ -3154,7 +3141,7 @@ class NetworkManagerService(object, metaclass=Singleton):
     nm_devices: List[NetworkManagerDeviceWatcher] = []
     nm_systemd_service_state: str = "inactive"
     subscribed_to_nm_systemd_service_state: bool = False
-    interface: Optional[ProxyInterface] = None
+    interface: Optional["ProxyInterface"] = None
     lock: Lock = Lock()
 
     async def on_properties_changed(
@@ -3364,93 +3351,97 @@ class NetworkManagerService(object, metaclass=Singleton):
             syslog("NetworkManagerService: Unsubscribed from NetworkManager signals")
 
     @staticmethod
-    def get_active_ap_rssi(ifname: Optional[str] = "wlan0") -> Tuple[bool, float]:
+    async def get_active_ap_rssi(ifname: Optional[str] = "wlan0") -> Tuple[bool, float]:
         """
         Retrieve the signal strength in dBm for the active accesspoint on the specified interface
         (default is wlan0).
 
         The return value is a tuple in the form of: (success, rssi)
         """
-        iw = IW()
         try:
-            for interface in iw.get_interfaces_dump():
-                if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
-                    continue
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                interfaces = await iw.get_interfaces_dump()
+                try:
+                    async for interface in interfaces:
+                        if str(interface.get_attr("NL80211_ATTR_IFNAME")) != ifname:
+                            continue
 
-                msg = nl80211cmd()
-                msg["cmd"] = NL80211_NAMES["NL80211_CMD_GET_STATION"]
-                msg["attrs"] = [
-                    ["NL80211_ATTR_IFINDEX", interface.get_attr("NL80211_ATTR_IFINDEX")]
-                ]
+                        stations = await iw.get_stations(
+                            interface.get_attr("NL80211_ATTR_IFINDEX")
+                        )
+                        try:
+                            async for station in stations:
+                                station_info = station.get_attr("NL80211_ATTR_STA_INFO")
+                                if station_info is None:
+                                    continue
 
-                res = iw.nlm_request(
-                    msg, msg_type=iw.prid, msg_flags=NLM_F_REQUEST | NLM_F_DUMP
-                )
-                return (
-                    True,
-                    float(
-                        res[0]
-                        .get_attr("NL80211_ATTR_STA_INFO")
-                        .get_attr("NL80211_STA_INFO_SIGNAL")
-                    ),
-                )
+                                signal = station_info.get_attr("NL80211_STA_INFO_SIGNAL")
+                                if signal is None:
+                                    continue
+
+                                return (True, float(signal))
+                        finally:
+                            await stations.aclose()
+
+                        raise Exception("station not found")
+                finally:
+                    await interfaces.aclose()
 
             # If not found, raise exception
             raise Exception("interface not found")
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read RSSI value: {str(exception)}")
             return (False, INVALID_RSSI)
-        finally:
-            iw.close()
 
     @staticmethod
-    def get_reg_domain_info() -> str:
+    async def get_reg_domain_info() -> str:
         """
-        Retrieve the radio's regulatory domain using 'netlink' (pyroute2)
+        Retrieve the radio's regulatory domain using pyroute2's async nl80211 API.
         """
-        iw = IW()
         try:
-            res = iw.get_regulatory_domain()
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                res = await iw.get_regulatory_domain(0)
 
             for phy in res:
-                phy_name = phy.get_attr("NL80211_ATTR_WIPHY")
-                if phy_name is None or phy_name != 0:
-                    continue
-
-                return str(phy.get_attr("NL80211_ATTR_REG_ALPHA2"))
+                reg_alpha2 = phy.get_attr("NL80211_ATTR_REG_ALPHA2")
+                if reg_alpha2 is not None:
+                    return str(reg_alpha2)
 
             # If not found, raise exception
             raise Exception("interface not found")
         except Exception as exception:
             print(f"Unable to read reg domain: {str(exception)}")
             return "WW"
-        finally:
-            iw.close()
 
     @staticmethod
-    def get_frequency_info(interface: str, frequency: int) -> int:
+    async def get_frequency_info(interface: str, frequency: int) -> int:
         """
         Retrieve the current frequency used by the given 'interface' as an int using 'frequency' as
         a default
         """
-        iw = IW()
         try:
-            for iface in iw.get_interfaces_dump():
-                if str(iface.get_attr("NL80211_ATTR_IFNAME")) != interface:
-                    continue
+            async with AsyncIW() as iw:
+                await iw.setup_endpoint()
+                interfaces = await iw.get_interfaces_dump()
+                try:
+                    async for iface in interfaces:
+                        if str(iface.get_attr("NL80211_ATTR_IFNAME")) != interface:
+                            continue
 
-                return int(iface.get_attr("NL80211_ATTR_WIPHY_FREQ"))
+                        return int(iface.get_attr("NL80211_ATTR_WIPHY_FREQ"))
+                finally:
+                    await interfaces.aclose()
 
             # If not found, raise exception
             raise Exception("interface not found")
         except Exception as exception:
             syslog(LOG_ERR, f"Unable to read frequency value: {str(exception)}")
             return frequency
-        finally:
-            iw.close()
 
     @staticmethod
-    def get_ap_properties(
+    async def get_ap_properties(
         wireless_properties: dict,
         ap_props: Optional[dict],
         interface_name: str,
@@ -3490,15 +3481,16 @@ class NetworkManagerService(object, metaclass=Singleton):
             )
             if mode == NM80211Mode.NM_802_11_MODE_AP:
                 ap_properties["Strength"] = 100
-                ap_properties["Frequency"] = NetworkManagerService().get_frequency_info(
-                    interface_name, ap_props.get("Frequency", 0)
+                ap_properties["Frequency"] = await NetworkManagerService.get_frequency_info(
+                    interface_name,
+                    ap_props.get("Frequency", 0),
                 )
                 ap_properties["Signal"] = INVALID_RSSI
             else:
                 ap_properties["Strength"] = ap_props.get("Strength", 0)
                 ap_properties["Frequency"] = ap_props.get("Frequency", 0)
-                (success, signal) = NetworkManagerService().get_active_ap_rssi(
-                    interface_name
+                (success, signal) = await NetworkManagerService.get_active_ap_rssi(
+                    interface_name,
                 )
                 ap_properties["Signal"] = signal if success else INVALID_RSSI
             ap_properties["Channel"] = frequency_to_channel(ap_properties["Frequency"])
@@ -3797,7 +3789,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         return wired
 
     @staticmethod
-    def get_wifi_properties(wireless_properties: dict) -> dict:
+    async def get_wifi_properties(wireless_properties: dict) -> dict:
         """
         Retrieve a dictionary of properties for a wireless (Wi-Fi) device with the provided
         dictionary
@@ -3809,7 +3801,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         wireless["Mode"] = int(
             wireless_properties.get("Mode", NM80211Mode.NM_802_11_MODE_UNKNOWN)
         )
-        wireless["RegDomain"] = NetworkManagerService().get_reg_domain_info()
+        wireless["RegDomain"] = await NetworkManagerService.get_reg_domain_info()
         wireless["LastScan"] = int(wireless_properties.get("LastScan", -1))
         return wireless
 
@@ -4049,13 +4041,13 @@ class NetworkManagerService(object, metaclass=Singleton):
                     == NMDeviceType.NM_DEVICE_TYPE_WIFI
                 ):
                     status[device.device_interface_name]["wireless"] = (
-                        self.get_wifi_properties(
+                        await self.get_wifi_properties(
                             device.device_properties,
                         )
                     )
                     if dev_state == NMDeviceState.NM_DEVICE_STATE_ACTIVATED:
                         status[device.device_interface_name]["ActiveAccessPoint"] = (
-                            self.get_ap_properties(
+                            await self.get_ap_properties(
                                 device.device_properties,
                                 (
                                     device.active_access_point.properties

@@ -740,7 +740,7 @@ class NetworkInterfaceStationDump(object):
                 resp.media = result
                 return
 
-            result["stations"] = NetworkService.get_station_dump(ifname=name)
+            result["stations"] = await NetworkService.get_station_dump(ifname=name)
             result["SDCERR"] = 0
         except Exception as e:
             result["InfoMsg"] = f"Could not retrieve interface station dump - {str(e)}"
@@ -777,7 +777,7 @@ class NetworkInterfaceAvailableApChannels(object):
                 resp.media = result
                 return
 
-            result["channels"] = NetworkService.get_interface_available_ap_channels(
+            result["channels"] = await NetworkService.get_interface_available_ap_channels(
                 ifname=name
             )
             result["SDCERR"] = 0
