@@ -10,9 +10,13 @@ SYSTEM_CONF_DIR = "/etc"
 
 NETWORKMANAGER_CONF_DIR = "/etc/NetworkManager/"
 # summit-rcm.ini is for server config. It should be updated only by software update.
-SUMMIT_RCM_SERVER_CONF_FILE = "/etc/summit-rcm.ini"
+SUMMIT_RCM_SERVER_CONF_FILE = os.environ.get(
+    "SUMMIT_RCM_SERVER_CONF_FILE", "/etc/summit-rcm.ini"
+)
 # system settings
-SUMMIT_RCM_SETTINGS_FILE = "/etc/summit-rcm/summit-rcm-settings.ini"
+SUMMIT_RCM_SETTINGS_FILE = os.environ.get(
+    "SUMMIT_RCM_SETTINGS_FILE", "/etc/summit-rcm/summit-rcm-settings.ini"
+)
 # log forwarding
 LOG_FORWARDING_ENABLED_FLAG_FILE = "/etc/summit-rcm/log_forwarding_enabled"
 
