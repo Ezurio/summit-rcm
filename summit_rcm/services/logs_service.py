@@ -43,19 +43,22 @@ class LogsService(metaclass=Singleton):
     """Service to handle interfacing with logs"""
 
     @staticmethod
-    def format_days_since_for_journalctl(days_since: int) -> str:
-        """Format the given 'days_since' value for use with journalctl"""
-        return datetime.fromtimestamp(time.time() - days_since * 86400).strftime(
-            JOURNALCTL_DAYS_SINCE_FORMAT_STRING
-        )
+    def format_days_since_for_journalctl(days_since: int, hours_since: int = 0) -> str:
+        """Format the given 'days_since' and 'hours_since' values for use with journalctl"""
+        return datetime.fromtimestamp(
+            time.time() - (days_since * 86400 + hours_since * 3600)
+        ).strftime(JOURNALCTL_DAYS_SINCE_FORMAT_STRING)
 
     @staticmethod
     async def get_journal_log_data(
-        log_type: JournalctlLogTypesEnum, priority: int, days: int
+        log_type: JournalctlLogTypesEnum, priority: int, days: int, hours: int = 0
     ) -> list:
         """Retrieve journal log data using the given parameters as a list"""
         if priority not in range(0, 8, 1):
             raise ValueError("Priority must be an int between 0-7")
+        if hours < 0:
+            raise ValueError("Hours must be a non-negative int")
+        days = max(days, 0)
 
         log_type = str(log_type.value).lower()
         if log_type == "networkmanager":
@@ -72,9 +75,9 @@ class LogsService(metaclass=Singleton):
         ]
         if log_type != "All":
             journalctl_args.append(f"--identifier={str(log_type)}")
-        if days > 0:
+        if days > 0 or hours > 0:
             journalctl_args.append(
-                f"--since={LogsService.format_days_since_for_journalctl(days)}"
+                f"--since={LogsService.format_days_since_for_journalctl(days, hours)}"
             )
 
         proc = await asyncio.create_subprocess_exec(
