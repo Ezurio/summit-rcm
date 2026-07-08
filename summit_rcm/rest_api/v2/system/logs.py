@@ -139,10 +139,10 @@ class LogsDataResource:
             priority = int(req.params.get("priority", 7))
             if priority not in range(0, 8, 1):
                 raise ValueError("Priority must be an int between 0-7")
-            days = int(req.params.get("days", 1))
             hours = int(req.params.get("hours", 0))
             if hours < 0:
                 raise ValueError("hours must be a non-negative int")
+            days = int(req.params.get("days", 0 if "hours" in req.params else 1))
             log_type = JournalctlLogTypesEnum(req.params.get("type", "All"))
 
             resp.media = await LogsService.get_journal_log_data(
