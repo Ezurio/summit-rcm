@@ -271,7 +271,7 @@ class LogsDataRequestQuery(BaseModel):
         le=7,
         default=7,
     )
-    days: Optional[int] = Field(ge=0, default=1)
+    days: Optional[int] = Field(ge=0, default=0)
     hours: Optional[int] = Field(ge=0, default=0)
     type: Optional[JournalctlLogTypesEnum] = Field(default=JournalctlLogTypesEnum.ALL)
 
