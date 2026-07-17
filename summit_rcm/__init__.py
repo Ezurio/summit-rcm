@@ -710,27 +710,29 @@ try:
             "/datetime": RouteAdd(add_date_time_legacy()),
         }
 
+        def __init__(self):
+            # Per-instance so multiple app instances do not share loaded-route state.
+            self.loaded_plugin_v2_routes = set()
+            self.loaded_plugin_legacy_routes = set()
+            # Serialize lazy route loading so concurrent requests can't both
+            # await the same route coroutine or register the same routes twice.
+            self._route_load_lock = asyncio.Lock()
+
         async def process_request(self, req, resp):
             """Load the routes when the first request is received"""
             global discovered_plugins
 
+            should_load_plugin_routes = False
+
             # Check if the requested path is already loaded
-            if app._router.find(req.path):
-                return True
-
-            # Check if the requested path is a known route and load it
-            for route, route_add in self.routes_dict.items():
-                if req.path.startswith(route):
-                    if route_add.awaited:
-                        break
-                    await route_add.route
-                    route_add.awaited = True
-                    if app._router.find(req.path):
-                        return True
-                    break
-
-            # Check if the requested path is a plugin route and load it
             for name, module in discovered_plugins.items():
+                # Already-loaded plugins can't change should_load_plugin_routes,
+                # so skip them before fetching their (possibly heavy) route lists.
+                if (
+                    name in self.loaded_plugin_v2_routes
+                    and name in self.loaded_plugin_legacy_routes
+                ):
+                    continue
                 # If optional method for supported routes is implemented, use it
                 if hasattr(module, "get_legacy_supported_routes") and hasattr(
                     module, "get_v2_supported_routes"
@@ -741,27 +743,80 @@ try:
                     legacy_module_routes = await module.get_legacy_routes()
                     v2_module_routes = await module.get_v2_routes()
 
-                for route in v2_module_routes:
-                    if req.path.startswith(route):
-                        if isinstance(v2_module_routes, list):
-                            v2_module_routes_dict = await module.get_v2_routes()
-                        else:
-                            v2_module_routes_dict = v2_module_routes
-                        for route in v2_module_routes_dict:
-                            add_route(route, v2_module_routes_dict[route])
-                            summit_rcm_plugins.append(route[1:])
-                        return True
+                if (
+                    name not in self.loaded_plugin_v2_routes
+                    and any(req.path.startswith(route) for route in v2_module_routes)
+                ):
+                    should_load_plugin_routes = True
 
-                for route in legacy_module_routes:
+                if (
+                    name not in self.loaded_plugin_legacy_routes
+                    and any(req.path.startswith(route) for route in legacy_module_routes)
+                ):
+                    should_load_plugin_routes = True
+
+                if should_load_plugin_routes:
+                    break
+
+            if app._router.find(req.path) and not should_load_plugin_routes:
+                return True
+
+            # Serialize route loading so concurrent requests can't both await the
+            # same route coroutine or register the same routes twice.
+            async with self._route_load_lock:
+                # Check if the requested path is a known route and load it
+                for route, route_add in self.routes_dict.items():
                     if req.path.startswith(route):
-                        if isinstance(legacy_module_routes, list):
-                            legacy_module_routes_dict = await module.get_legacy_routes()
-                        else:
-                            legacy_module_routes_dict = legacy_module_routes
-                        for route in legacy_module_routes_dict:
-                            add_route(route, legacy_module_routes_dict[route])
-                            summit_rcm_plugins.append(route[1:])
-                        return True
+                        if route_add.awaited:
+                            break
+                        await route_add.route
+                        route_add.awaited = True
+                        if app._router.find(req.path):
+                            return True
+                        break
+
+                # Check if the requested path is a plugin route and load it
+                for name, module in discovered_plugins.items():
+                    # If optional method for supported routes is implemented, use it
+                    if hasattr(module, "get_legacy_supported_routes") and hasattr(
+                        module, "get_v2_supported_routes"
+                    ):
+                        legacy_module_routes = await module.get_legacy_supported_routes()
+                        v2_module_routes = await module.get_v2_supported_routes()
+                    else:
+                        legacy_module_routes = await module.get_legacy_routes()
+                        v2_module_routes = await module.get_v2_routes()
+
+                    for route in v2_module_routes:
+                        if req.path.startswith(route):
+                            if name in self.loaded_plugin_v2_routes:
+                                break
+                            if isinstance(v2_module_routes, list):
+                                v2_module_routes_dict = await module.get_v2_routes()
+                            else:
+                                v2_module_routes_dict = v2_module_routes
+                            for route in v2_module_routes_dict:
+                                add_route(route, v2_module_routes_dict[route])
+                                summit_rcm_plugins.append(route[1:])
+                            self.loaded_plugin_v2_routes.add(name)
+                            break
+
+                    for route in legacy_module_routes:
+                        if req.path.startswith(route):
+                            if name in self.loaded_plugin_legacy_routes:
+                                break
+                            if isinstance(legacy_module_routes, list):
+                                legacy_module_routes_dict = await module.get_legacy_routes()
+                            else:
+                                legacy_module_routes_dict = legacy_module_routes
+                            for route in legacy_module_routes_dict:
+                                add_route(route, legacy_module_routes_dict[route])
+                                summit_rcm_plugins.append(route[1:])
+                            self.loaded_plugin_legacy_routes.add(name)
+                            break
+
+                if app._router.find(req.path):
+                    return True
 
     def add_default_middleware() -> None:
         """Add middleware to the ASGI application"""
