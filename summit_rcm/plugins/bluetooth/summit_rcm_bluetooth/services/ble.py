@@ -31,6 +31,17 @@ ADAPTER_IFACE = "org.bluez.Adapter1"
 DEVICE_IFACE = "org.bluez.Device1"
 BLUEZ_PATH_PREPEND = "/org/bluez/"
 AGENT_PATH = "/com/summit/agent"
+DEFAULT_PAIRING_IO_CAPABILITY = "NoInputNoOutput"
+
+
+class BluetoothPairingIOCapability(str, Enum):
+    """Enumeration of BlueZ pairing agent IO capabilities exposed over REST."""
+
+    DISPLAY_ONLY = "DisplayOnly"
+    DISPLAY_YES_NO = "DisplayYesNo"
+    KEYBOARD_ONLY = "KeyboardOnly"
+    KEYBOARD_DISPLAY = "KeyboardDisplay"
+    NO_INPUT_NO_OUTPUT = "NoInputNoOutput"
 
 
 def controller_pretty_name(name: str):
@@ -192,24 +203,83 @@ class AgentSingleton:
     def clear_instance():
         AgentSingleton.__instance = None
 
+    @staticmethod
+    def get_existing_instance():
+        return AgentSingleton.__instance
+
     def __init__(self):
         """Virtually private constructor."""
         self.passkeys = {}
+        self.registered = False
         if AgentSingleton.__instance is None:
             AgentSingleton.__instance = self
 
 
-async def create_agent_singleton() -> AgentSingleton:
+async def unregister_agent_singleton() -> None:
+    """Unregister and unexport the shared BlueZ agent if it is currently active."""
+
+    bus = await DBusManager().get_bus()
+    obj = bus.get_proxy_object(
+        BLUEZ_SERVICE_NAME,
+        "/org/bluez",
+        await bus.introspect(BLUEZ_SERVICE_NAME, "/org/bluez"),
+    )
+    agent_manager = obj.get_interface("org.bluez.AgentManager1")
+
+    try:
+        await agent_manager.call_unregister_agent(AGENT_PATH)
+    except Exception:
+        pass
+
+    try:
+        bus.unexport(AGENT_PATH)
+    except Exception:
+        pass
+
+    agent_instance = AgentSingleton.get_existing_instance()
+    if agent_instance is not None:
+        agent_instance.registered = False
+
+
+async def create_agent_singleton(
+    io_capability: str = DEFAULT_PAIRING_IO_CAPABILITY,
+) -> AgentSingleton:
     """
     Async wrapper to create/generate the AgentSingleton
     """
 
-    agent_singleton = AgentSingleton()
+    requested_io_capability = io_capability or DEFAULT_PAIRING_IO_CAPABILITY
+    agent_singleton = AgentSingleton.get_existing_instance() or AgentSingleton()
+    current_io_capability = getattr(
+        agent_singleton,
+        "io_capability",
+        DEFAULT_PAIRING_IO_CAPABILITY,
+    )
+    agent_singleton.io_capability = requested_io_capability
 
-    syslog("Registering agent for auto-pairing...")
+    if (
+        agent_singleton.registered
+        and current_io_capability == requested_io_capability
+    ):
+        return agent_singleton
+
+    if agent_singleton.registered:
+        syslog(
+            "Re-registering agent for auto-pairing "
+            f"with IO capability {requested_io_capability} "
+            f"(was {current_io_capability})"
+        )
+        agent_singleton.registered = False
+    else:
+        syslog(
+            "Registering agent for auto-pairing "
+            f"with IO capability {requested_io_capability}"
+        )
+
     try:
         # get the system bus
         bus = await DBusManager().get_bus()
+        await unregister_agent_singleton()
         agent = AuthenticationAgent(AGENT_IFACE)
         bus.export(AGENT_PATH, agent)
 
@@ -220,8 +290,11 @@ async def create_agent_singleton() -> AgentSingleton:
         )
 
         agent_manager = obj.get_interface("org.bluez.AgentManager1")
-        await agent_manager.call_register_agent(AGENT_PATH, "NoInputNoOutput")
+        await agent_manager.call_register_agent(AGENT_PATH, requested_io_capability)
+        await agent_manager.call_request_default_agent(AGENT_PATH)
+        agent_singleton.registered = True
     except Exception as exception:
+        agent_singleton.registered = False
         syslog(LOG_ERR, str(exception))
 
     return agent_singleton
@@ -235,6 +308,9 @@ class AuthenticationAgent(ServiceInterface):
 
     @method()
     def Release(self):
+        agent_instance = AgentSingleton.get_existing_instance()
+        if agent_instance is not None:
+            agent_instance.registered = False
         syslog("AuthenticationAgent Release")
 
     @method()
