@@ -696,6 +696,7 @@ class Bluetooth(metaclass=Singleton):
     ):
         result = {}
         error_message = None
+        extra_data = {}
         processed = False
         if command == "getConnInfo":
             processed = True
@@ -715,7 +716,7 @@ class Bluetooth(metaclass=Singleton):
         else:
             for plugin in bluetooth_plugins:
                 try:
-                    processed, error_message = await plugin.ProcessDeviceCommand(
+                    result_tuple = await plugin.ProcessDeviceCommand(
                         bus,
                         command,
                         device_uuid,
@@ -724,10 +725,17 @@ class Bluetooth(metaclass=Singleton):
                         post_data,
                         self.remove_device_method,
                     )
+                    # ProcessDeviceCommand returns (processed, error_message) or
+                    # (processed, error_message, extra_data) for commands that
+                    # surface data in the REST response (e.g. bleGatt read).
+                    processed = result_tuple[0]
+                    error_message = result_tuple[1] if len(result_tuple) > 1 else None
+                    extra_data = result_tuple[2] if len(result_tuple) > 2 else {}
                 except Exception as exception:
                     self.log_exception(exception)
                     processed = True
                     error_message = f"Command {command} failed with {str(exception)}"
+                    extra_data = {}
                     break
                 if processed:
                     break

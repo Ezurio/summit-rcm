@@ -139,7 +139,10 @@ class BluetoothBlePlugin(BluetoothPlugin):
             self.ble_logger.error_occurred = False
         if command == "bleConnect":
             processed = True
-            await bt_connect(self.bt, device_uuid)
+            device_path = device_interface.path if device_interface is not None else ""
+            connected = await bt_connect(self.bt, device_uuid, device_path)
+            if not connected:
+                return True, f"Failed to connect BLE device {device_uuid}"
         elif command == "bleDisconnect":
             processed = True
             purge = False
@@ -151,24 +154,40 @@ class BluetoothBlePlugin(BluetoothPlugin):
             if "svcUuid" not in post_data:
                 return True, "svcUuid param not specified"
             if "chrUuid" not in post_data:
-                return True, "charUuid param not specified"
+                return True, "chrUuid param not specified"
             if "operation" not in post_data:
                 return True, "operation param not specified"
             service_uuid = post_data["svcUuid"]
             char_uuid = post_data["chrUuid"]
             operation = post_data["operation"]
             if operation == "read":
-                await bt_read_characteristic(
+                value = await bt_read_characteristic(
                     self.bt, device_uuid, service_uuid, char_uuid
                 )
+                if value is None:
+                    return True, (
+                        f"read characteristic {char_uuid} in service "
+                        f"{service_uuid} failed for device {device_uuid}"
+                    )
+                extra: dict = {}
+                try:
+                    extra["value"] = bytearray(value).hex()
+                except Exception:
+                    pass
+                return True, None, extra
             elif operation == "write":
                 if "value" not in post_data:
                     return True, "value param not specified"
                 value = post_data["value"]
                 value_bytes = bytearray.fromhex(value)
-                await bt_write_characteristic(
+                write_success = await bt_write_characteristic(
                     self.bt, device_uuid, service_uuid, char_uuid, value_bytes
                 )
+                if not write_success:
+                    return True, (
+                        f"write characteristic {char_uuid} in service "
+                        f"{service_uuid} failed for device {device_uuid}"
+                    )
             elif operation == "notify":
                 if "enable" not in post_data:
                     return True, "enable param not specified"

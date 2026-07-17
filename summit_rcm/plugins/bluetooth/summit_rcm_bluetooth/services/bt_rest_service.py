@@ -40,10 +40,13 @@ class BluetoothRESTService:
     @staticmethod
     def prepare_response_media(media: dict, is_legacy: bool = False) -> dict:
         """
-        Remove the 'InfoMsg' and 'SDCERR' items from the response dictionary for non-legacy
-        responses
+        Remove successful command status fields from non-legacy responses while preserving
+        failure details so v2 clients can diagnose command-level errors returned over HTTP 200.
         """
         if is_legacy:
+            return media
+
+        if media.get("SDCERR") != definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]:
             return media
 
         if "InfoMsg" in media:
