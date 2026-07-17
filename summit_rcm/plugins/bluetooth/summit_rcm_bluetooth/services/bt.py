@@ -21,6 +21,7 @@ from summit_rcm import definition
 from summit_rcm_bluetooth.services.ble import (
     DBUS_PROP_IFACE,
     controller_pretty_name,
+    DEFAULT_PAIRING_IO_CAPABILITY,
     find_device,
     DEVICE_IFACE,
     ADAPTER_IFACE,
@@ -603,6 +604,9 @@ class Bluetooth(metaclass=Singleton):
         post_data,
     ):
         result = {}
+        pairing_io_capability = post_data.get(
+            "pairingIoCapability", DEFAULT_PAIRING_IO_CAPABILITY
+        )
         for settable_property in SETTABLE_DEVICE_PROPS:
             prop_name, prop_type, prop_signature = settable_property
             value = post_data.get(lower_camel_case(prop_name), None)
@@ -616,14 +620,18 @@ class Bluetooth(metaclass=Singleton):
                 )
         auto_connect = post_data.get("autoConnect", None)
         if auto_connect == 1:
-            await create_agent_singleton()
+            await create_agent_singleton(pairing_io_capability)
         paired = post_data.get("paired", None)
         if paired == 1:
             paired_state = (
                 1 if variant_to_python(await device_interface.get_paired()) else 0
             )
             if paired_state != paired:
-                await create_agent_singleton()
+                syslog(
+                    LOG_INFO,
+                    f"Pairing {device_uuid} using IO capability {pairing_io_capability}",
+                )
+                await create_agent_singleton(pairing_io_capability)
                 await asyncio.wait_for(
                     device_interface.call_pair(), PAIR_TIMEOUT_SECONDS
                 )
@@ -639,7 +647,7 @@ class Bluetooth(metaclass=Singleton):
             if connected == 1:
                 # Note - device may need to be paired prior to connecting
                 # AgentSingleton can be registered to allow BlueZ to auto-pair (without bonding)
-                await create_agent_singleton()
+                await create_agent_singleton(pairing_io_capability)
                 if bluetooth_ble_plugin:
                     await bluetooth_ble_plugin.initialize()
                 if bluetooth_ble_plugin and bluetooth_ble_plugin.bt:
@@ -746,6 +754,8 @@ class Bluetooth(metaclass=Singleton):
         else:
             result["SDCERR"] = definition.SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             result["InfoMsg"] = ""
+            if isinstance(extra_data, dict):
+                result.update(extra_data)
 
         return result
 
