@@ -14,6 +14,7 @@ from summit_rcm.rest_api.utils.spectree.models import (
 )
 from summit_rcm_bluetooth.services.ble import (
     BLEWriteCharacteristicType,
+    BluetoothPairingIOCapability,
     VSPSocketRxTypeEnum,
 )
 
@@ -136,6 +137,13 @@ class BluetoothControlRequestModel(BaseModel):
     Pattern: Optional[str] = Field(description="Pattern Discovery filter", default=None)
     autoConnect: Optional[int] = Field(description="Auto-connect state", default=None)
     paired: Optional[int] = Field(description="Paired state", default=None)
+    pairingIoCapability: Optional[BluetoothPairingIOCapability] = Field(
+        description=(
+            "Optional BlueZ pairing agent IO capability to register before a paired or "
+            "connected request. Defaults to NoInputNoOutput when omitted."
+        ),
+        default=None,
+    )
     passkey: Optional[str] = Field(description="Passkey", default=None)
     connected: Optional[int] = Field(description="Connected state", default=None)
     purge: Optional[bool] = Field(
