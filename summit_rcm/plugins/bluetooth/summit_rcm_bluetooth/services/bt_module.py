@@ -26,6 +26,15 @@ BT_CHARACTERISTIC_IFACE = "org.bluez.GattCharacteristic1"
 DBUS_OBJ_MGR_IFACE = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
 CONNECT_TIMEOUT_SECONDS = 60
+PROFILE_UNAVAILABLE_GRACE_SECONDS = 5
+PROFILE_UNAVAILABLE_POLL_INTERVAL_SECONDS = 0.1
+SERVICE_RESOLUTION_GRACE_SECONDS = 10
+SERVICE_RESOLUTION_POLL_INTERVAL_SECONDS = 0.1
+# After Numeric Comparison pairing, BlueZ briefly removes/re-adds the device
+# D-Bus object while distributing keys. Retry the managed-objects scan so that
+# bleConnect doesn't fail during this transitional window.
+POST_PAIR_DEVICE_LOOKUP_GRACE_SECONDS = 6
+POST_PAIR_DEVICE_LOOKUP_RETRY_INTERVAL_SECONDS = 0.5
 
 RESULT_SUCCESS = 0
 RESULT_ERR = -1
@@ -80,10 +89,11 @@ class BtMgr(threading.Thread):
         """
         Returns a path to the service for the given device identified by the UUID
         """
+        requested_uuid = service_uuid.lower()
         for path, interfaces in self.objects.items():
             if path.startswith(device_path):
                 service = interfaces.get(BT_SERVICE_IFACE)
-                if service and str(variant_to_python(service["UUID"])) == service_uuid:
+                if service and str(variant_to_python(service["UUID"])).lower() == requested_uuid:
                     return path
         return None
 
@@ -104,6 +114,151 @@ class BtMgr(threading.Thread):
 
         return chars_array
 
+    async def find_characteristic(self, device_path, char_uuid, service_uuid=""):
+        requested_char_uuid = char_uuid.lower()
+        requested_service_uuid = service_uuid.lower()
+        for path, interfaces in self.objects.items():
+            if not path.startswith(device_path):
+                continue
+            char = interfaces.get(BT_CHARACTERISTIC_IFACE)
+            if not char:
+                continue
+            if str(variant_to_python(char["UUID"])).lower() != requested_char_uuid:
+                continue
+
+            if requested_service_uuid:
+                service_path = path.rsplit("/", 1)[0]
+                service = self.objects.get(service_path, {}).get(BT_SERVICE_IFACE)
+                if not service or str(variant_to_python(service["UUID"])).lower() != requested_service_uuid:
+                    continue
+
+            return path
+
+        return None
+
+    def available_characteristics(self, device_path, service_uuid=""):
+        requested_service_uuid = service_uuid.lower()
+        characteristics = []
+        for path, interfaces in self.objects.items():
+            if not path.startswith(device_path):
+                continue
+
+            char = interfaces.get(BT_CHARACTERISTIC_IFACE)
+            if not char:
+                continue
+
+            service_path = path.rsplit("/", 1)[0]
+            service = self.objects.get(service_path, {}).get(BT_SERVICE_IFACE)
+            service_uuid_value = ""
+            if service:
+                service_uuid_value = str(variant_to_python(service["UUID"]))
+                if (
+                    requested_service_uuid
+                    and service_uuid_value.lower() != requested_service_uuid
+                ):
+                    continue
+
+            characteristics.append(
+                f"{variant_to_python(char['UUID'])} ({service_uuid_value or 'unknown service'})"
+            )
+
+        return characteristics
+
+    def available_services(self, device_path):
+        services = []
+        for path, interfaces in self.objects.items():
+            if not path.startswith(device_path):
+                continue
+
+            service = interfaces.get(BT_SERVICE_IFACE)
+            if service:
+                services.append(f"{variant_to_python(service['UUID'])} ({path})")
+
+        return services
+
+    async def _connect_device(self, device):
+        await device.connect()
+
+        gatt_reload_attempted = False
+        deadline = asyncio.get_running_loop().time() + SERVICE_RESOLUTION_GRACE_SECONDS
+        while asyncio.get_running_loop().time() < deadline:
+            if await device.is_connected() and await device.is_services_resolved():
+                # Verify GattService1 D-Bus objects actually exist. After Numeric
+                # Comparison pairing, the device may show Connected+ServicesResolved=True
+                # from the pairing link but BlueZ has not loaded the GATT profile
+                # (br-connection-profile-unavailable). GattService1 objects are absent.
+                # Detect this and disconnect+reconnect to establish a proper GATT conn.
+                fresh_objects = await self.manager.call_get_managed_objects()
+                has_gatt = any(
+                    BT_SERVICE_IFACE in ifaces
+                    for path, ifaces in fresh_objects.items()
+                    if path.startswith(device.get_path())
+                )
+                if has_gatt:
+                    self.logger.info(
+                        "Device %s connected with services resolved before GATT cache build",
+                        device.get_address(),
+                    )
+                    await self.mgr_connection_callback(device)
+                    return True
+                if not gatt_reload_attempted:
+                    gatt_reload_attempted = True
+                    self.logger.warning(
+                        "Device %s: Connected+ServicesResolved but no GattService1 objects; "
+                        "disconnecting pairing link to reload GATT profile",
+                        device.get_address(),
+                    )
+                    try:
+                        await device.interface.call_disconnect()
+                        self.logger.info(
+                            "Device %s: GATT-reload disconnect sent", device.get_address()
+                        )
+                    except Exception as disc_exc:
+                        self.logger.warning(
+                            "Device %s: GATT-reload disconnect raised: %s",
+                            device.get_address(),
+                            disc_exc,
+                        )
+                    await asyncio.sleep(PROFILE_UNAVAILABLE_POLL_INTERVAL_SECONDS)
+                    # Re-connect bounded by the time remaining in the grace window
+                    # so the reconnect can't overshoot the outer deadline.
+                    self.logger.info(
+                        "Device %s: GATT-reload: calling Device1.Connect() for bonded reconnect",
+                        device.get_address(),
+                    )
+                    try:
+                        await asyncio.wait_for(
+                            device.interface.call_connect(),
+                            max(0.0, deadline - asyncio.get_running_loop().time()),
+                        )
+                        self.logger.info(
+                            "Device %s: GATT-reload: Device1.Connect() returned (Connected=%s ServicesResolved=%s)",
+                            device.get_address(),
+                            await device.is_connected(),
+                            await device.is_services_resolved(),
+                        )
+                    except Exception as reload_exc:
+                        self.logger.warning(
+                            "Device %s: GATT-reload: Device1.Connect() raised %s: %s",
+                            device.get_address(),
+                            type(reload_exc).__name__,
+                            reload_exc,
+                        )
+            await asyncio.sleep(SERVICE_RESOLUTION_POLL_INTERVAL_SECONDS)
+
+        if await device.is_connected():
+            self.logger.info(
+                "Device %s connected but services were not resolved before GATT cache build",
+                device.get_address(),
+            )
+            await self.mgr_connection_callback(device)
+            return True
+
+        self.logger.error(
+            "Device %s failed to reach a connected state", device.get_address()
+        )
+        return False
+
     async def connect(self, address, device_path=""):
         """
         Connect to the bluetooth device at the designated address
@@ -123,29 +278,55 @@ class BtMgr(threading.Thread):
                 self.write_notification_callback,
                 throw_exceptions=self.throw_exceptions,
             )
-            await device.connect()
-            success = True
+            success = await self._connect_device(device)
         else:
-            for path, interfaces in self.objects.items():
-                if path.startswith(self.adapter.path):
-                    device = interfaces.get(BT_DEVICE_IFACE)
-                    if device and str(variant_to_python(device["Address"])) == address:
-                        # Found it; create and connect
-                        # NOTE: The 'mgr_connection_callback' will store the device locally if it
-                        # connects successfully
-                        device = await create_device(
-                            address,
-                            path,
-                            self.characteristic_property_change_callback,
-                            self.mgr_connection_callback,
-                            self.write_notification_callback,
-                            throw_exceptions=self.throw_exceptions,
-                        )
-                        await device.connect()
-                        success = True
+            # No explicit path supplied (device_interface was None in the REST layer, which
+            # happens when find_device() returned None). BlueZ briefly removes and re-adds
+            # the device D-Bus object after Numeric Comparison pairing completes (key
+            # distribution). Retry the managed-objects scan for up to
+            # POST_PAIR_DEVICE_LOOKUP_GRACE_SECONDS before giving up.
+            deadline = (
+                asyncio.get_running_loop().time() + POST_PAIR_DEVICE_LOOKUP_GRACE_SECONDS
+            )
+            while not success:
+                for path, interfaces in self.objects.items():
+                    if path.startswith(self.adapter.path):
+                        device = interfaces.get(BT_DEVICE_IFACE)
+                        if device and str(variant_to_python(device["Address"])) == address:
+                            # Found it; create and connect
+                            # NOTE: The 'mgr_connection_callback' will store the device
+                            # locally if it connects successfully
+                            device = await create_device(
+                                address,
+                                path,
+                                self.characteristic_property_change_callback,
+                                self.mgr_connection_callback,
+                                self.write_notification_callback,
+                                throw_exceptions=self.throw_exceptions,
+                            )
+                            success = await self._connect_device(device)
+                            break
+
+                if success or asyncio.get_running_loop().time() >= deadline:
+                    break
+
+                self.logger.info(
+                    "Device %s not yet visible in managed objects "
+                    "(BlueZ post-pairing transition), retrying in %.1fs "
+                    "(%.1fs remaining)...",
+                    address,
+                    POST_PAIR_DEVICE_LOOKUP_RETRY_INTERVAL_SECONDS,
+                    deadline - asyncio.get_running_loop().time(),
+                )
+                await asyncio.sleep(POST_PAIR_DEVICE_LOOKUP_RETRY_INTERVAL_SECONDS)
+                self.objects = await self.manager.call_get_managed_objects()
 
         if not success:
-            self.logger.error("Device %s was not found", address)
+            self.logger.error("Failed to connect device %s", address)
+            if self.throw_exceptions:
+                raise RuntimeError(f"Failed to connect device {address}")
+
+        return success
 
     async def disconnect(self, address, purge):
         """
@@ -157,7 +338,7 @@ class BtMgr(threading.Thread):
         device = self.devices.get(address)
         if device is not None:
             device_path = device.get_path()
-            device.disconnect()
+            await device.disconnect()
             if purge:
                 await self.adapter.call_remove_device(device_path)
         else:
@@ -174,20 +355,197 @@ class BtMgr(threading.Thread):
 
             device = self.devices.get(address)
             if device is not None:
-                uuids = await device.get_service_uuids()
-                for uuid in uuids:
+                services = []
+                for uuid in await device.get_service_uuids():
                     service_path = await self.find_service(device.get_path(), uuid)
                     if service_path:
-                        await device.add_service(uuid, service_path)
-                        service = device.get_service(uuid)
+                        services.append((uuid, service_path))
 
-                        chars_array = await self.find_characteristics(service_path)
-                        for char in chars_array:
-                            await service.add_characteristic(char["uuid"], char["path"])
+                for path, interfaces in self.objects.items():
+                    if not path.startswith(device.get_path()):
+                        continue
+                    service_props = interfaces.get(BT_SERVICE_IFACE)
+                    if service_props:
+                        services.append((variant_to_python(service_props["UUID"]), path))
+
+                for uuid, service_path in services:
+                    service = await device.add_service(uuid, service_path)
+                    chars_array = await self.find_characteristics(service_path)
+                    for char in chars_array:
+                        await service.add_characteristic(char["uuid"], char["path"])
+
+                self.logger.debug(
+                    "Discovered GATT objects for device %s: services=%s characteristics=%s",
+                    address,
+                    ", ".join(self.available_services(device.get_path())) or "none",
+                    ", ".join(self.available_characteristics(device.get_path())) or "none",
+                )
         except Exception as exception:
             self.logger.error(
                 "Failed to build services for device %s: %s", address, exception
             )
+
+    async def get_device_service(self, address, service_uuid):
+        device = self.devices.get(address)
+        if device is None:
+            self.logger.error("Device %s was not found", address)
+            return None, None
+
+        service = device.get_service(service_uuid)
+        if service is None:
+            await self.build_device_services(address)
+            service = device.get_service(service_uuid)
+
+        return device, service
+
+    async def ensure_device_ready(self, address):
+        device = self.devices.get(address)
+        if device is None:
+            self.logger.error("Device %s was not found", address)
+            return None
+
+        connected = await device.is_connected()
+        services_resolved = await device.is_services_resolved()
+        if connected and services_resolved:
+            return device
+
+        self.logger.info(
+            "Refreshing GATT connection for device %s before operation "
+            "(Connected=%s, ServicesResolved=%s)",
+            address,
+            connected,
+            services_resolved,
+        )
+        device.disconnect_signal()
+        self.devices.pop(address, None)
+        await self.connect(address, device.get_path())
+        refreshed_device = self.devices.get(address)
+        if refreshed_device is not None:
+            self.logger.info(
+                "Post-refresh GATT state for device %s: Connected=%s ServicesResolved=%s services=%s characteristics=%s",
+                address,
+                await refreshed_device.is_connected(),
+                await refreshed_device.is_services_resolved(),
+                ", ".join(self.available_services(refreshed_device.get_path())) or "none",
+                ", ".join(self.available_characteristics(refreshed_device.get_path())) or "none",
+            )
+        else:
+            self.logger.error("Post-refresh GATT state for device %s: device not cached", address)
+
+        return refreshed_device
+
+    async def get_device_characteristic(self, address, service_uuid, char_uuid):
+        device = await self.ensure_device_ready(address)
+        if device is None:
+            return None, None, None
+
+        service = device.get_service(service_uuid)
+        if service is None:
+            await self.build_device_services(address)
+            service = device.get_service(service_uuid)
+
+        if service:
+            char = service.get_characteristic(char_uuid)
+            if char:
+                return device, service, char
+
+        deadline = asyncio.get_running_loop().time() + SERVICE_RESOLUTION_GRACE_SECONDS
+        char_path = None
+        reconnected_during_lookup = False
+        while asyncio.get_running_loop().time() < deadline:
+            connected = await device.is_connected()
+            services_resolved = await device.is_services_resolved()
+            if not connected or not services_resolved:
+                if reconnected_during_lookup:
+                    self.logger.info(
+                        "GATT characteristic lookup for device %s still sees Connected=%s ServicesResolved=%s after reconnect",
+                        address,
+                        connected,
+                        services_resolved,
+                    )
+                else:
+                    self.logger.info(
+                        "GATT characteristic lookup for device %s saw Connected=%s ServicesResolved=%s; reconnecting before retry",
+                        address,
+                        connected,
+                        services_resolved,
+                    )
+                    refreshed_device = await self.ensure_device_ready(address)
+                    if refreshed_device is None:
+                        return None, None, None
+                    device = refreshed_device
+                    service = device.get_service(service_uuid)
+                    if service is None:
+                        await self.build_device_services(address)
+                        service = device.get_service(service_uuid)
+                    if service:
+                        char = service.get_characteristic(char_uuid)
+                        if char:
+                            return device, service, char
+                    reconnected_during_lookup = True
+
+            self.objects = await self.manager.call_get_managed_objects()
+            char_path = await self.find_characteristic(
+                device.get_path(), char_uuid, service_uuid
+            )
+            if char_path:
+                break
+            await asyncio.sleep(SERVICE_RESOLUTION_POLL_INTERVAL_SECONDS)
+
+        if not char_path:
+            service_characteristics = self.available_characteristics(
+                device.get_path(), service_uuid
+            )
+            all_characteristics = self.available_characteristics(device.get_path())
+            services = self.available_services(device.get_path())
+            global_services = self.available_services("")
+            global_characteristics = self.available_characteristics("")
+            device_uuids = await device.get_service_uuids()
+            device_connected = await device.is_connected()
+            device_services_resolved = await device.is_services_resolved()
+            self.logger.error(
+                "Characteristic UUID %s not found for service %s and device %s "
+                "at path %s; connected=%s services_resolved=%s device UUIDs: %s; "
+                "device services: %s; service characteristics: %s; "
+                "device characteristics: %s; global services: %s; "
+                "global characteristics: %s",
+                char_uuid,
+                service_uuid,
+                address,
+                device.get_path(),
+                device_connected,
+                device_services_resolved,
+                ", ".join(device_uuids) if device_uuids else "none",
+                ", ".join(services) if services else "none",
+                ", ".join(service_characteristics) if service_characteristics else "none",
+                ", ".join(all_characteristics) if all_characteristics else "none",
+                ", ".join(global_services) if global_services else "none",
+                ", ".join(global_characteristics) if global_characteristics else "none",
+            )
+            return device, service, None
+
+        service_path = char_path.rsplit("/", 1)[0]
+        service_props = self.objects.get(service_path, {}).get(BT_SERVICE_IFACE)
+        if service is None and service_props:
+            service = await device.add_service(
+                variant_to_python(service_props["UUID"]), service_path
+            )
+
+        char_props = self.objects.get(char_path, {}).get(BT_CHARACTERISTIC_IFACE)
+        characteristic_uuid = (
+            variant_to_python(char_props["UUID"]) if char_props else char_uuid
+        )
+        if service:
+            char = await service.add_characteristic(characteristic_uuid, char_path)
+        else:
+            char = await create_characteristic(
+                characteristic_uuid,
+                char_path,
+                device.write_characteristic_notification_callback,
+                device.characteristic_property_change_callback,
+            )
+
+        return device, service, char
 
     async def get_device_services(self, address):
         """
@@ -218,26 +576,12 @@ class BtMgr(threading.Thread):
         )
 
         try:
-            device = self.devices.get(address)
+            device, _, char = await self.get_device_characteristic(
+                address, service_uuid, char_uuid
+            )
             if device is not None:
-                service = device.get_service(service_uuid)
-                if service:
-                    char = service.get_characteristic(char_uuid)
-                    if char:
-                        value = await char.read_value(offset)
-                    else:
-                        self.logger.error(
-                            "Characteristic UUID %s not found for service %s and device %s",
-                            char_uuid,
-                            service_uuid,
-                            address,
-                        )
-                else:
-                    self.logger.error(
-                        "Service UUID %s not found for device %s", service_uuid, address
-                    )
-            else:
-                self.logger.error("Device %s was not found", address)
+                if char:
+                    value = await char.read_value(offset)
         except Exception as exception:
             self.logger.error(
                 "Failed to read device %s characteristic %s: %s",
@@ -263,30 +607,13 @@ class BtMgr(threading.Thread):
         )
 
         try:
-            device = self.devices.get(address)
+            device, _, char = await self.get_device_characteristic(
+                address, service_uuid, char_uuid
+            )
             if device is not None:
-                service = device.get_service(service_uuid)
-                if service:
-                    char = service.get_characteristic(char_uuid)
-                    if char:
-                        # Convert the value to a DBus-formatted byte array
-                        value_bytes = bytearray(value)
-
-                        # Write the value
-                        await char.write_value(value_bytes, offset)
-                    else:
-                        self.logger.error(
-                            "Characteristic UUID %s not found for service %s and device %s",
-                            char_uuid,
-                            service_uuid,
-                            address,
-                        )
-                else:
-                    self.logger.error(
-                        "Service UUID %s not found for device %s", service_uuid, address
-                    )
-            else:
-                self.logger.error("Device %s was not found", address)
+                if char:
+                    value_bytes = bytearray(value)
+                    return await char.write_value(value_bytes, offset)
         except Exception as exception:
             self.logger.error(
                 "Failed to write device %s characteristic %s: %s",
@@ -294,6 +621,8 @@ class BtMgr(threading.Thread):
                 char_uuid,
                 exception,
             )
+
+        return False
 
     async def configure_characteristic_notification(
         self, address, service_uuid, char_uuid, enable
@@ -317,35 +646,21 @@ class BtMgr(threading.Thread):
             )
 
         try:
-            device: Device = self.devices.get(address)
+            device, _, char = await self.get_device_characteristic(
+                address, service_uuid, char_uuid
+            )
             if device is not None:
-                service: Service = device.get_service(service_uuid)
-                if service:
-                    char: Characteristic = service.get_characteristic(char_uuid)
-                    if char:
-                        if enable:
-                            if not await char.is_notifying():
-                                await char.start_notifications()
-                            else:
-                                self.logger.error(
-                                    "Characteristic %s is already sending notifications",
-                                    char_uuid,
-                                )
+                if char:
+                    if enable:
+                        if not await char.is_notifying():
+                            await char.start_notifications()
                         else:
-                            await char.stop_notifications()
+                            self.logger.error(
+                                "Characteristic %s is already sending notifications",
+                                char_uuid,
+                            )
                     else:
-                        self.logger.error(
-                            "Characteristic UUID %s not found for service %s and device %s",
-                            char_uuid,
-                            service_uuid,
-                            address,
-                        )
-                else:
-                    self.logger.error(
-                        "Service UUID %s not found for device %s", service_uuid, address
-                    )
-            else:
-                self.logger.error("Device %s was not found", address)
+                        await char.stop_notifications()
         except Exception as exception:
             self.logger.error(
                 "Failed to configure characteristic notifications for device %s "
@@ -471,10 +786,81 @@ class Device:
                 self.properties.on_properties_changed(self.properties_changed)
                 self.properties_signal = self.properties_changed
 
+            self.logger.info(
+                "Device %s calling Device1.Connect() (Connected=%s)",
+                self.address,
+                await self.is_connected(),
+            )
             await asyncio.wait_for(
                 self.interface.call_connect(), CONNECT_TIMEOUT_SECONDS
             )
         except Exception as exception:
+            self.logger.warning(
+                "Device %s Device1.Connect() raised %s: %s",
+                self.address,
+                type(exception).__name__,
+                exception,
+            )
+            if "br-connection-profile-unavailable" in str(exception):
+                # The LE pairing link is connected but BlueZ has not loaded the GATT
+                # profile for it. Explicitly disconnect to tear down the pairing link,
+                # then retry Device1.Connect() which will establish a proper bonded GATT
+                # connection and create GattService1 D-Bus objects.
+                self.logger.warning(
+                    "Device %s: br-connection-profile-unavailable — "
+                    "disconnecting to reload GATT profile before retry",
+                    self.address,
+                )
+                try:
+                    await self.interface.call_disconnect()
+                    self.logger.info(
+                        "Device %s: explicit disconnect sent", self.address
+                    )
+                except Exception as disc_exc:
+                    self.logger.warning(
+                        "Device %s: explicit disconnect raised: %s",
+                        self.address,
+                        disc_exc,
+                    )
+                # Wait for the disconnect to be confirmed by BlueZ
+                deadline = (
+                    asyncio.get_running_loop().time()
+                    + PROFILE_UNAVAILABLE_GRACE_SECONDS
+                )
+                while asyncio.get_running_loop().time() < deadline:
+                    if not await self.is_connected():
+                        break
+                    await asyncio.sleep(PROFILE_UNAVAILABLE_POLL_INTERVAL_SECONDS)
+                self.logger.info(
+                    "Device %s: retrying Device1.Connect() after disconnect "
+                    "(Connected=%s)",
+                    self.address,
+                    await self.is_connected(),
+                )
+                # Retry — this time the device is disconnected so BlueZ will
+                # reconnect using bonded credentials and create GATT objects.
+                try:
+                    await asyncio.wait_for(
+                        self.interface.call_connect(), CONNECT_TIMEOUT_SECONDS
+                    )
+                    self.logger.info(
+                        "Device %s: Device1.Connect() retry succeeded "
+                        "(Connected=%s ServicesResolved=%s)",
+                        self.address,
+                        await self.is_connected(),
+                        await self.is_services_resolved(),
+                    )
+                except Exception as retry_exc:
+                    self.logger.warning(
+                        "Device %s: Device1.Connect() retry raised: %s (%s)",
+                        self.address,
+                        retry_exc,
+                        type(retry_exc).__name__,
+                    )
+                    if self.throw_exceptions:
+                        raise
+                return
+
             self.logger.error(
                 "Failed to connect device %s: %s", self.address, exception
             )
@@ -498,6 +884,10 @@ class Device:
         """
         Create and store a new service linked to this device
         """
+        service = self.get_service(uuid)
+        if service:
+            return service
+
         service = await create_service(
             uuid,
             path,
@@ -505,14 +895,16 @@ class Device:
             self.characteristic_property_change_callback,
         )
         self.services.append(service)
+        return service
 
     def get_service(self, uuid):
         """
         Returns the device service matching the UUID
         None if the service is not found
         """
+        requested_uuid = uuid.lower()
         for service in self.services:
-            if service.get_uuid() == uuid:
+            if service.get_uuid().lower() == requested_uuid:
                 return service
 
         return None
@@ -603,6 +995,26 @@ class Device:
         Notifies the client when the device has been both connected
         and all services have been discovered
         """
+        interesting_properties = {
+            key: variant_to_python(value)
+            for key, value in changed_properties.items()
+            if key in {
+                "Connected",
+                "ServicesResolved",
+                "Paired",
+                "Bonded",
+                "Trusted",
+                "DisconnectReason",
+            }
+        }
+        if interesting_properties or invalidated_properties:
+            self.logger.info(
+                "Device %s property change: changed=%s invalidated=%s",
+                self.address,
+                interesting_properties,
+                invalidated_properties,
+            )
+
         if "Connected" in changed_properties and not variant_to_python(
             changed_properties["Connected"]
         ):
@@ -688,6 +1100,10 @@ class Service:
         self.properties_signal = None
 
     async def add_characteristic(self, uuid, path):
+        characteristic = self.get_characteristic(uuid)
+        if characteristic:
+            return characteristic
+
         char = await create_characteristic(
             uuid,
             path,
@@ -695,14 +1111,16 @@ class Service:
             self.characteristic_property_change_callback,
         )
         self.characteristics.append(char)
+        return char
 
     def get_characteristic(self, uuid):
         """
         Returns the service characteristic matching the UUID
         None if the characteristic is not found
         """
+        requested_uuid = uuid.lower()
         for char in self.characteristics:
-            if char.get_uuid() == uuid:
+            if char.get_uuid().lower() == requested_uuid:
                 return char
 
         return None
@@ -814,7 +1232,7 @@ class Characteristic:
         """
         Returns whether or not the characteristic is notifying on its value changes
         """
-        return variant_to_python(self.interface.get_notifying())
+        return variant_to_python(await self.interface.get_notifying())
 
     async def read_value(self, offset):
         """
@@ -836,8 +1254,9 @@ class Characteristic:
             )
         except DBusError as exception:
             await self.write_characteristic_error_callback(exception)
-            return
+            return False
         await self.write_characteristic_success_callback()
+        return True
 
     async def start_notifications(self):
         """
@@ -958,12 +1377,13 @@ async def bt_stop_discovery(bt):
         await bt.stop_discovery()
 
 
-async def bt_connect(bt, address):
+async def bt_connect(bt, address, device_path=""):
     """
     Connect to the bluetooth device at the designated address
     """
     if bt:
-        await bt.connect(address)
+        return await bt.connect(address, device_path)
+    return False
 
 
 async def bt_disconnect(bt, address, purge):
@@ -985,10 +1405,11 @@ async def bt_device_services(bt, address):
 async def bt_read_characteristic(bt, address, service_uuid, char_uuid):
     """
     Read a value to the given characteristic for the given device/service
-    Value is returned in the 'characteristic_property_change_callback'
+    Value is returned as a bytearray, or None on failure
     """
     if bt:
-        await bt.read_characteristic(address, service_uuid, char_uuid)
+        return await bt.read_characteristic(address, service_uuid, char_uuid)
+    return None
 
 
 async def bt_write_characteristic(bt, address, service_uuid, char_uuid, value):
@@ -997,7 +1418,8 @@ async def bt_write_characteristic(bt, address, service_uuid, char_uuid, value):
     The value is an array of bytes
     """
     if bt:
-        await bt.write_characteristic(address, service_uuid, char_uuid, value)
+        return await bt.write_characteristic(address, service_uuid, char_uuid, value)
+    return False
 
 
 async def bt_config_characteristic_notification(
