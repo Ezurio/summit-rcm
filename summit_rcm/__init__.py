@@ -807,19 +807,25 @@ try:
         parser = ServerConfig().get_parser()
         ssl_private_key = (
             parser["global"]
-            .get("server.ssl_private_key", "/etc/summit-rcm/ssl/server.key")
+            .get(
+                "server.ssl_private_key",
+                f"{ServerConfig().data_dir}/ssl/server.key",
+            )
             .strip('"')
         )
         ssl_certificate = (
             parser["global"]
-            .get("server.ssl_certificate", "/etc/summit-rcm/ssl/server.crt")
+            .get(
+                "server.ssl_certificate",
+                f"{ServerConfig().data_dir}/ssl/server.crt",
+            )
             .strip('"')
         )
         ssl_certificate_chain = (
             parser["global"]
             .get(
                 "server.ssl_certificate_chain",
-                "/etc/summit-rcm/ssl/ca.crt",
+                f"{ServerConfig().data_dir}/ssl/ca.crt",
             )
             .strip('"')
         )

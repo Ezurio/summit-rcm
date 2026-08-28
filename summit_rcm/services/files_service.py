@@ -9,6 +9,7 @@ Module to interact with files.
 import asyncio
 import configparser
 import os
+import shlex
 from shutil import copy2, rmtree
 from subprocess import run
 from syslog import LOG_ERR, syslog
@@ -26,7 +27,7 @@ from summit_rcm.services.network_service import (
     ConnectionProfileReservedError,
     NetworkService,
 )
-from summit_rcm.settings import SystemSettingsManage
+from summit_rcm.settings import ServerConfig, SystemSettingsManage
 from summit_rcm.utils import Singleton
 from summit_rcm.services.network_manager_service import NetworkManagerService
 from summit_rcm.services.system_service import FACTORY_RESET_SCRIPT
@@ -42,10 +43,7 @@ UNZIP = "/usr/bin/unzip"
 ZIP = "/usr/bin/zip"
 NETWORKMANAGER_DIR = "etc/NetworkManager"
 NETWORKMANAGER_DIR_FULL = "/etc/NetworkManager/"
-SUMMIT_RCM_DIR = "/etc/summit-rcm/"
-SUMMIT_RCM_CLIENT_SSL_DIR = "/etc/summit-rcm/client-ssl/"
 DATA_SECRET_NETWORKMANAGER_DIR = "/data/secret/NetworkManager"
-DATA_SECRET_SUMMIT_RCM_DIR = "/data/secret/summit-rcm"
 SECURED_FWUPDATE_FILE_PATH = "/data/summit-rcm-update.swu"
 UNSECURED_FWUPDATE_FILE_PATH = "/usr/share/summit-rcm-update.swu"
 PERSISTENT_LOG_PATH = "/var/log/journal/"
@@ -144,10 +142,11 @@ class FilesService(metaclass=Singleton):
         """
         Handle when a client uploads an SSL file
         """
-        ssl_file_path = Path(SUMMIT_RCM_CLIENT_SSL_DIR)
+        ssl_dir = f"{ServerConfig().data_dir}/client-ssl/"
+        ssl_file_path = Path(ssl_dir)
         ssl_file_path.mkdir(parents=True, exist_ok=True)
         return await FilesService.handle_file_upload_bytes(
-            incoming_data, str(Path(SUMMIT_RCM_CLIENT_SSL_DIR, name)), mode
+            incoming_data, str(Path(ssl_dir, name)), mode
         )
 
     @staticmethod
@@ -426,7 +425,7 @@ class FilesService(metaclass=Singleton):
             # https://docs.python.org/3/library/zipfile.html
             proc = await asyncio.create_subprocess_shell(
                 f"cd / && {ZIP} --symlinks --password {password} -9 -r {CONFIG_TMP_ARCHIVE_FILE} "
-                "/etc/summit-rcm/summit-rcm-settings.ini "
+                f"{shlex.quote(ServerConfig().settings_file)} "
                 "/etc/NetworkManager/certs/* "
                 "/etc/NetworkManager/system-connections/* "
                 f"{' '.join(FilesService.get_timezone_file_paths())} "
@@ -498,7 +497,7 @@ class FilesService(metaclass=Singleton):
             proc = await asyncio.create_subprocess_shell(
                 f"cd / && rm -fr /etc/NetworkManager/system-connections/* "
                 "/etc/NetworkManager/certs/* "
-                "/etc/summit-rcm/summit-rcm-settings.ini "
+                f"{shlex.quote(ServerConfig().settings_file)} "
                 f"{' '.join(FilesService.get_timezone_file_paths())} "
                 f"{' '.join(FilesService.get_other_config_files())}",
                 stdout=asyncio.subprocess.PIPE,
@@ -597,7 +596,7 @@ class FilesService(metaclass=Singleton):
             debug_paths: list[str] = [
                 FilesService.get_log_path(),
                 NETWORKMANAGER_DIR_FULL,
-                SUMMIT_RCM_DIR,
+                f"{ServerConfig().data_dir}/",
             ]
 
             # Generate the archive using 'zip' (the built-in Python zipfile implementation is

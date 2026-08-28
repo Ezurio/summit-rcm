@@ -27,6 +27,140 @@ from summit_rcm import definition
 """
 
 
+class ServerConfig(object, metaclass=Singleton):
+    def __init__(self):
+        try:
+            self.parser = configparser.ConfigParser(interpolation=None)
+            self.parser.read(
+                definition.resolve_ini_files(definition.SUMMIT_RCM_SERVER_CONF_FILE)
+            )
+
+            self._sessions_enabled = self.parser.getboolean(
+                section="/", option="tools.sessions.on", fallback=True
+            )
+            self._validate_request = self.parser.getboolean(
+                section="summit-rcm", option="rest_api_validate_request", fallback=False
+            )
+            self._validate_response = self.parser.getboolean(
+                section="summit-rcm",
+                option="rest_api_validate_response",
+                fallback=False,
+            )
+            self._rest_api_docs_enabled = self.parser.getboolean(
+                section="summit-rcm", option="rest_api_docs", fallback=False
+            ) or os.environ.get("DOCS_GENERATION", "False") == "True"
+        except Exception:
+            syslog(LOG_ERR, "Unable to parse server configuration")
+            self.parser = None
+            self._sessions_enabled = True
+            self._validate_request = False
+            self._validate_response = False
+            self._rest_api_docs_enabled = False
+        self._uvicorn_server: Optional[Server] = None
+
+    def get_parser(self) -> Optional[configparser.ConfigParser]:
+        return self.parser
+
+    def _get(self, section: str, key: str, fallback: str) -> str:
+        if self.parser is None:
+            return fallback
+        return self.parser.get(section, key, fallback=fallback).strip('"')
+
+    @property
+    def data_dir(self) -> str:
+        """Runtime data directory (from the [summit-rcm] ini section)"""
+        return self._get("summit-rcm", "data_dir", definition.SUMMIT_RCM_DATA_DIR)
+
+    @property
+    def settings_file(self) -> str:
+        """Runtime settings file (from the [summit-rcm] ini section)"""
+        return self._get(
+            "summit-rcm", "settings_file", definition.SUMMIT_RCM_SETTINGS_FILE
+        )
+
+    @property
+    def provisioning_dir(self) -> str:
+        """Runtime provisioning directory (from the [summit-rcm] ini section)"""
+        return self._get(
+            "summit-rcm", "provisioning_dir", definition.PROVISIONING_DIR
+        )
+
+    @property
+    def provisioning_ssl_private_key(self) -> str:
+        """Runtime provisioning SSL private key (from the [summit-rcm] ini section)"""
+        return self._get(
+            "summit-rcm",
+            "provisioning_ssl_private_key",
+            definition.PROVISIONING_SERVER_KEY_PATH,
+        )
+
+    @property
+    def provisioning_ssl_certificate(self) -> str:
+        """Runtime provisioning SSL certificate (from the [summit-rcm] ini section)"""
+        return self._get(
+            "summit-rcm",
+            "provisioning_ssl_certificate",
+            definition.PROVISIONING_SERVER_CERT_PATH,
+        )
+
+    @property
+    def provisioning_ssl_certificate_chain(self) -> str:
+        """Runtime provisioning SSL CA chain (from the [summit-rcm] ini section)"""
+        return self._get(
+            "summit-rcm",
+            "provisioning_ssl_certificate_chain",
+            definition.PROVISIONING_CA_CERT_CHAIN_PATH,
+        )
+
+    @property
+    def server_ssl_certificate(self) -> str:
+        """Runtime server SSL certificate (from the [global] ini section)"""
+        return self._get(
+            "global",
+            "server.ssl_certificate",
+            f"{self.data_dir}/ssl/server.crt",
+        )
+
+    @property
+    def server_ssl_certificate_chain(self) -> str:
+        """Runtime server SSL CA chain (from the [global] ini section)"""
+        return self._get(
+            "global",
+            "server.ssl_certificate_chain",
+            f"{self.data_dir}/ssl/ca.crt",
+        )
+
+    @property
+    def sessions_enabled(self) -> bool:
+        """Determine whether or not cookie-based sessions are enabled"""
+        return self._sessions_enabled
+
+    @property
+    def rest_api_docs_enabled(self) -> bool:
+        """Determine whether or not the REST API documentation is enabled"""
+        return self._rest_api_docs_enabled
+
+    @property
+    def validate_request(self) -> bool:
+        """Determine whether or not request validation is enabled"""
+        return self._validate_request
+
+    @property
+    def validate_response(self) -> bool:
+        """Determine whether or not response validation is enabled"""
+        return self._validate_response
+
+    @property
+    def uvicorn_server(self) -> Optional[Server]:
+        """Get the Uvicorn server (if set)"""
+        return self._uvicorn_server
+
+    @uvicorn_server.setter
+    def uvicorn_server(self, value: Server):
+        """Set the Uvicorn server"""
+        self._uvicorn_server = value
+
+
 class SummitRCMConfigManage(object):
     """
     summit-rcm.ini has multi sections:
@@ -36,7 +170,7 @@ class SummitRCMConfigManage(object):
 
     _lock = Lock()
     _parser = configparser.ConfigParser(defaults=None)
-    _filename = definition.SUMMIT_RCM_SETTINGS_FILE
+    _filename = ServerConfig().settings_file
     if os.path.isfile(_filename):
         _parser.read(_filename)
 
@@ -248,7 +382,7 @@ class SystemSettingsManage(object):
         return SummitRCMConfigManage.get_key_from_section(
             cls.section,
             "cert_for_file_encryption",
-            "/etc/summit-rcm/ssl/server.crt",
+            ServerConfig().server_ssl_certificate,
         )
 
     @classmethod
@@ -263,66 +397,3 @@ class SystemSettingsManage(object):
             log_level = "error"
 
         return log_level
-
-
-class ServerConfig(object, metaclass=Singleton):
-    def __init__(self):
-        try:
-            self.parser = configparser.ConfigParser(interpolation=None)
-            self.parser.read(definition.SUMMIT_RCM_SERVER_CONF_FILE)
-
-            self._sessions_enabled = self.parser.getboolean(
-                section="/", option="tools.sessions.on", fallback=True
-            )
-            self._validate_request = self.parser.getboolean(
-                section="summit-rcm", option="rest_api_validate_request", fallback=False
-            )
-            self._validate_response = self.parser.getboolean(
-                section="summit-rcm",
-                option="rest_api_validate_response",
-                fallback=False,
-            )
-            self._rest_api_docs_enabled = self.parser.getboolean(
-                section="summit-rcm", option="rest_api_docs", fallback=False
-            ) or os.environ.get("DOCS_GENERATION", "False") == "True"
-        except Exception:
-            syslog(LOG_ERR, "Unable to parse server configuration")
-            self.parser = None
-            self._sessions_enabled = True
-            self._validate_request = False
-            self._validate_response = False
-            self._rest_api_docs_enabled = False
-        self._uvicorn_server: Optional[Server] = None
-
-    def get_parser(self) -> Optional[configparser.ConfigParser]:
-        return self.parser
-
-    @property
-    def sessions_enabled(self) -> bool:
-        """Determine whether or not cookie-based sessions are enabled"""
-        return self._sessions_enabled
-
-    @property
-    def rest_api_docs_enabled(self) -> bool:
-        """Determine whether or not the REST API documentation is enabled"""
-        return self._rest_api_docs_enabled
-
-    @property
-    def validate_request(self) -> bool:
-        """Determine whether or not request validation is enabled"""
-        return self._validate_request
-
-    @property
-    def validate_response(self) -> bool:
-        """Determine whether or not response validation is enabled"""
-        return self._validate_response
-
-    @property
-    def uvicorn_server(self) -> Optional[Server]:
-        """Get the Uvicorn server (if set)"""
-        return self._uvicorn_server
-
-    @uvicorn_server.setter
-    def uvicorn_server(self, value: Server):
-        """Set the Uvicorn server"""
-        self._uvicorn_server = value

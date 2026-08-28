@@ -11,7 +11,7 @@ from syslog import LOG_ERR, syslog
 from enum import IntEnum
 from summit_rcm.at_interface.commands.command import Command
 from summit_rcm.at_interface.services.http_service import HTTPService
-from summit_rcm.services.files_service import SUMMIT_RCM_CLIENT_SSL_DIR
+from summit_rcm.settings import ServerConfig
 from summit_rcm.definition import SSLModes
 
 
@@ -36,12 +36,13 @@ class HTTPConfigureSSL(Command):
             syslog(LOG_ERR, "Invalid Parameters")
             return (True, "ERROR")
         try:
+            ssl_dir = f"{ServerConfig().data_dir}/client-ssl/"
             HTTPService().configure_http_ssl(
                 params_dict["auth_mode"].value,
                 params_dict["check_hostname"],
-                SUMMIT_RCM_CLIENT_SSL_DIR + params_dict["key"],
-                SUMMIT_RCM_CLIENT_SSL_DIR + params_dict["cert"],
-                SUMMIT_RCM_CLIENT_SSL_DIR + params_dict["ca"],
+                ssl_dir + params_dict["key"],
+                ssl_dir + params_dict["cert"],
+                ssl_dir + params_dict["ca"],
             )
             return (True, "OK")
         except Exception as exception:

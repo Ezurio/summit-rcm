@@ -10,8 +10,8 @@ from typing import Optional
 from summit_rcm_provisioning.services.provisioning_service import (
     CertificateProvisioningService,
     ProvisioningState,
+    provisioning_config,
 )
-from summit_rcm.settings import ServerConfig
 
 
 async def get_legacy_supported_routes():
@@ -86,31 +86,17 @@ async def server_config_preload_hook(config) -> None:
     provisioning_state = CertificateProvisioningService().get_provisioning_state()
 
     if provisioning_state == ProvisioningState.UNPROVISIONED:
-        config.ssl_keyfile = "/etc/summit-rcm/ssl/provisioning.key"
-        config.ssl_certfile = "/etc/summit-rcm/ssl/provisioning.crt"
+        config.ssl_keyfile = provisioning_config.ssl_private_key
+        config.ssl_certfile = provisioning_config.ssl_certificate
         config.ssl_ca_certs = ""
         syslog("*** RESTRICTED PROVISIONING MODE ***")
         return
 
     if provisioning_state == ProvisioningState.PARTIALLY_PROVISIONED:
-        parser = ServerConfig().get_parser()
-        config.ssl_keyfile = (
-            parser["global"]
-            .get("server.ssl_private_key", "/etc/summit-rcm/ssl/server.key")
-            .strip('"')
-        )
-        config.ssl_certfile = (
-            parser["global"]
-            .get("server.ssl_certificate", "/etc/summit-rcm/ssl/server.crt")
-            .strip('"')
-        )
-        config.ssl_ca_certs = (
-            parser["global"]
-            .get(
-                "server.ssl_certificate_chain",
-                "",
-            )
-            .strip('"')
+        config.ssl_keyfile = provisioning_config.server_ssl_private_key
+        config.ssl_certfile = provisioning_config.server_ssl_certificate
+        config.ssl_ca_certs = provisioning_config.get(
+            "global", "server.ssl_certificate_chain", ""
         )
         syslog("*** PARTIALLY PROVISIONED MODE ***")
 

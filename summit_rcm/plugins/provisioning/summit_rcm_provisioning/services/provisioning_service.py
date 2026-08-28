@@ -25,15 +25,8 @@ except ImportError as error:
     MessageType = None
 
 import falcon.asgi.multipart
-from summit_rcm.settings import ServerConfig
+from summit_rcm_provisioning.config import ProvisioningConfig
 from summit_rcm.definition import (
-    DEVICE_CA_CERT_CHAIN_PATH,
-    DEVICE_SERVER_KEY_PATH,
-    DEVICE_SERVER_CSR_PATH,
-    DEVICE_SERVER_CERT_PATH,
-    PROVISIONING_DIR,
-    PROVISIONING_CA_CERT_CHAIN_PATH,
-    PROVISIONING_STATE_FILE_PATH,
     CERT_TEMP_PATH,
     CONFIG_FILE_TEMP_PATH,
     SYSTEMD_BUS_NAME,
@@ -53,6 +46,8 @@ OPENSSL_CERT_DATETIME_FORMAT = "%b %d %H:%M:%S %Y %Z"
 TOUCH_TIMESTAMP_FORMAT = "%Y%m%d%H%M.%S"
 FALLBACK_TIMESTAMP_FILE_PATH = "/etc/fallback_timestamp"
 CLIENT_CERT_TEMP_PATH = "/tmp/client.crt"
+
+provisioning_config = ProvisioningConfig()
 
 
 class ProvisioningState(IntEnum):
@@ -135,16 +130,7 @@ class CertificateProvisioningService:
         """
         Retrieve the validity period from the CA certificate using OpenSSL.
         """
-        ca_cert_path = (
-            ServerConfig()
-            .get_parser()
-            .get(
-                section="global",
-                option="server.ssl_certificate_chain",
-                fallback=DEVICE_CA_CERT_CHAIN_PATH,
-            )
-            .strip('"')
-        )
+        ca_cert_path = provisioning_config.server_ssl_certificate_chain
 
         if not Path(ca_cert_path).exists():
             raise Exception(
@@ -203,14 +189,14 @@ class CertificateProvisioningService:
     def get_provisioning_state() -> ProvisioningState:
         """Read current provisioning state"""
 
-        if not Path(PROVISIONING_STATE_FILE_PATH).exists():
+        if not Path(provisioning_config.provisioning_state_file_path).exists():
             CertificateProvisioningService.set_provisioning_state(
                 ProvisioningState.UNPROVISIONED
             )
             return ProvisioningState.UNPROVISIONED
 
         try:
-            with open(PROVISIONING_STATE_FILE_PATH, "r") as provisioning_state_file:
+            with open(provisioning_config.provisioning_state_file_path, "r") as provisioning_state_file:
                 return ProvisioningState(int(provisioning_state_file.read()))
         except Exception as exception:
             syslog(f"Unable to read provisioning state - {str(exception)}")
@@ -219,8 +205,8 @@ class CertificateProvisioningService:
     @staticmethod
     def set_provisioning_state(provisioning_state: ProvisioningState):
         """Update the provisioning state file on disk"""
-        Path(PROVISIONING_DIR).mkdir(exist_ok=True)
-        with open(PROVISIONING_STATE_FILE_PATH, "w") as provisioning_state_file:
+        Path(provisioning_config.provisioning_dir).mkdir(parents=True, exist_ok=True)
+        with open(provisioning_config.provisioning_state_file_path, "w") as provisioning_state_file:
             provisioning_state_file.write(str(int(provisioning_state)))
 
     @staticmethod
@@ -234,11 +220,11 @@ class CertificateProvisioningService:
         if not Path(CONFIG_FILE_TEMP_PATH).exists():
             raise Exception("Config file not found")
 
-        Path(PROVISIONING_DIR).mkdir(exist_ok=True)
+        Path(provisioning_config.provisioning_dir).mkdir(parents=True, exist_ok=True)
 
-        if Path(DEVICE_SERVER_KEY_PATH).exists():
+        if Path(provisioning_config.device_server_key_path).exists():
             # Private key has already been generated, remove it
-            Path(DEVICE_SERVER_KEY_PATH).unlink()
+            Path(provisioning_config.device_server_key_path).unlink()
 
         if openssl_key_gen_args:
             # Generate the key using the arguments provided
@@ -251,7 +237,7 @@ class CertificateProvisioningService:
             if proc.returncode:
                 raise Exception(stderr.decode("utf-8"))
 
-            if not Path(DEVICE_SERVER_KEY_PATH).exists():
+            if not Path(provisioning_config.device_server_key_path).exists():
                 raise Exception("Key file not found")
 
             # Build the args to use the new key
@@ -260,9 +246,9 @@ class CertificateProvisioningService:
                 "req",
                 "-new",
                 "-key",
-                DEVICE_SERVER_KEY_PATH,
+                provisioning_config.device_server_key_path,
                 "-out",
-                DEVICE_SERVER_CSR_PATH,
+                provisioning_config.device_server_csr_path,
                 "-config",
                 CONFIG_FILE_TEMP_PATH,
             ]
@@ -280,9 +266,9 @@ class CertificateProvisioningService:
                 "-pkeyopt",
                 "ec_param_enc:named_curve",
                 "-keyout",
-                DEVICE_SERVER_KEY_PATH,
+                provisioning_config.device_server_key_path,
                 "-out",
-                DEVICE_SERVER_CSR_PATH,
+                provisioning_config.device_server_csr_path,
                 "-config",
                 CONFIG_FILE_TEMP_PATH,
             ]
@@ -324,13 +310,13 @@ class CertificateProvisioningService:
 
         # Verify the certificate
         if not await CertificateProvisioningService.verify_certificate_against_ca(
-            CERT_TEMP_PATH, PROVISIONING_CA_CERT_CHAIN_PATH
+            CERT_TEMP_PATH, provisioning_config.ssl_certificate_chain
         ):
             raise InvalidCertificateError()
 
         # Move the certificate to the target path
-        Path(PROVISIONING_DIR).mkdir(exist_ok=True)
-        shutil.move(CERT_TEMP_PATH, DEVICE_SERVER_CERT_PATH)
+        Path(provisioning_config.provisioning_dir).mkdir(parents=True, exist_ok=True)
+        shutil.move(CERT_TEMP_PATH, provisioning_config.device_server_cert_path)
 
         # Flag that the device is now partially provisioned
         CertificateProvisioningService.set_provisioning_state(
