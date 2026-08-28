@@ -105,7 +105,7 @@ async def get_controller_obj(controller: str = ""):
     if not controller:
         result[
             "InfoMsg"
-        ] = f"Controller {controller_pretty_name(controller)} not found."
+        ] = "Bluetooth controller not found."
         result["SDCERR"] = definition.SUMMIT_RCM_ERRORS.get("SDCERR_FAIL", 1)
         controller_obj = None
     else:
