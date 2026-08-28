@@ -133,6 +133,7 @@ class Bluetooth(metaclass=Singleton):
         self._logger = logging.getLogger(__name__)
         self._devices_to_restore: Dict[str, type(None)] = {}
         """Map of device uuids to restore state due to associated controller reset"""
+        self._devices_being_restored = set()
         self.setup_initiated: bool = False
 
     async def setup(self, app: falcon.asgi.App) -> None:
@@ -352,6 +353,26 @@ class Bluetooth(metaclass=Singleton):
         for device_uuid, _ in controller_state.device_properties_uuids.items():
             self._devices_to_restore.update({device_uuid: None})
 
+        # Restore devices that reappeared before the controller callback.
+        bus = await DBusManager().get_bus()
+        remote_om = bus.get_proxy_object(
+            BLUEZ_SERVICE_NAME, "/", await bus.introspect(BLUEZ_SERVICE_NAME, "/")
+        ).get_interface(DBUS_OM_IFACE)
+        objects = await remote_om.call_get_managed_objects()
+        for device, interfaces in objects.items():
+            device_properties = interfaces.get(DEVICE_IFACE, {})
+            device_address = device_properties.get("Address")
+            if (
+                device.startswith(controller + "/dev_")
+                and device_address
+                and uri_to_uuid(variant_to_python(device_address))
+                in self._devices_to_restore
+            ):
+                try:
+                    await self.device_restore(device)
+                except Exception as exception:
+                    self.log_exception(exception, "failed restoring device: ")
+
     async def device_restore(self, device: str):
         """Set device's properties, and plugin protocol connections if applicable."""
         bus, device_obj, _ = await get_controller_obj(device)
@@ -371,15 +392,30 @@ class Bluetooth(metaclass=Singleton):
         if device_uuid not in self._devices_to_restore.keys():
             return
 
-        self._devices_to_restore.pop(device_uuid)
+        if device_uuid in self._devices_being_restored:
+            return
 
+        self._devices_being_restored.add(device_uuid)
+        try:
+            restored = await self._restore_device(device, device_uuid, device_obj)
+        except Exception as exception:
+            self.log_exception(exception, "failed restoring device: ")
+        else:
+            if restored:
+                self._devices_to_restore.pop(device_uuid, None)
+        finally:
+            self._devices_being_restored.remove(device_uuid)
+
+    async def _restore_device(self, device: str, device_uuid: str, device_obj) -> bool:
+        """Restore a device after claiming its UUID for this recovery operation."""
+        restored = True
         match = DEVICE_ADAPTER_GROUP_PATTERN.match(device)
         if not match or match.lastindex < 1:
             syslog(
                 LOG_ERR,
                 f"device_restore couldn't determine controller of device {device}",
             )
-            return
+            return False
         controller = match[1]
         controller_friendly_name: str = await self.remapped_controller_to_friendly_name(
             controller
@@ -413,10 +449,12 @@ class Bluetooth(metaclass=Singleton):
                 )
             except Exception as exception:
                 self.log_exception(exception, "failed setting device properties: ")
+                restored = False
         else:
             syslog(
                 LOG_ERR, f"***couldn't find device {device_uuid} to restore properties"
             )
+            return False
 
         # Notify plugins, re-establishing protocol links.
         # We do not wait for BT connections to restore, so service discovery may not be complete
@@ -426,6 +464,10 @@ class Bluetooth(metaclass=Singleton):
                 await plugin.DeviceAddedNotify(device, device_uuid, device_obj)
             except Exception as exception:
                 self.log_exception(exception)
+                restored = False
+
+        return restored
+
 
     async def get_device_property(
         self, obj_path: str, interface: str, property_name: str
