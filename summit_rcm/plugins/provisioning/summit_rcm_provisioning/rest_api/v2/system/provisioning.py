@@ -19,7 +19,7 @@ from summit_rcm_provisioning.services.provisioning_service import (
     CertificateProvisioningService,
     InvalidCertificateError,
     ProvisioningState,
-    DEVICE_SERVER_CSR_PATH,
+    provisioning_config,
     CONFIG_FILE_TEMP_PATH,
 )
 from summit_rcm.rest_api.services.rest_files_service import (
@@ -155,7 +155,7 @@ class CertificateProvisioningResource:
             )
 
             resp.stream = await FilesService().handle_file_download(
-                DEVICE_SERVER_CSR_PATH
+                provisioning_config.device_server_csr_path
             )
             resp.content_type = falcon.MEDIA_TEXT
             resp.status = falcon.HTTP_200
