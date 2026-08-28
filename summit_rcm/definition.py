@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-Ezurio-Clause
 # Copyright (C) 2024 Ezurio LLC.
 #
+import glob
 import os
 from enum import Enum, IntEnum
 
@@ -14,11 +15,26 @@ SUMMIT_RCM_SERVER_CONF_FILE = os.environ.get(
     "SUMMIT_RCM_SERVER_CONF_FILE", "/etc/summit-rcm.ini"
 )
 # system settings
+SUMMIT_RCM_DATA_DIR = os.environ.get("SUMMIT_RCM_DATA_DIR", "/etc/summit-rcm")
 SUMMIT_RCM_SETTINGS_FILE = os.environ.get(
     "SUMMIT_RCM_SETTINGS_FILE", "/etc/summit-rcm/summit-rcm-settings.ini"
 )
-# log forwarding
-LOG_FORWARDING_ENABLED_FLAG_FILE = "/etc/summit-rcm/log_forwarding_enabled"
+# drop-in directory merged into the server config ini at parse time
+SUMMIT_RCM_INI_DROPIN_DIR = os.getenv(
+    "SUMMIT_RCM_INI_DROPIN_DIR", "/etc/summit-rcm.ini.d"
+)
+
+
+def resolve_ini_files(base_path: str) -> list[str]:
+    """Return the base ini path (if it exists) followed by lexicographically sorted
+    *.conf drop-ins from the drop-in directory. Later files override earlier ones
+    when passed to ConfigParser.read()."""
+    files = [base_path] if os.path.isfile(base_path) else []
+    dropin_dir = SUMMIT_RCM_INI_DROPIN_DIR
+    if os.path.isdir(dropin_dir):
+        files += sorted(glob.glob(os.path.join(dropin_dir, "*.conf")))
+    return files
+
 
 # timezone list
 SUMMIT_RCM_ZONELIST_COMMAND = ["timedatectl", "list-timezones"]
@@ -144,15 +160,10 @@ MODEM_CONTROL_SERVICE_FILE = "modem-control.service"
 INVALID_RSSI = -9999.9999
 
 # Provisioning info
-DEVICE_SERVER_KEY_PATH = "/etc/summit-rcm/provisioning/dev.key"
-DEVICE_SERVER_CSR_PATH = "/etc/summit-rcm/provisioning/dev.csr"
-DEVICE_SERVER_CERT_PATH = "/etc/summit-rcm/provisioning/dev.crt"
-DEVICE_CA_CERT_CHAIN_PATH = "/etc/summit-rcm/ssl/ca.crt"
+PROVISIONING_DIR = "/etc/summit-rcm/provisioning"
 PROVISIONING_SERVER_KEY_PATH = "/etc/summit-rcm/ssl/provisioning.key"
 PROVISIONING_SERVER_CERT_PATH = "/etc/summit-rcm/ssl/provisioning.crt"
 PROVISIONING_CA_CERT_CHAIN_PATH = "/etc/summit-rcm/ssl/provisioning.ca.crt"
-PROVISIONING_DIR = "/etc/summit-rcm/provisioning"
-PROVISIONING_STATE_FILE_PATH = "/etc/summit-rcm/provisioning/state"
 CERT_TEMP_PATH = "/tmp/dev.crt"
 CONFIG_FILE_TEMP_PATH = "/tmp/dev.cnf"
 
