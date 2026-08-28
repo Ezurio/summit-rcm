@@ -296,10 +296,9 @@ class Bluetooth(metaclass=Singleton):
         try:
             if ADAPTER_PATH_PATTERN.match(interface):
                 syslog(LOG_INFO, f"Bluetooth interface removed: {str(interface)}")
-                _, adapter_obj, _ = await get_controller_obj(interface)
                 for plugin in bluetooth_plugins:
                     try:
-                        await plugin.ControllerRemovedNotify(interface, adapter_obj)
+                        await plugin.ControllerRemovedNotify(interface, None)
                     except Exception as exception:
                         self.log_exception(exception)
         except Exception as exception:

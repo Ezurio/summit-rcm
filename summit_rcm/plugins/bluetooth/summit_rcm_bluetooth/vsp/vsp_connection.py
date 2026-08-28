@@ -143,10 +143,13 @@ class VspConnection:
                     f"{variant_to_python(changed_props['ServicesResolved'])}",
                 )
                 if variant_to_python(changed_props["ServicesResolved"]):
-                    await self.start_client()
                     if self._waiting_for_services_resolved:
                         self._waiting_for_services_resolved = False
                         await self.gatt_only_connected()
+                    elif not self.vsp_read_chrc or not self.vsp_write_chrc:
+                        await self.gatt_only_connected()
+                    else:
+                        await self.start_client()
             except Exception as exception:
                 self.log_exception(exception)
 
@@ -234,7 +237,7 @@ class VspConnection:
                 await self.vsp_read_chrc[1].call_stop_notify()
             except Exception as exception:
                 syslog(LOG_ERR, "stop_client: " + str(exception))
-            self.vsp_read_chrc = None
+        self.vsp_read_chrc = None
         if self.vsp_read_prop_iface:
             try:
                 self.vsp_read_prop_iface.off_properties_changed(
@@ -379,14 +382,14 @@ class VspConnection:
                 f"VSP: gatt_connect() - error serving TCP connection - {str(exception)}"
             )
 
-    async def gatt_only_disconnect(self):
+    async def gatt_only_disconnect(self, stop_notify=True):
         self.vsp_write_chrc: Optional[Tuple[ProxyObject, ProxyInterface]] = None
         try:
             self.dev_props_iface.off_properties_changed(self.device_prop_changed_cb)
             self.dev_props_iface = None
         except Exception as exception:
             syslog(LOG_ERR, "gatt_only_disconnect: " + str(exception))
-        await self.stop_client()
+        await self.stop_client(stop_notify)
 
     async def gatt_only_reconnect(self):
         """
@@ -475,7 +478,7 @@ class VspConnection:
                     break
         return vsp_service
 
-    async def vsp_close(self):
+    async def vsp_close(self, stop_notify=True):
         """
         Close the VSP connection down, including the REST host connection, and perform any necessary
         cleanup
@@ -486,7 +489,7 @@ class VspConnection:
 
         # Other cleanup
         self.connected = False
-        await self.gatt_only_disconnect()
+        await self.gatt_only_disconnect(stop_notify)
         self.server.close()
         syslog(LOG_INFO, f"VSP: closed for device {self.device_uuid}")
 
@@ -656,14 +659,21 @@ class VspConnectionPlugin(BluetoothPlugin):
         """Called when user has requested device be unpaired."""
         if device_uuid in self.vsp_connections:
             syslog("Closing VSP because the device was removed")
-            await self.vsp_connections[device_uuid].vsp_close()
+            await self.vsp_connections[device_uuid].vsp_close(False)
 
     async def ControllerRemovedNotify(
-        self, controller_name: str, adapter_obj: ProxyObject
+        self, controller_name: str, adapter_obj: Optional[ProxyObject]
     ):
         for _, vsp_connection in self.vsp_connections.items():
+            if not (
+                vsp_connection.device_interface
+                and vsp_connection.device_interface.path.startswith(
+                    controller_name + "/dev_"
+                )
+            ):
+                continue
             syslog("Controller removed, removing GATT change subscriptions")
-            vsp_connection.gatt_only_disconnect()
+            await vsp_connection.gatt_only_disconnect(False)
 
     async def DeviceAddedNotify(
         self, device: str, device_uuid: str, device_obj: ProxyObject
