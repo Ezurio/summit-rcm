@@ -57,7 +57,7 @@ class BluetoothPlugin(object):
         await self.ControllerAddedNotify(controller_name, adapter_obj)
 
     async def ControllerRemovedNotify(
-        self, controller_name: str, adapter_obj: ProxyObject
+        self, controller_name: str, adapter_obj: Optional[ProxyObject]
     ):
         """Notify plugin that BT controller was removed, all state reset."""
         return
