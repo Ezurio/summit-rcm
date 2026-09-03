@@ -718,6 +718,37 @@ Response:
 }
 ```
 
+#### Enterprise Wi-Fi examples
+
+These enterprise examples assume the required CA certificate and client
+key bundle have already been uploaded with the certificate upload
+endpoint. Each example expresses one inner authentication method per
+connection profile.
+
+```bash
+$ FILE_NAME="SystestCA.cer" FILE_PATH="/path/to/SystestCA.cer" ./network_certificates_post.sh
+$ FILE_NAME="user1.p12" FILE_PATH="/path/to/user1.p12" ./network_certificates_post.sh
+$ CONNECTION_NAME="lab-eap-tls" SSID="lab-eap-tls" ./network_connections_post_EAP_TLS.sh
+$ CONNECTION_NAME="lab-peap-mschapv2" SSID="lab-peap-mschapv2" ./network_connections_post_PEAP_MSCHAPV2.sh
+$ CONNECTION_NAME="lab-peap-gtc" SSID="lab-peap-gtc" ./network_connections_post_PEAP_GTC.sh
+$ CONNECTION_NAME="lab-peap-tls" SSID="lab-peap-tls" ./network_connections_post_PEAP_TLS.sh
+$ CONNECTION_NAME="lab-eap-ttls-pap" SSID="lab-eap-ttls" ./network_connections_post_EAP_TTLS_PAP.sh
+$ CONNECTION_NAME="lab-eap-ttls-mschapv2" SSID="lab-eap-ttls" ./network_connections_post_EAP_TTLS_MSCHAPV2.sh
+$ CONNECTION_NAME="lab-eap-ttls-gtc" SSID="lab-eap-ttls" ./network_connections_post_EAP_TTLS_GTC.sh
+$ CONNECTION_NAME="lab-wpa3-enterprise" SSID="lab-wpa3-enterprise" ./network_connections_post_WPA3_EAP_TLS.sh
+$ CONNECTION_NAME="lab-wpa3-suiteb192" SSID="lab-wpa3-suiteb192" ./network_connections_post_WPA3_SUITE_B_192.sh
+```
+
+These examples set `connection.autoconnect` in the submitted profile, so
+NetworkManager may begin activation immediately after the POST succeeds.
+Let that activation finish before sending another activation request.
+Use `./network_connections_patch_activate_by_id.sh` or
+`./network_connections_patch_activate_by_uuid.sh` for an existing profile
+that is not already activating.
+
+The default examples are CA-validated. If you need a no-CA lab flow,
+use a local copy of the relevant script and remove the `ca-cert` field.
+
 #### Delete connection
 ```json
 $ CONNECTION_NAME="test-connection" ./network_connections_delete_by_id.sh 
