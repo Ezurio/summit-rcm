@@ -4,7 +4,7 @@
 #
 """Module to hold SpecTree Models"""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import (
     BaseModel as PydanticBaseModel,
     RootModel as PydanticRootModel,
@@ -1279,11 +1279,11 @@ class ConnectionSettings8021xModel(BaseModel):
             "is empty, no verification of the server certificate's altSubjectName is performed."
         ),
     )
-    phase2_auth: Optional[str] = Field(
+    phase2_auth: Optional[Union[str, List[str]]] = Field(
         alias="phase2-auth",
         default=NM_SETTING_8021X_DEFAULTS["phase2-auth"],
         description=(
-            "Specifies the allowed \"phase 2\" inner authentication method when an EAP method that "
+            "Specifies the allowed \"phase 2\" inner authentication method or methods when an EAP method that "
             "uses an inner TLS tunnel is specified in the \"eap\" property. For TTLS this property "
             "selects one of the supported non-EAP inner methods: \"pap\", \"chap\", \"mschap\", "
             "\"mschapv2\" while \"phase2-autheap\" selects an EAP inner method. For PEAP this "
@@ -1293,11 +1293,11 @@ class ConnectionSettings8021xModel(BaseModel):
             "\"phase2-autheap\" cannot be specified."
         ),
     )
-    phase2_autheap: Optional[str] = Field(
+    phase2_autheap: Optional[Union[str, List[str]]] = Field(
         alias="phase2-autheap",
         default=NM_SETTING_8021X_DEFAULTS["phase2-autheap"],
         description=(
-            "Specifies the allowed \"phase 2\" inner EAP-based authentication method when TTLS is "
+            "Specifies the allowed \"phase 2\" inner EAP-based authentication method or methods when TTLS is "
             "specified in the \"eap\" property. Recognized EAP-based \"phase 2\" methods are "
             "\"md5\", \"mschapv2\", \"otp\", \"gtc\", and \"tls\". Each \"phase 2\" inner method "
             "requires specific parameters for successful authentication; see the wpa_supplicant "
@@ -3092,8 +3092,8 @@ class ConnectionSettingsWirelessSecurityModel(BaseModel):
         default=NM_SETTING_WIRELESS_SECURITY_DEFAULTS["proto"],
         description=(
             "List of strings specifying the allowed WPA protocol versions to use. Each element may "
-            "be one \"wpa\" (allow WPA) or \"rsn\" (allow WPA2/RSN). If not specified, both WPA "
-            "and RSN connections are allowed."
+            "be one \"wpa\" (allow WPA), \"rsn\" (allow WPA2/RSN), or \"wpa3\" (allow WPA3). "
+            "If not specified, both WPA and RSN connections are allowed."
         ),
     )
     psk: Optional[str] = Field(
