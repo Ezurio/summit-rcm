@@ -862,42 +862,50 @@ class NetworkService(metaclass=Singleton):
             await NetworkManagerService().prepare_new_connection_data(new_settings)
         )
 
-        await NetworkManagerService().update_connection(
-            connection_obj_path=connection_obj_path, connection=connection_settings
-        )
+        if activated_setting is not None:
+            # Activation/deactivation explicitly requested - update the profile in place and then
+            # activate or deactivate it as requested.
+            await NetworkManagerService().update_connection(
+                connection_obj_path=connection_obj_path, connection=connection_settings
+            )
 
-        if activate_connection:
-            # Activation requested
-            await NetworkService.activate_connection_profile(uuid=uuid)
+            if activate_connection:
+                # Activation requested
+                await NetworkService.activate_connection_profile(uuid=uuid)
 
-            async def _wait_activated():
-                while not bool(
-                    await NetworkService.get_active_connection_obj_path(uuid=uuid)
-                ):
-                    await asyncio.sleep(0.1)
+                async def _wait_activated():
+                    while not bool(
+                        await NetworkService.get_active_connection_obj_path(uuid=uuid)
+                    ):
+                        await asyncio.sleep(0.1)
 
-            try:
-                await asyncio.wait_for(
-                    _wait_activated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                raise Exception("Unable to verify connection activated")
-        elif activated_setting is not None:
-            # Deactivation requested
-            await NetworkService.deactivate_connection_profile(uuid=uuid)
+                try:
+                    await asyncio.wait_for(
+                        _wait_activated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    raise Exception("Unable to verify connection activated")
+            else:
+                # Deactivation requested
+                await NetworkService.deactivate_connection_profile(uuid=uuid)
 
-            async def _wait_deactivated():
-                while bool(
-                    await NetworkService.get_active_connection_obj_path(uuid=uuid)
-                ):
-                    await asyncio.sleep(0.1)
+                async def _wait_deactivated():
+                    while bool(
+                        await NetworkService.get_active_connection_obj_path(uuid=uuid)
+                    ):
+                        await asyncio.sleep(0.1)
 
-            try:
-                await asyncio.wait_for(
-                    _wait_deactivated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                raise Exception("Unable to verify connection deactivated")
+                try:
+                    await asyncio.wait_for(
+                        _wait_deactivated(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    raise Exception("Unable to verify connection deactivated")
+        else:
+            # Plain update: delete then add so NetworkManager re-evaluates the profile's
+            # autoconnect setting (an in-place update is a no-op with respect to activation).
+            await NetworkManagerService().delete_connection(connection_obj_path)
+            await NetworkManagerService().add_connection(connection_settings)
 
         return await NetworkService.get_connection_profile_settings(
             uuid=uuid, id=None, extended=True, is_legacy=is_legacy
