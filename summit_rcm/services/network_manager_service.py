@@ -3120,6 +3120,21 @@ class NetworkManagerDeviceWatcher:
                     await self.active_access_point.subscribe()
 
 
+DBUS_ERROR_UNKNOWN_OBJECT = "org.freedesktop.DBus.Error.UnknownObject"
+
+
+class DBusError(Exception):
+    """
+    Raised when a D-Bus call returns an error reply. Preserves the D-Bus error name
+    (e.g., 'org.freedesktop.DBus.Error.UnknownObject') so callers can distinguish
+    between error causes.
+    """
+
+    def __init__(self, error_name: Optional[str], description: str) -> None:
+        super().__init__(description)
+        self.error_name = error_name
+
+
 class NetworkManagerService(object, metaclass=Singleton):
     DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
 
@@ -4270,7 +4285,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         )
 
         if reply.message_type == MessageType.ERROR:
-            raise Exception(reply.body[0])
+            raise DBusError(reply.error_name, reply.body[0])
 
         result = reply.body[0]
 
@@ -4378,7 +4393,7 @@ class NetworkManagerService(object, metaclass=Singleton):
         )
 
         if reply.message_type == MessageType.ERROR:
-            raise Exception(reply.body[0])
+            raise DBusError(reply.error_name, reply.body[0])
 
         result = reply.body[0]
         for key in result.keys():
