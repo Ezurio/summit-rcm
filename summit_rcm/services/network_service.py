@@ -47,6 +47,8 @@ except ImportError as error:
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
     SUMMIT_RCM_NM_ACTIVE_CONNECTION_STATE_TEXT,
+    DBUS_ERROR_UNKNOWN_OBJECT,
+    DBusError,
     NM80211ApFlags,
     NM80211ApSecurityFlags,
     NMDeviceType,
@@ -1269,8 +1271,12 @@ class NetworkService(metaclass=Singleton):
 
         connection_obj_path = active_connection_props.get("Connection", "")
         properties["con-path" if is_legacy else "conPath"] = connection_obj_path
-        connection_conn_props = await NetworkManagerService().get_connection_settings(
-            connection_obj_path
+        # The 'Connection' path can transiently be '/' while a profile is being
+        # removed and re-added; skip the settings lookup in that case.
+        connection_conn_props = (
+            await NetworkManagerService().get_connection_settings(connection_obj_path)
+            if connection_obj_path and connection_obj_path != "/"
+            else {}
         )
         connection_setting_connection = connection_conn_props.get("connection", None)
         properties["zone"] = (
@@ -1516,7 +1522,7 @@ class NetworkService(metaclass=Singleton):
         except Exception as exception:
             raise Exception(f"Invalid UUID - {str(exception)}")
 
-        if connection_obj_path == "":
+        if connection_obj_path in ("", "/"):
             raise Exception("Invalid UUID")
 
         connection_conn_props = await NetworkManagerService().get_connection_settings(
@@ -1645,37 +1651,63 @@ class NetworkService(metaclass=Singleton):
         # Get settings only available if the requested connection is active
         active_connection_obj_paths = manager_props.get("ActiveConnections", [])
         for active_connection_obj_path in active_connection_obj_paths:
-            active_connection_props = await NetworkManagerService().get_obj_properties(
-                active_connection_obj_path,
-                NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
-            )
+            if not active_connection_obj_path or active_connection_obj_path == "/":
+                continue
+            try:
+                active_connection_props = (
+                    await NetworkManagerService().get_obj_properties(
+                        active_connection_obj_path,
+                        NetworkManagerService().NM_CONNECTION_ACTIVE_IFACE,
+                    )
+                )
+            except DBusError as exception:
+                if exception.error_name != DBUS_ERROR_UNKNOWN_OBJECT:
+                    raise
+                # The 'ActiveConnection' is no longer exported (e.g., a transient path
+                # during teardown); any other error must propagate.
+                continue
+
             if active_connection_props.get("Uuid", "") == uuid:
-                settings[
-                    "GENERAL"
-                ] = await NetworkService.extract_general_properties_from_active_connection(
-                    active_connection_props=active_connection_props, is_legacy=is_legacy
-                )
-                settings["GENERAL"]["dbus-path"] = active_connection_obj_path
-                settings[
-                    "IP4"
-                ] = await NetworkService.extract_ip4_config_properties_from_active_connection(
-                    active_connection_props=active_connection_props, is_legacy=is_legacy
-                )
-                settings[
-                    "IP6"
-                ] = await NetworkService.extract_ip6_config_properties_from_active_connection(
-                    active_connection_props=active_connection_props, is_legacy=is_legacy
-                )
-                settings[
-                    "DHCP4"
-                ] = await NetworkService.extract_dhcp4_config_properties_from_active_connection(
-                    active_connection_props=active_connection_props, is_legacy=is_legacy
-                )
-                settings[
-                    "DHCP6"
-                ] = await NetworkService.extract_dhcp6_config_properties_from_active_connection(
-                    active_connection_props=active_connection_props, is_legacy=is_legacy
-                )
+                try:
+                    active_settings: dict = {}
+                    active_settings[
+                        "GENERAL"
+                    ] = await NetworkService.extract_general_properties_from_active_connection(
+                        active_connection_props=active_connection_props,
+                        is_legacy=is_legacy,
+                    )
+                    active_settings["GENERAL"]["dbus-path"] = active_connection_obj_path
+                    active_settings[
+                        "IP4"
+                    ] = await NetworkService.extract_ip4_config_properties_from_active_connection(
+                        active_connection_props=active_connection_props,
+                        is_legacy=is_legacy,
+                    )
+                    active_settings[
+                        "IP6"
+                    ] = await NetworkService.extract_ip6_config_properties_from_active_connection(
+                        active_connection_props=active_connection_props,
+                        is_legacy=is_legacy,
+                    )
+                    active_settings[
+                        "DHCP4"
+                    ] = await NetworkService.extract_dhcp4_config_properties_from_active_connection(
+                        active_connection_props=active_connection_props,
+                        is_legacy=is_legacy,
+                    )
+                    active_settings[
+                        "DHCP6"
+                    ] = await NetworkService.extract_dhcp6_config_properties_from_active_connection(
+                        active_connection_props=active_connection_props,
+                        is_legacy=is_legacy,
+                    )
+                except DBusError as exception:
+                    if exception.error_name != DBUS_ERROR_UNKNOWN_OBJECT:
+                        raise
+                    # A sub-object (e.g., the profile or an IP config) vanished
+                    # mid-extraction; treat the connection as no longer active.
+                    continue
+                settings.update(active_settings)
                 break
 
         # Get type-specific connection settings (e.g., Wired, Wireless, etc.)
