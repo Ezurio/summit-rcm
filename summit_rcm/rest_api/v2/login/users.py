@@ -101,10 +101,12 @@ class UsersResource:
             password = post_data.get("password")
             permissions = post_data.get("permissions")
 
-            if (
-                not username or not password or not permissions
-            ) or UserService.user_exists(username):
+            if not username or not password or not permissions:
                 resp.status = falcon.HTTP_400
+                return
+
+            if UserService.user_exists(username):
+                resp.status = falcon.HTTP_409
                 return
 
             if UserService.max_users_reached():
