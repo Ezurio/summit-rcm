@@ -85,6 +85,11 @@ Timeout for polling NetworkManager to verify a connection state change (activate
 or wireless enable/disable) has taken effect.
 """
 
+NETWORK_STATE_VERIFY_POLL_INTERVAL = 0.1  # seconds
+"""
+Polling interval for NetworkManager state verification.
+"""
+
 SUPPLICANT_INTERFACE_IFACE = "fi.w1.wpa_supplicant1.Interface"
 
 
@@ -357,6 +362,31 @@ class NetworkService(metaclass=Singleton):
             target_interface_name=target_interface_name,
             is_legacy=is_legacy,
         )
+
+    @staticmethod
+    async def get_interface_status_when_available(
+        target_interface_name: str, is_legacy: bool = False
+    ) -> dict:
+        """Wait for NetworkManager to expose status properties for an interface."""
+
+        async def _wait_interface_status() -> dict:
+            while True:
+                result = await NetworkService.get_interface_status(
+                    target_interface_name=target_interface_name,
+                    is_legacy=is_legacy,
+                )
+                if result:
+                    return result
+                await asyncio.sleep(NETWORK_STATE_VERIFY_POLL_INTERVAL)
+
+        try:
+            return await asyncio.wait_for(
+                _wait_interface_status(), timeout=NETWORK_STATE_VERIFY_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            raise Exception(
+                f"Unable to retrieve status for network interface {target_interface_name}"
+            )
 
     @staticmethod
     async def get_all_interfaces() -> list:
@@ -899,7 +929,7 @@ class NetworkService(metaclass=Singleton):
                     while not bool(
                         await NetworkService.get_active_connection_obj_path(uuid=uuid)
                     ):
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(NETWORK_STATE_VERIFY_POLL_INTERVAL)
 
                 try:
                     await asyncio.wait_for(
@@ -915,7 +945,7 @@ class NetworkService(metaclass=Singleton):
                     while bool(
                         await NetworkService.get_active_connection_obj_path(uuid=uuid)
                     ):
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(NETWORK_STATE_VERIFY_POLL_INTERVAL)
 
                 try:
                     await asyncio.wait_for(
@@ -2088,7 +2118,7 @@ class NetworkService(metaclass=Singleton):
 
         async def _wait_wireless_state():
             while await NetworkService.get_wireless_enabled() != enabled:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(NETWORK_STATE_VERIFY_POLL_INTERVAL)
 
         try:
             await asyncio.wait_for(
