@@ -173,7 +173,7 @@ class NetworkInterfaceResource(object):
 
             # The interface creation was successful, so now return the current status properties for
             # it
-            result = await NetworkService.get_interface_status(
+            result = await NetworkService.get_interface_status_when_available(
                 target_interface_name="wlan1", is_legacy=False
             )
 
