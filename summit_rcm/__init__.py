@@ -57,6 +57,11 @@ try:
     PKCS11_URI_PREFIX = "pkcs11:"
     """Prefix for PKCS#11 URIs"""
 
+    DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT = 5
+    """Default seconds uvicorn waits for open connections and tasks to drain on
+    shutdown. Unset, uvicorn waits indefinitely for clients to close keep-alive
+    sockets. Override with summit-rcm.graceful_shutdown_timeout."""
+
     summit_rcm_plugins: List[str] = []
 
     discovered_plugins: dict[str, ModuleType] = {}
@@ -882,6 +887,11 @@ try:
             section="summit-rcm", option="enable_client_auth", fallback=False
         )
         port = parser.getint(section="summit-rcm", option="socket_port", fallback=443)
+        graceful_shutdown_timeout = parser.getint(
+            section="summit-rcm",
+            option="graceful_shutdown_timeout",
+            fallback=DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT,
+        )
 
         websockets_config = "none"
         try:
@@ -925,6 +935,7 @@ try:
                 loop="asyncio",
                 log_level=SystemSettingsManage.get_uvicorn_log_level(),
                 ws=websockets_config,
+                timeout_graceful_shutdown=graceful_shutdown_timeout,
             )
 
             # Populate the list of discovered plugins
