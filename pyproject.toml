@@ -4,7 +4,7 @@ requires = ["setuptools"]
 
 [project]
 name = "summit_rcm"
-version = "14.0.0.43"
+version = "14.0.0.44"
 description = "Summit Remote Control Manager (RCM)"
 license = "LicenseRef-Ezurio-Clause"
 license-files = ["LICENSE.ezurio"]
