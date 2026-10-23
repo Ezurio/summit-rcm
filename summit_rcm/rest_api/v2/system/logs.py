@@ -143,6 +143,8 @@ class LogsDataResource:
             if hours < 0:
                 raise ValueError("hours must be a non-negative int")
             days = int(req.params.get("days", 0 if "hours" in req.params else 1))
+            if days < 0:
+                raise ValueError("days must be a non-negative int")
             log_type = JournalctlLogTypesEnum(req.params.get("type", "All"))
 
             resp.media = await LogsService.get_journal_log_data(
@@ -219,7 +221,7 @@ class LogsConfigResource:
 
             # Read in and validate the input data
             supp_level = SupplicantLogLevelEnum(
-                put_data.get("suppDebugLevel", "").lower()
+                (put_data.get("suppDebugLevel") or "").lower()
             )
             if not supp_level:
                 raise ValueError()
