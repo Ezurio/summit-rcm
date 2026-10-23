@@ -21,7 +21,7 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 try:
-    from dbus_fast import Message, MessageType
+    from dbus_fast import Message, MessageType, Variant
     from summit_rcm.dbus_manager import DBusManager
     from pyroute2.iwutil import AsyncIW
 except ImportError as error:
@@ -43,6 +43,7 @@ except ImportError as error:
 
     Message = None
     MessageType = None
+    Variant = None
 
 from summit_rcm import definition
 from summit_rcm.services.network_manager_service import (
@@ -956,6 +957,8 @@ class NetworkService(metaclass=Singleton):
         else:
             # Plain update: delete then add so NetworkManager re-evaluates the profile's
             # autoconnect setting (an in-place update is a no-op with respect to activation).
+            # Keep the UUID, which a replaced 'connection' section may not carry.
+            connection_settings.setdefault("connection", {})["uuid"] = Variant("s", uuid)
             await NetworkManagerService().delete_connection(connection_obj_path)
             await NetworkManagerService().add_connection(connection_settings)
 
