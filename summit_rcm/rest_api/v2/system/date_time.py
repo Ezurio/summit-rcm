@@ -21,6 +21,7 @@ try:
 
     from spectree import Response
     from summit_rcm.rest_api.utils.spectree.models import (
+        BadRequestErrorResponseModel,
         GetDateTimeResponseModel,
         InternalServerErrorResponseModel,
         SetDateTimeRequestModel,
@@ -30,6 +31,7 @@ try:
 except (ImportError, DocsNotEnabledException):
     from summit_rcm.rest_api.services.spectree_service import DummyResponse as Response
 
+    BadRequestErrorResponseModel = None
     GetDateTimeResponseModel = None
     InternalServerErrorResponseModel = None
     SetDateTimeRequestModel = None
@@ -89,6 +91,7 @@ class DateTimeResource(object):
         json=SetDateTimeRequestModel,
         resp=Response(
             HTTP_200=GetDateTimeResponseModel,
+            HTTP_400=BadRequestErrorResponseModel,
             HTTP_401=UnauthorizedErrorResponseModel,
             HTTP_500=InternalServerErrorResponseModel,
         ),
@@ -120,6 +123,10 @@ class DateTimeResource(object):
             if date_time != "":
                 try:
                     await DateTimeService.set_time_manual(date_time)
+                except ValueError as exception:
+                    syslog(LOG_ERR, f"Invalid datetime: {str(exception)}")
+                    resp.status = falcon.HTTP_400
+                    return
                 except Exception as exception:
                     syslog(LOG_ERR, f"Could not set datetime: {str(exception)}")
                     resp.status = falcon.HTTP_500

@@ -166,8 +166,8 @@ class DateTimeService(metaclass=Singleton):
                     .timestamp()
                     * 1_000_000
                 )
-            except Exception:
-                raise Exception("Unable to parse datetime")
+            except Exception as exception:
+                raise ValueError("Unable to parse datetime") from exception
 
         bus = await DBusManager().get_bus()
 
@@ -183,4 +183,8 @@ class DateTimeService(metaclass=Singleton):
         )
 
         if reply.message_type == MessageType.ERROR:
-            raise Exception("Error calling SetTime")
+            error_name = reply.error_name or "Unknown D-Bus error"
+            error_message = str(reply.body[0]) if reply.body else "SetTime failed"
+            if error_name == "org.freedesktop.DBus.Error.InvalidArgs":
+                raise ValueError(error_message)
+            raise RuntimeError(f"{error_name}: {error_message}")
