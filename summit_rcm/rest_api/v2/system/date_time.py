@@ -47,7 +47,7 @@ class DateTimeResource(object):
     Resource to handle queries and requests for the system date/time settings
     """
 
-    def get_date_time_info(self) -> dict:
+    async def get_date_time_info(self) -> dict:
         """
         Retrieve a dictionary of current system date/time settings
         - zones
@@ -57,7 +57,7 @@ class DateTimeResource(object):
         result = {"zones": [], "zone": "", "datetime": ""}
 
         result["zones"] = DateTimeService().zones
-        result["zone"] = DateTimeService().local_zone
+        result["zone"] = await DateTimeService().get_local_zone()
 
         success, msg = DateTimeService.check_current_date_and_time()
         result["datetime"] = msg.strip() if success else ""
@@ -77,7 +77,7 @@ class DateTimeResource(object):
         Retrieve current date/time info
         """
         try:
-            resp.media = self.get_date_time_info()
+            resp.media = await self.get_date_time_info()
             resp.status = falcon.HTTP_200
             resp.content_type = falcon.MEDIA_JSON
         except Exception as exception:
@@ -132,7 +132,7 @@ class DateTimeResource(object):
                     resp.status = falcon.HTTP_500
                     return
 
-            resp.media = self.get_date_time_info()
+            resp.media = await self.get_date_time_info()
             resp.content_type = falcon.MEDIA_JSON
             resp.status = falcon.HTTP_200
         except Exception as exception:

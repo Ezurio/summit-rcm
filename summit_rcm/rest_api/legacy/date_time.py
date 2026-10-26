@@ -65,7 +65,7 @@ class DateTimeSetting:
         }
 
         result["zones"] = DateTimeService().zones
-        result["zone"] = DateTimeService().local_zone
+        result["zone"] = await DateTimeService().get_local_zone()
 
         success, msg = DateTimeService.check_current_date_and_time()
         if success:
@@ -132,7 +132,7 @@ class DateTimeSetting:
         if success:
             result["time"] = msg
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
-            result["InfoMsg"] = DateTimeService().local_zone
+            result["InfoMsg"] = await DateTimeService().get_local_zone()
         else:
             result["InfoMsg"] = msg
             result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_FAIL"]

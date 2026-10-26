@@ -24,6 +24,7 @@ except ImportError as error:
     MessageType = None
 
 from summit_rcm.definition import (
+    DBUS_PROP_IFACE,
     TIMEDATE1_BUS_NAME,
     TIMEDATE1_MAIN_OBJ,
     SUMMIT_RCM_TIME_FORMAT,
@@ -49,11 +50,50 @@ class DateTimeService(metaclass=Singleton):
         """
         return self._zones
 
-    @property
-    def local_zone(self) -> str:
+    async def get_local_zone(self) -> str:
         """
         Current local time zone
         """
+        try:
+            bus = await DBusManager().get_bus()
+            reply = await bus.call(
+                Message(
+                    destination=TIMEDATE1_BUS_NAME,
+                    path=TIMEDATE1_MAIN_OBJ,
+                    interface=DBUS_PROP_IFACE,
+                    member="Get",
+                    signature="ss",
+                    body=[TIMEDATE1_BUS_NAME, "Timezone"],
+                )
+            )
+            if reply.message_type == MessageType.ERROR:
+                raise RuntimeError(reply.body[0])
+
+            zone_name = reply.body[0].value
+            if isinstance(zone_name, str) and zone_name:
+                return zone_name
+            raise ValueError("Invalid timedated timezone property")
+        except Exception as exception:
+            syslog(LOG_ERR, f"Could not read timedated timezone: {str(exception)}")
+
+        # Fallback to reading /etc/localtime symlink if timedated fails
+        try:
+            localtime_target = os.readlink(LOCALTIME)
+            if not os.path.isabs(localtime_target):
+                localtime_target = os.path.join(
+                    os.path.dirname(LOCALTIME), localtime_target
+                )
+            localtime_target = os.path.abspath(localtime_target)
+            zoneinfo_path = os.path.abspath(ZONEINFO)
+            if os.path.commonpath((zoneinfo_path, localtime_target)) == zoneinfo_path:
+                zone = os.path.relpath(localtime_target, zoneinfo_path)
+                if zone.startswith("posix/"):
+                    zone = zone[len("posix/") :]
+                return zone
+        except (OSError, ValueError):
+            pass
+
+        # Fallback to reading /etc/timezone if /etc/localtime symlink fails
         try:
             with open(ETC_TIMEZONE, "r") as etc_timezone_file:
                 return etc_timezone_file.readline().strip()

@@ -40,7 +40,9 @@ class TimezoneGetCommand(Command):
                 for timezone in timezone_list:
                     timezone_str += f"+TZGET: {timezone}\r\n"
             else:
-                timezone_str = f"+TZGET: {DateTimeService().local_zone}\r\n"
+                timezone_str = (
+                    f"+TZGET: {await DateTimeService().get_local_zone()}\r\n"
+                )
             return (True, f"{timezone_str}OK")
         except Exception as exception:
             syslog(LOG_ERR, f"Error getting timezone: {str(exception)}")
