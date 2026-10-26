@@ -6,17 +6,15 @@
 
 DATETIME_NOW=$(($(date +%s%N) / 1000))
 DATETIME="${DATETIME:-$DATETIME_NOW}"
-TZ="${TZ:-"Etc/UTC"}"
 
 source ../global_settings
 
 echo "========================="
-echo "Set Date/Time/Timezone"
+echo "Set Date/Time"
 echo "========================="
 echo
 
 echo "Datetime: ${DATETIME}"
-echo "Timezone: ${TZ}"
 echo -n "Status Code: "
 
 curl -s --location \
@@ -25,8 +23,7 @@ curl -s --location \
     --header 'Content-Type: application/json' \
     ${AUTH_OPT} \
     --data '{
-        "datetime": "'"${DATETIME}"'",
-        "zone": "'"${TZ}"'"
+        "datetime": "'"${DATETIME}"'"
     }' \
     -o >(${JQ_APP})
 
