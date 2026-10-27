@@ -25,6 +25,16 @@ CHRONY_SOURCES_PATH = "/etc/chrony/supplemental.sources"
 CHRONYC_PATH = "/usr/bin/chronyc"
 
 
+def is_valid_ntp_address(address: object) -> bool:
+    """Return whether address is a single safe Chrony source token, without resolving it."""
+    return (
+        isinstance(address, str)
+        and bool(address)
+        and address.isprintable()
+        and not any(character.isspace() for character in address)
+    )
+
+
 class ChronyNTPService:
     """
     Manages chrony NTP configuration

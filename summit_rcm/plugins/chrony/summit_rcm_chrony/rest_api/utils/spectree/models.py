@@ -4,7 +4,7 @@
 #
 """Module to hold SpecTree Models"""
 
-from typing import List
+from typing import List, Union
 from summit_rcm.rest_api.utils.spectree.models import (
     DefaultResponseModelLegacy,
     BaseModel,
@@ -28,7 +28,7 @@ class ChronySourcesResponseModel(RootModel):
 class ChronySourcesRequestModelLegacy(BaseModel):
     """Model for chrony NTP sources (legacy)"""
 
-    sources: List[ChronySourceModel]
+    sources: List[Union[ChronySourceModel, str]]
 
 
 class ChronySourcesResponseModelLegacy(

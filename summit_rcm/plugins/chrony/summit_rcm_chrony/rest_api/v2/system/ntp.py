@@ -17,6 +17,7 @@ from summit_rcm_chrony.services.ntp_service import (
     REMOVE_SOURCE,
     OVERRIDE_SOURCES,
     ChronyNTPService,
+    is_valid_ntp_address,
 )
 
 try:
@@ -111,8 +112,15 @@ class NTPSourcesResource:
                     return
 
                 # Only 'static' sources (e.g., sources not configured via DHCP) can be configured
-                if source["type"] == "static":
-                    new_sources.append(str(source["address"]))
+                if source["type"] != "static":
+                    resp.status = falcon.HTTP_400
+                    return
+
+                address = source["address"]
+                if not is_valid_ntp_address(address):
+                    resp.status = falcon.HTTP_400
+                    return
+                new_sources.append(address)
             await ChronyNTPService.chrony_configure_sources(
                 OVERRIDE_SOURCES, new_sources
             )

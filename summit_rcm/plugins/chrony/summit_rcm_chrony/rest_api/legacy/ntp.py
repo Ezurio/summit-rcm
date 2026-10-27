@@ -12,7 +12,11 @@ from summit_rcm.rest_api.services.spectree_service import (
     DocsNotEnabledException,
     SpectreeService,
 )
-from summit_rcm_chrony.services.ntp_service import ChronyNTPService, SOURCE_COMMANDS
+from summit_rcm_chrony.services.ntp_service import (
+    ChronyNTPService,
+    SOURCE_COMMANDS,
+    is_valid_ntp_address,
+)
 from summit_rcm.definition import SUMMIT_RCM_ERRORS
 
 try:
@@ -121,8 +125,25 @@ class NTPResourceLegacy:
                         )
                     )
                 else:
+                    sources = post_data.get("sources", [])
+                    if not isinstance(sources, list):
+                        raise ValueError("Invalid NTP sources")
+
+                    source_addresses = []
+                    for source in sources:
+                        if isinstance(source, str):
+                            address = source
+                        elif isinstance(source, dict) and source.get("type") == "static":
+                            address = source.get("address")
+                        else:
+                            raise ValueError("Invalid NTP source")
+
+                        if not is_valid_ntp_address(address):
+                            raise ValueError("Invalid NTP source")
+                        source_addresses.append(address)
+
                     await ChronyNTPService.chrony_configure_sources(
-                        command, post_data.get("sources", [])
+                        command, source_addresses
                     )
                     result["SDCERR"] = SUMMIT_RCM_ERRORS["SDCERR_SUCCESS"]
             else:
